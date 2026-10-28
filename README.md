@@ -7,6 +7,19 @@ chỉ số chứng khoán phiên trước, tin nổi bật từ VnExpress và D�
 - Gửi ngay: tab **Actions** → **Bản tin sáng** → **Run workflow** (làm được cả trên app GitHub điện thoại).
 - Đổi nguồn báo, số tin, chỉ số chứng khoán: sửa phần "Cấu hình" đầu file [bantin.py](bantin.py).
 
+## Cảnh báo tức thì
+
+[canhbao.py](canhbao.py) chạy mỗi 30 phút từ 6h đến 22h và chỉ nhắn khi có chuyện:
+
+- ☔ Sắp mưa trong 2 tiếng tới (báo xong im 3 tiếng)
+- 😷 Không khí xấu đi so với đầu ngày, vượt AQI 150
+- 🪙 Giá vàng SJC đổi từ 1 triệu/lượng trở lên
+- 📉 VN-Index tăng/giảm mỗi 1,5% trong phiên
+- 🎯 Cổ phiếu trong `WATCHLIST` chạm giá đặt trước
+- 📰 Tin có từ khóa trong `KEYWORDS` (tối đa 5 tin/lần)
+
+Ngưỡng, mã cổ phiếu, từ khóa: sửa phần "Cấu hình" đầu file. Xem thử không gửi: `python canhbao.py --xem`.
+
 ## Xem thử trên máy
 
 ```

@@ -1,0 +1,31 @@
+name: Cảnh báo
+
+on:
+  schedule:
+    - cron: "10,40 23 * * *"   # 6:10 và 6:40 sáng giờ Việt Nam
+    - cron: "10,40 0-14 * * *" # 7:10 → 21:40 giờ Việt Nam
+  workflow_dispatch:
+
+concurrency: canhbao  # không cho hai lần chạy giẫm lên state của nhau
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      # state.json (những gì đã báo) được giữ giữa các lần chạy bằng cache
+      - uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: canhbao-${{ github.run_id }}
+          restore-keys: canhbao-
+      - run: python3 canhbao.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: state.json
+          key: canhbao-${{ github.run_id }}

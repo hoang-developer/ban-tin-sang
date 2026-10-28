@@ -37,6 +37,7 @@ INDICES = [
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/130.0 Safari/537.36")
+PNJ_GOLD_URL = "https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00"
 
 WEEKDAYS = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
 
@@ -139,7 +140,7 @@ def gold_sjc():
 
 
 def gold_pnj():
-    rows = fetch_json("https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00")["data"]
+    rows = fetch_json(PNJ_GOLD_URL)["data"]
     by_code = {r["masp"]: r for r in rows}
 
     def row(name, r):  # PNJ báo nghìn đồng/chỉ -> đổi sang triệu đồng/lượng
