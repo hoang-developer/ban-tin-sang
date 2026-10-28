@@ -1,0 +1,17 @@
+name: Bản tin sáng
+
+on:
+  schedule:
+    - cron: "45 23 * * *"  # 23:45 UTC = 6:45 sáng giờ Việt Nam (GitHub thường trễ thêm vài phút)
+  workflow_dispatch:       # nút "Run workflow" để gửi ngay
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 bantin.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
