@@ -1,17 +1,59 @@
 name: Bản tin sáng
 
+# Lịch chính: cron-job.org gọi workflow_dispatch đúng 6:45 kèm tu_dong=true (cách cài: README).
+# Lịch của GitHub chỉ là dự phòng: hay trễ, có hôm bỏ hẳn, nên đặt ba mốc, mốc đầu lùi
+# sau lịch chính 10 phút; mốc nào tới khi hôm nay đã gửi rồi thì tự bỏ qua.
 on:
   schedule:
-    - cron: "45 23 * * *"  # 23:45 UTC = 6:45 sáng giờ Việt Nam (GitHub thường trễ thêm vài phút)
-  workflow_dispatch:       # nút "Run workflow" để gửi ngay
+    - cron: "55 23 * * *"    # 6:55 sáng giờ Việt Nam
+    - cron: "25,55 0 * * *"  # 7:25 và 7:55
+  workflow_dispatch:         # nút "Run workflow" để gửi ngay
+    inputs:
+      tu_dong:
+        description: "Chạy theo lịch (bỏ qua nếu hôm nay đã gửi)"
+        type: boolean
+        default: false
+
+concurrency: bantin  # hai lần gọi sát nhau thì xếp hàng, lần sau thấy đã gửi sẽ bỏ qua
 
 jobs:
   send:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read  # checkout
+      actions: write  # bật lại lịch ở bước cuối
+    env:
+      TU_DONG: ${{ github.event_name == 'schedule' || inputs.tu_dong }}
     steps:
       - uses: actions/checkout@v5
-      - run: python3 bantin.py
+      - id: ngay
+        run: echo "key=bantin-da-gui-$(TZ=Asia/Ho_Chi_Minh date +%F)" >> "$GITHUB_OUTPUT"
+      # Bấm tay thì luôn gửi; chạy theo lịch thì xem hôm nay đã gửi chưa
+      - id: da_gui
+        if: env.TU_DONG == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: da-gui
+          key: ${{ steps.ngay.outputs.key }}
+          lookup-only: true
+      - id: gui
+        if: steps.da_gui.outputs.cache-hit != 'true'
+        run: python3 bantin.py && touch da-gui
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - if: env.TU_DONG == 'true' && steps.gui.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: da-gui
+          key: ${{ steps.ngay.outputs.key }}
+      # Repo công khai 60 ngày không có commit thì GitHub tắt workflow có lịch;
+      # bật lại mỗi lần chạy để bộ đếm đó về 0
+      - if: ${{ !cancelled() }}
+        run: |
+          for wf in bantin.yml canhbao.yml; do
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/$wf/enable"
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
