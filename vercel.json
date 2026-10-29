@@ -3,7 +3,7 @@
   "regions": ["sin1"],
   "functions": {
     "api/telegram.py": {
-      "maxDuration": 30
+      "maxDuration": 60
     }
   }
 }

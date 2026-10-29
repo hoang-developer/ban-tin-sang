@@ -54,9 +54,11 @@ def rain_label(mm_per_hour):
     return "mưa rất to"
 
 
-def check_rain(state, now):
-    if now.timestamp() - state.get("rain_alert_at", 0) < RAIN_COOLDOWN_HOURS * 3600:
-        return [], "mưa: vừa báo, đang chờ"
+def rain_outlook(now):
+    """Mưa ở Hà Nội trong 2 tiếng tới: (đang mưa, giờ cơn mưa tới bắt đầu, mô tả cơn mưa tới).
+
+    Trời khô cả 2 tiếng thì hai giá trị sau là None.
+    """
     lat, lon = HANOI
     q = urllib.parse.urlencode({
         "latitude": lat, "longitude": lon,
@@ -70,7 +72,7 @@ def check_rain(state, now):
         return mm >= RAIN_MIN_MM or code >= 95  # 95+ là dông
 
     if wet(*slots[0][1:]):
-        return [], "mưa: đang mưa"
+        return True, None, None
     for i, (t, mm, code) in enumerate(slots[1:], start=1):
         if wet(mm, code):
             start = datetime.fromisoformat(t).replace(tzinfo=VN_TZ)
@@ -78,11 +80,21 @@ def check_rain(state, now):
             peak = max(s[1] for s in ahead) * 4  # mm/15 phút -> mm/giờ
             storm = any(s[2] >= 95 for s in ahead)
             minutes = max(5, round((start - now).total_seconds() / 300) * 5)
-            state["rain_alert_at"] = now.timestamp()
-            text = (f"☔ <b>Sắp mưa</b>: khoảng {start:%H:%M} (~{minutes} phút nữa) Hà Nội có "
-                    f"{rain_label(peak)}{' kèm dông ⛈️' if storm else ''}. Nhớ mang áo mưa!")
-            return [text], f"mưa: báo mưa lúc {start:%H:%M}"
-    return [], "mưa: không có trong 2 tiếng tới"
+            return False, start, (f"khoảng {start:%H:%M} (~{minutes} phút nữa) Hà Nội có "
+                                  f"{rain_label(peak)}{' kèm dông ⛈️' if storm else ''}")
+    return False, None, None
+
+
+def check_rain(state, now):
+    if now.timestamp() - state.get("rain_alert_at", 0) < RAIN_COOLDOWN_HOURS * 3600:
+        return [], "mưa: vừa báo, đang chờ"
+    raining, start, desc = rain_outlook(now)
+    if raining:
+        return [], "mưa: đang mưa"
+    if not start:
+        return [], "mưa: không có trong 2 tiếng tới"
+    state["rain_alert_at"] = now.timestamp()
+    return [f"☔ <b>Sắp mưa</b>: {desc}. Nhớ mang áo mưa!"], f"mưa: báo mưa lúc {start:%H:%M}"
 
 
 def check_air(state, now):
