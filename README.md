@@ -54,10 +54,39 @@ secret, không sửa được code.
 
 Ngưỡng, mã cổ phiếu, từ khóa: sửa phần "Cấu hình" đầu file. Xem thử không gửi: `python canhbao.py --xem`.
 
+## Lệnh /stock
+
+Gõ trong Telegram, bot trả lời sau vài giây:
+
+- `/stock`: phiên hiện tại. VN-Index, VN30, HNX, UPCoM kèm giá trị giao dịch và số mã tăng/giảm;
+  mã VN30 tăng/giảm mạnh nhất; khối ngoại mua/bán ròng trong rổ VN30.
+- `/stock FPT`: chi tiết một mã. Giá khớp, tham chiếu/trần/sàn, khối lượng, khối ngoại, dư mua/bán;
+  biến động 1 tuần, 1 tháng, từ đầu năm, đỉnh/đáy 52 tuần, vốn hóa; 3 tin mới nhất về mã.
+  Xem nhiều mã một lúc: `/stock FPT VNM HPG` (tối đa 3).
+
+Bot chỉ trả lời chat có `TELEGRAM_CHAT_ID`, người khác nhắn vào thì bỏ qua.
+Phần nhận lệnh chạy trên Vercel ([api/telegram.py](api/telegram.py)), dữ liệu lấy trong [chungkhoan.py](chungkhoan.py).
+
+### Cài lên Vercel (làm một lần, miễn phí)
+
+1. Vào [vercel.com](https://vercel.com) → **Sign Up** bằng tài khoản GitHub (gói Hobby).
+2. **Add New…** → **Project** → chọn repo `ban-tin-sang` → **Import**.
+   Nếu không thấy repo, bấm cấu hình GitHub App của Vercel để cho phép truy cập repo này.
+3. Mở **Environment Variables**, thêm 2 biến, giá trị giống secret bên GitHub:
+   `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID`. Rồi bấm **Deploy**.
+4. Deploy xong, mở bằng trình duyệt `https://<tên-dự-án>.vercel.app/api/telegram`
+   (tên miền xem ở trang dự án trên Vercel). Trang báo "Đã cài webhook" là xong.
+5. Vào Telegram gõ `/stock`.
+
+Về sau mỗi lần merge vào `main`, Vercel tự cập nhật bot. Bot không trả lời thì mở lại link ở bước 4:
+trang đó cài lại webhook và hiện lỗi gần nhất mà Telegram gặp.
+
 ## Xem thử trên máy
 
 ```
 python bantin.py
+python chungkhoan.py        # /stock
+python chungkhoan.py FPT    # /stock FPT
 ```
 
 Không có token Telegram thì bản tin chỉ in ra màn hình. Muốn gửi thật từ máy, tạo file `.env`:
@@ -70,3 +99,5 @@ TELEGRAM_CHAT_ID=...
 ## Nguồn dữ liệu
 
 Open-Meteo (thời tiết, AQI), SJC (dự phòng: PNJ), VNDirect (dự phòng: SSI), RSS VnExpress và Dân trí.
+Lệnh /stock: VPS (chỉ số trong phiên), Vietcap (giá từng mã, dự phòng: VPS), VNDirect (lịch sử giá),
+Google News (tin theo mã).
