@@ -54,12 +54,12 @@ def rain_label(mm_per_hour):
     return "mưa rất to"
 
 
-def rain_outlook(now):
-    """Mưa ở Hà Nội trong 2 tiếng tới: (đang mưa, giờ cơn mưa tới bắt đầu, mô tả cơn mưa tới).
+def rain_outlook(now, place=HANOI, name="Hà Nội"):
+    """Mưa trong 2 tiếng tới: (đang mưa, giờ cơn mưa tới bắt đầu, mô tả cơn mưa tới).
 
     Trời khô cả 2 tiếng thì hai giá trị sau là None.
     """
-    lat, lon = HANOI
+    lat, lon = place
     q = urllib.parse.urlencode({
         "latitude": lat, "longitude": lon,
         "minutely_15": "precipitation,weather_code",
@@ -80,7 +80,7 @@ def rain_outlook(now):
             peak = max(s[1] for s in ahead) * 4  # mm/15 phút -> mm/giờ
             storm = any(s[2] >= 95 for s in ahead)
             minutes = max(5, round((start - now).total_seconds() / 300) * 5)
-            return False, start, (f"khoảng {start:%H:%M} (~{minutes} phút nữa) Hà Nội có "
+            return False, start, (f"khoảng {start:%H:%M} (~{minutes} phút nữa) {name} có "
                                   f"{rain_label(peak)}{' kèm dông ⛈️' if storm else ''}")
     return False, None, None
 
@@ -153,12 +153,13 @@ def check_index(state, now):
              f"({vn_num(pct, sign=True)}%)"], f"VN-Index {pct:+.2f}%: đã báo")
 
 
-def check_watchlist(state, now):
-    if not WATCHLIST:
+def check_watchlist(state, now, watchlist=None):
+    watchlist = WATCHLIST if watchlist is None else watchlist
+    if not watchlist:
         return [], "cổ phiếu: chưa có mã theo dõi"
     flags = state.setdefault("watch", {})
     alerts, notes = [], []
-    for symbol, (low, high) in WATCHLIST.items():
+    for symbol, (low, high) in watchlist.items():
         price = index_history(symbol, symbol)[1][-1]
         notes.append(f"{symbol} {price}")
         for key, hit, target in [(f"{symbol}:low", low is not None and price <= low, low),
@@ -201,21 +202,30 @@ def check_news(state, now):
 CHECKS = [check_rain, check_air, check_gold, check_index, check_watchlist, check_news]
 
 
+def run(state, now, watchlist=None):
+    """Chạy mọi bước kiểm tra, cập nhật state tại chỗ; trả về các cảnh báo cần gửi.
+
+    watchlist thay cho WATCHLIST khi danh sách theo dõi lấy từ kho dữ liệu của bot.
+    """
+    extra = {check_watchlist: {"watchlist": watchlist}} if watchlist is not None else {}
+    alerts = []
+    for check in CHECKS:
+        try:
+            found, note = check(state, now, **extra.get(check, {}))
+            alerts += found
+            print(f"- {note}")
+        except Exception as e:
+            print(f"[lỗi] {check.__name__}: {e!r}", file=sys.stderr)
+    return alerts
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
     preview = "--xem" in sys.argv
     load_env()
     state = json.loads(STATE_FILE.read_text(encoding="utf-8")) if STATE_FILE.exists() else {}
-    now = datetime.now(VN_TZ)
-    alerts = []
-    for check in CHECKS:
-        try:
-            found, note = check(state, now)
-            alerts += found
-            print(f"- {note}")
-        except Exception as e:
-            print(f"[lỗi] {check.__name__}: {e!r}", file=sys.stderr)
+    alerts = run(state, datetime.now(VN_TZ))
 
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")

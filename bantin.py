@@ -9,12 +9,14 @@ import json
 import os
 import sys
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import amlich
+import tg
 
 # ---- Cấu hình -------------------------------------------------------------
 VN_TZ = timezone(timedelta(hours=7))  # Việt Nam không đổi giờ mùa hè
@@ -76,32 +78,34 @@ def vn_num(x, decimals=2, sign=False):
 
 # ---- Các mục trong bản tin ---------------------------------------------------
 
-def weather():
-    lat, lon = HANOI
+def weather(place=HANOI, day=0):
+    """Thời tiết một ngày ở tọa độ place: day=0 là hôm nay (kèm nhiệt độ lúc này và AQI), 1 là ngày mai."""
+    lat, lon = place
     q = urllib.parse.urlencode({
         "latitude": lat, "longitude": lon,
         "current": "temperature_2m",
         "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-        "timezone": "Asia/Bangkok", "forecast_days": 1,
+        "timezone": "Asia/Bangkok", "forecast_days": day + 1,
     })
     w = fetch_json(f"https://api.open-meteo.com/v1/forecast?{q}")
     d = w["daily"]
-    icon, desc = WEATHER.get(d["weather_code"][0], ("🌡️", "Không rõ"))
-    rain = d["precipitation_probability_max"][0]
+    icon, desc = WEATHER.get(d["weather_code"][day], ("🌡️", "Không rõ"))
+    rain = d["precipitation_probability_max"][day]
+    now = f" (bây giờ {w['current']['temperature_2m']:.0f}°C)" if day == 0 else ""
     lines = [
-        f"{icon} {desc}, {d['temperature_2m_min'][0]:.0f}–{d['temperature_2m_max'][0]:.0f}°C "
-        f"(bây giờ {w['current']['temperature_2m']:.0f}°C)",
+        f"{icon} {desc}, {d['temperature_2m_min'][day]:.0f}–{d['temperature_2m_max'][day]:.0f}°C{now}",
         f"☔ Khả năng mưa: {rain}%" + (" – nhớ mang ô!" if rain >= 50 else ""),
     ]
-    try:
-        lines += air_quality()
-    except Exception as e:
-        print(f"[lỗi] không khí: {e!r}", file=sys.stderr)
+    if day == 0:
+        try:
+            lines += air_quality(place)
+        except Exception as e:
+            print(f"[lỗi] không khí: {e!r}", file=sys.stderr)
     return lines
 
 
-def air_quality():
-    lat, lon = HANOI
+def air_quality(place=HANOI):
+    lat, lon = place
     q = urllib.parse.urlencode({"latitude": lat, "longitude": lon,
                                 "current": "us_aqi,pm2_5", "timezone": "Asia/Bangkok"})
     c = fetch_json(f"https://air-quality-api.open-meteo.com/v1/air-quality?{q}")["current"]
@@ -113,45 +117,150 @@ def air_quality():
     return lines
 
 
-def gold():
+def hourly(place=HANOI, days=2):
+    """Dự báo theo giờ: mỗi giờ một dict time/feel/rain_prob/rain/humid/uv/aqi (aqi None nếu lỗi)."""
+    lat, lon = place
+    q = urllib.parse.urlencode({
+        "latitude": lat, "longitude": lon, "forecast_days": days, "timezone": "Asia/Bangkok",
+        "hourly": "apparent_temperature,precipitation_probability,precipitation,relative_humidity_2m,uv_index",
+    })
+    h = fetch_json(f"https://api.open-meteo.com/v1/forecast?{q}")["hourly"]
     try:
-        return gold_sjc()
+        q = urllib.parse.urlencode({"latitude": lat, "longitude": lon, "hourly": "us_aqi",
+                                    "forecast_days": days, "timezone": "Asia/Bangkok"})
+        a = fetch_json(f"https://air-quality-api.open-meteo.com/v1/air-quality?{q}")["hourly"]
+        aqi = dict(zip(a["time"], a["us_aqi"]))
+    except Exception as e:
+        print(f"[lỗi] AQI theo giờ: {e!r}", file=sys.stderr)
+        aqi = {}
+    return [{"time": datetime.fromisoformat(t), "feel": feel, "rain_prob": prob or 0, "rain": rain or 0,
+             "humid": humid or 0, "uv": uv or 0, "aqi": aqi.get(t)}
+            for t, feel, prob, rain, humid, uv in zip(
+                h["time"], h["apparent_temperature"], h["precipitation_probability"], h["precipitation"],
+                h["relative_humidity_2m"], h["uv_index"])]
+
+
+# Nhiệt độ cảm nhận buổi sáng dưới mức này -> nên mặc gì
+CLOTHES = [(12, "áo khoác dày, khăn quàng"), (17, "áo khoác ấm"), (21, "áo khoác mỏng"),
+           (25, "áo dài tay mỏng"), (30, "áo cộc tay"), (float("inf"), "đồ mỏng thoáng mát")]
+
+
+def wet(h):
+    return h["rain_prob"] >= 40 or h["rain"] >= 0.2
+
+
+def tips(hours, day, now):
+    """Gợi ý mặc gì, phơi đồ, chạy bộ cho ngày `day`, chỉ xét những giờ chưa qua."""
+    hs = {h["time"].hour: h for h in hours if h["time"].date() == day}
+    if not hs:
+        return []
+    past = now.hour if day == now.date() else -1
+    lines = []
+
+    # Mặc gì: theo giờ sắp ra đường (7h, hoặc giờ tới nếu đã quá 7h)
+    start = 7 if past < 7 else min((h for h in hs if h > past), default=max(hs))
+    morning = hs.get(start) or hs[min(hs)]
+    noon = max((hs[h]["feel"] for h in range(max(11, start), 16) if h in hs), default=morning["feel"])
+    wear = next(text for limit, text in CLOTHES if morning["feel"] < limit)
+    extra = []
+    if noon - morning["feel"] >= 7:
+        extra.append(f"trưa lên {noon:.0f}°C nên mặc nhiều lớp dễ cởi")
+    if any(wet(hs[h]) for h in range(max(7, past + 1), 20) if h in hs):
+        extra.append("mang áo mưa")
+    uv = max(h["uv"] for h in hs.values())
+    if uv >= 8:
+        extra.append(f"nắng gắt (UV {uv:.0f}), che chắn kỹ")
+    when = "Sáng" if start == 7 else f"{start}h"
+    lines.append(f"👕 {when} {morning['feel']:.0f}°C: {wear}" + "".join(f"; {e}" for e in extra))
+
+    window = [h for h in range(8, 18) if h in hs and h > past]
+    rest = "cả ngày" if past < 8 else "phần còn lại trong ngày"
+    if len(window) >= 2:
+        streaks, start = [], None  # các quãng giờ khô liền nhau: (từ giờ, tới giờ)
+        for h in window + [None]:
+            if h is not None and not wet(hs[h]):
+                start = h if start is None else start
+            elif start is not None:
+                streaks.append((start, h if h is not None else window[-1] + 1))
+                start = None
+        if not streaks:
+            text = f"mưa {rest}, nên phơi trong nhà"
+        else:
+            begin, end = max(streaks, key=lambda s: s[1] - s[0])
+            if (begin, end) == (window[0], window[-1] + 1):
+                text = f"khô ráo {rest}, phơi thoải mái"
+                if sum(hs[h]["humid"] for h in window) / len(window) >= 85:
+                    text += ", nhưng trời ẩm nên đồ lâu khô"
+            elif end - begin < 3:
+                text = "ít giờ khô ráo, nên phơi trong nhà"
+            elif begin == window[0]:
+                text = f"phơi sớm, cất trước {end}h"
+            elif end > window[-1]:
+                text = f"đợi tới {begin}h hãy phơi"
+            else:
+                text = f"phơi từ {begin}h, cất trước {end}h"
+        lines.append(f"🧺 Phơi đồ: {text}")
+
+    slots = [h for h in (5, 6, 7, 17, 18, 19) if h in hs and h > past]
+    if slots:
+        def blockers(h):
+            x = hs[h]
+            return [why for why, bad in [("aqi", x["aqi"] is not None and x["aqi"] > 100),
+                                         ("mưa", wet(x)), ("nóng", x["feel"] > 32)] if bad]
+
+        good = [h for h in slots if not blockers(h)]
+        if good:
+            best = hs[min(good, key=lambda h: (hs[h]["aqi"] or 0, abs(hs[h]["feel"] - 22)))]
+            aqi = f", AQI {best['aqi']:.0f}" if best["aqi"] is not None else ""
+            text = f"hợp nhất lúc {best['time'].hour}h ({best['feel']:.0f}°C{aqi})"
+        else:
+            reasons = [why for h in slots for why in blockers(h)]
+            why = max(set(reasons), key=reasons.count)
+            if why == "aqi":
+                low = min(hs[h]["aqi"] for h in slots)
+                text = f"không khí xấu (AQI thấp nhất {low:.0f}), nên tập trong nhà"
+            elif why == "mưa":
+                text = "giờ chạy đều có mưa, nên tập trong nhà"
+            else:
+                text = "trời nóng, nên tập trong nhà cho mát"
+        lines.append(f"🏃 Chạy bộ: {text}")
+    return lines
+
+
+def today_tips():
+    now = datetime.now(VN_TZ)
+    return tips(hourly(), now.date(), now.replace(tzinfo=None))
+
+
+def gold_prices():
+    """Giá vàng triệu đồng/lượng: {"sjc": (mua, bán), "nhan": (mua, bán), "nhan_ten", "nguon"}."""
+    try:
+        body = urllib.parse.urlencode({"method": "GetCurrentGoldPricesByBranch", "BranchId": 2}).encode()
+        res = fetch_json("https://sjc.com.vn/GoldPrice/Services/PriceService.ashx", data=body)
+        rows = res["data"]
+        bar = next(r for r in rows if r["TypeName"].startswith("Vàng SJC 1L"))
+        ring = next(r for r in rows if r["TypeName"].startswith("Vàng nhẫn SJC"))
+        return {"sjc": (bar["BuyValue"] / 1e6, bar["SellValue"] / 1e6),
+                "nhan": (ring["BuyValue"] / 1e6, ring["SellValue"] / 1e6),
+                "nhan_ten": "Nhẫn SJC 9999", "nguon": f"SJC Hà Nội, cập nhật {res['latestDate']}"}
     except Exception as e:
         print(f"[lỗi] giá vàng SJC, chuyển sang PNJ: {e!r}", file=sys.stderr)
-        return gold_pnj()
+    by_code = {r["masp"]: r for r in fetch_json(PNJ_GOLD_URL)["data"]}
+    # PNJ báo nghìn đồng/chỉ -> đổi sang triệu đồng/lượng
+    return {"sjc": (by_code["SJC"]["giamua"] / 100, by_code["SJC"]["giaban"] / 100),
+            "nhan": (by_code["N24K"]["giamua"] / 100, by_code["N24K"]["giaban"] / 100),
+            "nhan_ten": "Nhẫn trơn 9999", "nguon": "nguồn PNJ"}
 
 
-def gold_sjc():
-    body = urllib.parse.urlencode({"method": "GetCurrentGoldPricesByBranch", "BranchId": 2}).encode()
-    res = fetch_json("https://sjc.com.vn/GoldPrice/Services/PriceService.ashx", data=body)
-    rows = res["data"]
-    bar = next(r for r in rows if r["TypeName"].startswith("Vàng SJC 1L"))
-    ring = next(r for r in rows if r["TypeName"].startswith("Vàng nhẫn SJC"))
+def gold():
+    p = gold_prices()
 
-    def row(name, r):
-        return (f"{name}: mua <b>{vn_num(r['BuyValue'] / 1e6, 1)}</b> – "
-                f"bán <b>{vn_num(r['SellValue'] / 1e6, 1)}</b>")
+    def row(name, prices):
+        buy, sell = prices
+        return f"{name}: mua <b>{vn_num(buy, 1)}</b> – bán <b>{vn_num(sell, 1)}</b>"
 
-    return [
-        row("Miếng SJC", bar),
-        row("Nhẫn SJC 9999", ring),
-        f"<i>triệu đồng/lượng · SJC Hà Nội, cập nhật {res['latestDate']}</i>",
-    ]
-
-
-def gold_pnj():
-    rows = fetch_json(PNJ_GOLD_URL)["data"]
-    by_code = {r["masp"]: r for r in rows}
-
-    def row(name, r):  # PNJ báo nghìn đồng/chỉ -> đổi sang triệu đồng/lượng
-        return (f"{name}: mua <b>{vn_num(r['giamua'] / 100, 1)}</b> – "
-                f"bán <b>{vn_num(r['giaban'] / 100, 1)}</b>")
-
-    return [
-        row("Miếng SJC", by_code["SJC"]),
-        row("Nhẫn trơn 9999", by_code["N24K"]),
-        "<i>triệu đồng/lượng · nguồn PNJ</i>",
-    ]
+    return [row("Miếng SJC", p["sjc"]), row(p["nhan_ten"], p["nhan"]),
+            f"<i>triệu đồng/lượng · {p['nguon']}</i>"]
 
 
 def index_history(vnd_symbol, ssi_symbol, days=15):
@@ -219,32 +328,36 @@ def section(title, fn):
     return f"<b>{title}</b>\n" + "\n".join(body)
 
 
+def lunar_line(day):
+    """'🌙 Âm lịch 20/9 Bính Ngọ', kèm nhắc khi hôm nay hoặc mai là mùng 1, rằm."""
+    note = {1: " · hôm nay mùng 1", 15: " · hôm nay rằm"}.get(amlich.to_lunar(day)[0], "")
+    note += {1: " · mai là mùng 1", 15: " · mai là rằm"}.get(amlich.to_lunar(day + timedelta(days=1))[0], "")
+    return f"🌙 Âm lịch {amlich.label(day)}{note}"
+
+
+# Nút dưới bản tin; bấm thì bot trên Vercel xử lý (lenh.py)
+BUTTONS = [[("🔄 Cập nhật", "bantin")], [("📈 VN30", "vn30"), ("🌧️ Mưa lúc nào?", "mua")]]
+
+
 def build_message():
     today = datetime.now(VN_TZ)
-    header = f"☀️ <b>Bản tin sáng – {WEEKDAYS[today.weekday()]}, {today:%d/%m/%Y}</b>"
+    header = (f"☀️ <b>Bản tin sáng – {WEEKDAYS[today.weekday()]}, {today:%d/%m/%Y}</b>\n"
+              f"{lunar_line(today.date())}")
     return "\n\n".join([
         header,
         section("🌤️ Thời tiết Hà Nội", weather),
+        section("💡 Gợi ý hôm nay", today_tips),
         section("🪙 Giá vàng", gold),
         section("📈 Chứng khoán", stocks),
         section("📰 Tin nổi bật", news),
     ])
 
 
-def send_telegram(token, chat_id, text):
-    payload = json.dumps({
-        "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "HTML",
-        "link_preview_options": {"is_disabled": True},
-    }).encode()
-    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage",
-                                 data=payload, headers={"Content-Type": "application/json"})
+def send_telegram(token, chat_id, text, buttons=None):
     try:
-        urllib.request.urlopen(req, timeout=20)
-    except urllib.error.HTTPError as e:
-        detail = json.loads(e.read() or b"{}").get("description", "")
-        raise SystemExit(f"Telegram từ chối tin nhắn ({e.code}): {detail}")
+        tg.send(chat_id, text, buttons, tok=token)
+    except tg.TelegramError as e:
+        raise SystemExit(f"Telegram từ chối tin nhắn ({e.code}): {e.description}")
 
 
 def load_env():
@@ -270,7 +383,7 @@ def main():
         print(text)
         print("\n(Chưa có TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID nên chỉ in ra màn hình.)")
         return
-    send_telegram(token, chat_id, text)
+    send_telegram(token, chat_id, text, BUTTONS)
     print("Đã gửi bản tin qua Telegram.")
 
 
