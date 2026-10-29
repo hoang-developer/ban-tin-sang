@@ -1,5 +1,8 @@
 name: Cảnh báo
 
+# Cảnh báo và các việc theo giờ chạy trên Vercel (/api/tick): cron-job.org gọi mỗi 15 phút,
+# lịch này chỉ gọi dự phòng. Vercel chưa sẵn sàng (chưa có kho dữ liệu...) thì chạy canhbao.py
+# ngay tại đây như trước.
 on:
   schedule:
     - cron: "10,40 23 * * *"   # 6:10 và 6:40 sáng giờ Việt Nam
@@ -12,20 +15,30 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
-      - uses: actions/checkout@v5
+      # Khóa của /api/tick suy ra từ token bot, giống tg.derived_secret("tick")
+      - id: tick
+        continue-on-error: true
+        run: |
+          key=$(printf 'tick:%s' "$TELEGRAM_BOT_TOKEN" | sha256sum | cut -c1-32)
+          echo "::add-mask::$key"
+          curl -fsS --max-time 150 "https://ban-tin-sang.vercel.app/api/tick?key=$key"
+      - if: steps.tick.outcome == 'failure'
+        uses: actions/checkout@v5
       # state.json (những gì đã báo) được giữ giữa các lần chạy bằng cache
-      - uses: actions/cache/restore@v4
+      - if: steps.tick.outcome == 'failure'
+        uses: actions/cache/restore@v4
         with:
           path: state.json
           key: canhbao-${{ github.run_id }}
           restore-keys: canhbao-
-      - run: python3 canhbao.py
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      - uses: actions/cache/save@v4
-        if: always()
+      - if: steps.tick.outcome == 'failure'
+        run: python3 canhbao.py
+      - if: always() && steps.tick.outcome == 'failure'
+        uses: actions/cache/save@v4
         with:
           path: state.json
           key: canhbao-${{ github.run_id }}

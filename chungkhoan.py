@@ -139,6 +139,12 @@ def from_vps(r):
     }
 
 
+def quotes(symbols):
+    """Giá nhiều mã trong một lần gọi VCI: {mã: giá}; mã không tồn tại thì bỏ qua."""
+    rows = get_json(f"{VCI}/getList", {"symbols": list(symbols)}) if symbols else []
+    return {q["symbol"]: q for q in map(from_vci, rows) if q}
+
+
 def quote(symbol):
     """Giá của mã, None nếu mã không tồn tại."""
     try:
@@ -152,15 +158,22 @@ def quote(symbol):
 
 # ---- Tổng quan phiên --------------------------------------------------------------
 
-def indices():
+def index_rows():
+    """{tên chỉ số: (điểm, tham chiếu, giá trị giao dịch đồng, số mã tăng, giảm, đứng)} từ VPS."""
     rows = {r["mc"]: r for r in get_json(f"{VPS}/getlistindexdetail/{','.join(VPS_INDICES)}")}
-    lines = []
+    out = {}
     for code, name in VPS_INDICES.items():
         r = rows[code]
-        now, ref = r["cIndex"], r["oIndex"]
         _, _, value, up, down, same = r["ot"].split("|")  # thay đổi|%|giá trị|tăng|giảm|đứng
+        out[name] = (r["cIndex"], r["oIndex"], float(value) * 1e6, up, down, same)
+    return out
+
+
+def indices():
+    lines = []
+    for name, (now, ref, value, up, down, same) in index_rows().items():
         lines.append(f"{color(now, ref)} {name}: <b>{vn_num(now)}</b>  {change(now, ref, 2)}\n"
-                     f"      GT {ty(float(value) * 1e6)} · ▲{up} ▼{down} ■{same}")
+                     f"      GT {ty(value)} · ▲{up} ▼{down} ■{same}")
     return lines
 
 
@@ -220,14 +233,18 @@ def performance(symbol):
             f"52 tuần: thấp {dong(min(closes))} – cao {dong(max(closes))} <i>(giá đã điều chỉnh)</i>"]
 
 
-def news(symbol):
-    q = urllib.parse.quote(f'"cổ phiếu {symbol}" when:7d')
+def google_news(query):
+    """Các tin Google News (tiếng Việt) khớp truy vấn: [(tiêu đề, link)]."""
+    q = urllib.parse.quote(query)
     items = ET.fromstring(get(f"https://news.google.com/rss/search?q={q}&hl=vi&gl=VN&ceid=VN:vi"))
+    return [((item.findtext("title") or "").strip(), (item.findtext("link") or "").strip())
+            for item in items.findall(".//item")]
+
+
+def news(symbol, count=NEWS_COUNT):
     lines = []
-    for item in items.findall(".//item")[:NEWS_COUNT]:
-        title = html.escape((item.findtext("title") or "").strip(), quote=False)
-        link = html.escape((item.findtext("link") or "").strip(), quote=True)
-        lines.append(f'• <a href="{link}">{title}</a>')
+    for title, link in google_news(f'"cổ phiếu {symbol}" when:7d')[:count]:
+        lines.append(f'• <a href="{html.escape(link)}">{html.escape(title, quote=False)}</a>')
     return lines or ["<i>Không có tin trong 7 ngày qua</i>"]
 
 
