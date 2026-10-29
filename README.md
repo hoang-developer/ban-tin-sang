@@ -54,18 +54,22 @@ secret, không sửa được code.
 
 Ngưỡng, mã cổ phiếu, từ khóa: sửa phần "Cấu hình" đầu file. Xem thử không gửi: `python canhbao.py --xem`.
 
-## Lệnh /stock
+## Lệnh trên Telegram
 
-Gõ trong Telegram, bot trả lời sau vài giây:
+Gõ trong chat với bot (hoặc bấm nút **Menu** cạnh ô nhập), bot trả lời sau vài giây:
 
 - `/stock`: phiên hiện tại. VN-Index, VN30, HNX, UPCoM kèm giá trị giao dịch và số mã tăng/giảm;
   mã VN30 tăng/giảm mạnh nhất; khối ngoại mua/bán ròng trong rổ VN30.
 - `/stock FPT`: chi tiết một mã. Giá khớp, tham chiếu/trần/sàn, khối lượng, khối ngoại, dư mua/bán;
   biến động 1 tuần, 1 tháng, từ đầu năm, đỉnh/đáy 52 tuần, vốn hóa; 3 tin mới nhất về mã.
   Xem nhiều mã một lúc: `/stock FPT VNM HPG` (tối đa 3).
+- `/vang`: giá vàng SJC lúc này.
+- `/thoitiet`: thời tiết, chất lượng không khí và mưa trong 2 tiếng tới ở Hà Nội.
+- `/bantin`: gửi lại bản tin sáng ngay (khoảng 10 giây).
 
 Bot chỉ trả lời chat có `TELEGRAM_CHAT_ID`, người khác nhắn vào thì bỏ qua.
-Phần nhận lệnh chạy trên Vercel ([api/telegram.py](api/telegram.py)), dữ liệu lấy trong [chungkhoan.py](chungkhoan.py).
+Phần nhận lệnh chạy trên Vercel ([api/telegram.py](api/telegram.py)), các lệnh nằm trong [lenh.py](lenh.py).
+Thêm hay đổi lệnh xong thì mở lại link `/api/telegram` (bước 4 bên dưới) để menu lệnh trong Telegram cập nhật.
 
 ### Cài lên Vercel (làm một lần, miễn phí)
 
@@ -85,8 +89,7 @@ trang đó cài lại webhook và hiện lỗi gần nhất mà Telegram gặp.
 
 ```
 python bantin.py
-python chungkhoan.py        # /stock
-python chungkhoan.py FPT    # /stock FPT
+python lenh.py /stock FPT   # thử bất kỳ lệnh nào của bot
 ```
 
 Không có token Telegram thì bản tin chỉ in ra màn hình. Muốn gửi thật từ máy, tạo file `.env`:

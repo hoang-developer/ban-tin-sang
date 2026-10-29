@@ -14,12 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import các file ở thư mục gốc
 
 from bantin import send_telegram  # noqa: E402
-from chungkhoan import stock_command  # noqa: E402
-
-HELP = ("Lệnh của bot:\n"
-        "/stock – phiên chứng khoán hiện tại\n"
-        "/stock FPT – chi tiết một mã (xem nhiều mã: /stock FPT VNM HPG)")
-COMMANDS = [{"command": "stock", "description": "Phiên chứng khoán; /stock FPT để xem một mã"}]
+from lenh import MENU, answer  # noqa: E402
 
 
 def webhook_secret(token):
@@ -33,18 +28,6 @@ def telegram(token, method, **params):
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=10) as r:
         return json.loads(r.read())["result"]
-
-
-def answer(text):
-    parts = text.split()
-    if not parts:
-        return None
-    command = parts[0].split("@")[0].lower()  # trong nhóm chat lệnh có dạng /stock@TenBot
-    if command == "/stock":
-        return stock_command(parts[1:])
-    if command in ("/start", "/help"):
-        return HELP
-    return None
 
 
 def owner_chat():
@@ -63,6 +46,11 @@ def handle_update(update, token):
                                           "Nếu bạn là chủ bot: đặt TELEGRAM_CHAT_ID trên Vercel đúng "
                                           "số này rồi Redeploy.")
         return
+    if text.startswith("/"):
+        try:  # hiện "đang nhập…" trong lúc lấy dữ liệu, /bantin mất cả chục giây
+            telegram(token, "sendChatAction", chat_id=chat_id, action="typing")
+        except Exception as e:
+            print(f"[lỗi] sendChatAction: {e!r}", file=sys.stderr)
     try:
         reply = answer(text)
     except Exception as e:
@@ -76,7 +64,7 @@ def setup(token, host):
     url = f"https://{host}/api/telegram"
     telegram(token, "setWebhook", url=url, secret_token=webhook_secret(token),
              allowed_updates=["message"])
-    telegram(token, "setMyCommands", commands=COMMANDS)
+    telegram(token, "setMyCommands", commands=MENU)
     info = telegram(token, "getWebhookInfo")
     lines = [f"Đã cài webhook: {info['url']}",
              f"Tin nhắn đang chờ: {info.get('pending_update_count', 0)}"]
