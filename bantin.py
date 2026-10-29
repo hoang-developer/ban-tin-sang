@@ -154,9 +154,9 @@ def gold_pnj():
     ]
 
 
-def index_history(vnd_symbol, ssi_symbol):
+def index_history(vnd_symbol, ssi_symbol, days=15):
     now = int(time.time())
-    start = now - 15 * 86400
+    start = now - days * 86400
     try:
         d = fetch_json("https://dchart-api.vndirect.com.vn/dchart/history"
                        f"?resolution=D&symbol={vnd_symbol}&from={start}&to={now}")
