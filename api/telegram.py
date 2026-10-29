@@ -47,15 +47,26 @@ def answer(text):
     return None
 
 
+def owner_chat():
+    return os.environ.get("TELEGRAM_CHAT_ID", "").strip()  # dán trên điện thoại hay dính dấu cách
+
+
 def handle_update(update, token):
     message = update.get("message") or {}
     chat_id = (message.get("chat") or {}).get("id")
-    if str(chat_id) != os.environ.get("TELEGRAM_CHAT_ID"):
-        return  # bot riêng: chỉ trả lời chat của chủ
+    text = message.get("text") or ""
+    if str(chat_id) != owner_chat():
+        # Bot riêng: chỉ trả lời chat của chủ. Người gõ lệnh thì được biết chat ID của mình,
+        # để chủ bot cài sai TELEGRAM_CHAT_ID còn biết đường sửa.
+        if chat_id and text.startswith("/"):
+            send_telegram(token, chat_id, f"Bot này là bot riêng. Chat ID của bạn: {chat_id}\n"
+                                          "Nếu bạn là chủ bot: đặt TELEGRAM_CHAT_ID trên Vercel đúng "
+                                          "số này rồi Redeploy.")
+        return
     try:
-        reply = answer(message.get("text") or "")
+        reply = answer(text)
     except Exception as e:
-        print(f"[lỗi] trả lời {message.get('text')!r}: {e!r}", file=sys.stderr)
+        print(f"[lỗi] trả lời {text!r}: {e!r}", file=sys.stderr)
         reply = "⚠️ Bot gặp lỗi khi lấy dữ liệu, thử lại sau nhé."
     if reply:
         send_telegram(token, chat_id, reply)
@@ -75,7 +86,7 @@ def setup(token, host):
 
 
 def status_page(token, environ):
-    missing = [k for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID") if not os.environ.get(k)]
+    missing = [k for k in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID") if not os.environ.get(k, "").strip()]
     if missing:
         return f"Thiếu biến môi trường trên Vercel: {', '.join(missing)}. Thêm vào rồi Redeploy."
     host = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL") or environ.get("HTTP_HOST")
@@ -83,7 +94,8 @@ def status_page(token, environ):
         lines = setup(token, host)
     except Exception as e:
         return f"Không cài được webhook: {e!r}"
-    return "\n".join(lines + ["", "Xong! Vào Telegram gõ /stock để thử."])
+    return "\n".join(lines + [f"Chỉ trả lời chat ID: {owner_chat()}",
+                              "", "Xong! Vào Telegram gõ /stock để thử."])
 
 
 def respond(start_response, status, text):
@@ -94,7 +106,7 @@ def respond(start_response, status, text):
 
 
 def app(environ, start_response):
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     if environ["REQUEST_METHOD"] != "POST":
         return respond(start_response, "200 OK", status_page(token, environ))
     secret = environ.get("HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN", "").encode()
