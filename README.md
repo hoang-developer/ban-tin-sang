@@ -5,11 +5,10 @@ Bot Telegram riêng: bản tin mỗi sáng, bản tin tối, cảnh báo tức t
 
 - **Bản tin sáng** 6:45: âm lịch, thời tiết và không khí Hà Nội, gợi ý trong ngày (mặc gì, phơi đồ,
   chạy bộ), giá vàng, chứng khoán phiên trước, tin nổi bật. Dưới tin có nút 🔄 Cập nhật, 📈 VN30,
-  🌧️ Mưa lúc nào?. Chạy bằng GitHub Actions ([bantin.yml](.github/workflows/bantin.yml)), muốn đúng giờ
-  thì cài cron-job.org (mục **Lịch bản tin sáng**).
+  🌧️ Mưa lúc nào?.
 - **Bot trên Vercel** ([api/telegram.py](api/telegram.py)) trả lời lệnh, và mỗi 15 phút chạy các việc theo
-  giờ ([api/tick.py](api/tick.py), [lich.py](lich.py)): cảnh báo, bảng điện ghim, đoán xanh/đỏ, nhắc ngày,
-  tin cổ tức, bản tin tối. Cài theo mục **Cài bot lên Vercel**.
+  giờ ([api/tick.py](api/tick.py), [lich.py](lich.py)): bản tin sáng, cảnh báo, bảng điện ghim, đoán
+  xanh/đỏ, nhắc ngày, tin cổ tức, bản tin tối. Cài theo mục **Cài bot lên Vercel**.
 
 ## Lệnh trên Telegram
 
@@ -37,8 +36,9 @@ Các lệnh `/theodoi`, `/nho`, `/vivang`, `/doan` và nút ⭐ cần **kho dữ
 ## Việc bot tự làm theo giờ
 
 Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; lịch GitHub của
-[canhbao.yml](.github/workflows/canhbao.yml) gọi dự phòng):
+[canhbao.yml](.github/workflows/canhbao.yml) và [bantin.yml](.github/workflows/bantin.yml) gọi dự phòng):
 
+- **☀️ Bản tin sáng** (6:45, lỡ giờ thì gửi muộn tới 12h, mỗi ngày một lần).
 - **Cảnh báo** (6h–22h, [canhbao.py](canhbao.py)), chỉ nhắn khi có chuyện:
   ☔ sắp mưa trong 2 tiếng tới · 😷 không khí xấu đi, vượt AQI 150 · 🪙 vàng SJC đổi từ 1 triệu/lượng
   (kèm giá trị ví vàng) · 📉 VN-Index tăng/giảm mỗi 1,5% · 🎯 mã chạm giá đặt bằng `/theodoi` hoặc
@@ -51,8 +51,9 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
 - **🌙 Bản tin tối** (21h): thời tiết và gợi ý ngày mai, chứng khoán hôm nay, giá vàng so với hôm
   qua, ví vàng, ngày cần nhớ ngày mai, kết quả đoán. Bot cũng ghi giá vàng mỗi tối để `/neu vang` dùng.
 
-Nếu Vercel chưa sẵn sàng (chưa có kho dữ liệu...), GitHub tự chạy `canhbao.py` như trước, chỉ thiếu
-các việc mới.
+Nếu Vercel không chạy được (chưa có kho dữ liệu, lỗi...), GitHub tự chạy `canhbao.py` và `bantin.py`
+như trước, chỉ thiếu các việc mới; bản tin gửi theo cách này có dòng ⚠️ ở cuối. Lịch của GitHub rất
+thất thường (có ngày gần như không chạy), nên đừng trông vào nó: cronjob 15 phút ở bước 6 là chính.
 
 ## Cài bot lên Vercel (làm một lần, miễn phí)
 
@@ -75,38 +76,15 @@ Về sau mỗi lần merge vào `main`, Vercel tự cập nhật bot. Thêm hay 
 để menu lệnh cập nhật. Bot không trả lời thì cũng mở link đó: trang cài lại webhook và hiện lỗi gần
 nhất mà Telegram gặp.
 
-## Lịch bản tin sáng
+## Gửi bản tin ngay
 
-Lịch có sẵn của GitHub Actions không đáng tin: hay trễ, có hôm bỏ hẳn. Nên bản tin dùng hai lớp:
+Gõ `/bantin` trong Telegram, hoặc trên GitHub: tab **Actions** → **Bản tin sáng** → **Run workflow**
+(làm được cả trên app GitHub điện thoại).
 
-1. **Lịch chính: cron-job.org** (miễn phí) gọi GitHub đúng 6:45 mỗi sáng.
-2. **Dự phòng: lịch của GitHub** lúc 6:55, 7:25, 7:55. Mốc nào tới khi hôm nay đã gửi rồi thì bỏ qua,
-   nên không bị trùng. Bản tin gửi từ dự phòng có dòng ⚠️ ở cuối: khi thấy dòng đó, vào cron-job.org
-   xem lỗi (thường là token hết hạn).
-
-Mỗi lần chạy, workflow bật lại cả hai workflow để GitHub không tự tắt lịch khi repo 60 ngày không có commit.
-
-### Cài cron-job.org cho bản tin sáng (làm một lần)
-
-1. Tạo token: GitHub → **Settings** → **Developer settings** → **Personal access tokens** →
-   **Fine-grained tokens** → **Generate new token**.
-   - Repository access: **Only select repositories** → `ban-tin-sang`
-   - Permissions → Repository permissions → **Actions: Read and write** (không cần quyền nào khác)
-   - Expiration: chọn dài nhất có thể, và đặt lịch nhắc gia hạn
-2. Đăng ký [cron-job.org](https://cron-job.org) → **Create cronjob**:
-   - URL: `https://api.github.com/repos/hoang-developer/ban-tin-sang/actions/workflows/bantin.yml/dispatches`
-   - Lịch: mỗi ngày lúc 6:45, múi giờ `Asia/Ho_Chi_Minh`
-   - Bật thông báo email khi chạy lỗi
-   - Mục nâng cao (Advanced): Request method `POST`, thêm 3 header
-     - `Authorization`: `Bearer <token vừa tạo>`
-     - `Accept`: `application/vnd.github+json`
-     - `Content-Type`: `application/json`
-   - Request body: `{"ref":"main","inputs":{"tu_dong":"true"}}`
-3. Bấm **Test run**: kết quả HTTP `204` và Telegram nhận bản tin là xong. Lần chạy thử này tính là
-   bản tin của ngày hôm đó, nên đừng chạy thử trong khoảng 0h–6h45, kẻo sáng hôm ấy không gửi nữa.
-
-Token này chỉ có quyền với mục Actions của repo này (chạy, dừng, bật/tắt workflow): không đọc được
-secret, không sửa được code.
+Trước đây bản tin sáng cần một cronjob riêng trên cron-job.org kèm token GitHub. Giờ cronjob 15 phút
+của bot (bước 6 ở trên) lo luôn, token đó không cần nữa; nếu đã tạo cronjob gọi GitHub thì để hay xóa
+đều được, bản tin không bị gửi trùng. Mỗi lần chạy, workflow bản tin còn bật lại cả hai workflow để
+GitHub không tự tắt lịch khi repo 60 ngày không có commit.
 
 ## Xem thử trên máy
 

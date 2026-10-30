@@ -1,8 +1,8 @@
 name: Bản tin sáng
 
-# Lịch chính: cron-job.org gọi workflow_dispatch đúng 6:45 kèm tu_dong=true (cách cài: README).
-# Lịch của GitHub chỉ là dự phòng: hay trễ, có hôm bỏ hẳn, nên đặt ba mốc, mốc đầu lùi
-# sau lịch chính 10 phút; mốc nào tới khi hôm nay đã gửi rồi thì tự bỏ qua.
+# Bản tin sáng do bot trên Vercel gửi lúc 6:45 (lịch chạy /api/tick mà cron-job.org gọi 15 phút một lần).
+# Lịch của GitHub chỉ là dự phòng, hay trễ hoặc bỏ lượt: mỗi mốc gọi Vercel trước (Vercel đã gửi thì
+# thôi); Vercel không chạy được mới tự gửi ở đây, mỗi ngày một lần.
 on:
   schedule:
     - cron: "55 23 * * *"    # 6:55 sáng giờ Việt Nam
@@ -25,24 +25,32 @@ jobs:
       actions: write  # bật lại lịch ở bước cuối
     env:
       TU_DONG: ${{ github.event_name == 'schedule' || inputs.tu_dong }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
       - uses: actions/checkout@v5
-      - id: ngay
-        run: echo "key=bantin-da-gui-$(TZ=Asia/Ho_Chi_Minh date +%F)" >> "$GITHUB_OUTPUT"
-      # Bấm tay thì luôn gửi; chạy theo lịch thì xem hôm nay đã gửi chưa
-      - id: da_gui
+      # Chạy theo lịch: nhờ Vercel gửi. Khóa của /api/tick suy ra từ token bot, như canhbao.yml
+      - id: vercel
         if: env.TU_DONG == 'true'
+        continue-on-error: true
+        run: |
+          key=$(printf 'tick:%s' "$TELEGRAM_BOT_TOKEN" | sha256sum | cut -c1-32)
+          echo "::add-mask::$key"
+          curl -fsS --max-time 150 "https://ban-tin-sang.vercel.app/api/tick?key=$key"
+      - id: ngay
+        if: steps.vercel.outcome != 'success'
+        run: echo "key=bantin-da-gui-$(TZ=Asia/Ho_Chi_Minh date +%F)" >> "$GITHUB_OUTPUT"
+      # Bấm tay thì luôn gửi; chạy theo lịch mà Vercel lỗi thì xem hôm nay GitHub đã gửi chưa
+      - id: da_gui
+        if: env.TU_DONG == 'true' && steps.vercel.outcome == 'failure'
         uses: actions/cache/restore@v4
         with:
           path: da-gui
           key: ${{ steps.ngay.outputs.key }}
           lookup-only: true
       - id: gui
-        if: steps.da_gui.outputs.cache-hit != 'true'
+        if: steps.vercel.outcome != 'success' && steps.da_gui.outputs.cache-hit != 'true'
         run: python3 bantin.py && touch da-gui
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       - if: env.TU_DONG == 'true' && steps.gui.outcome == 'success'
         uses: actions/cache/save@v4
         with:
