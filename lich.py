@@ -13,7 +13,9 @@ import canhbao
 import kho
 import lenh
 import tg
-from bantin import WEEKDAYS, gold_prices, hourly, index_history, section, stocks, tips, vn_num, weather
+from bantin import BUTTONS as BANTIN_BUTTONS
+from bantin import (WEEKDAYS, build_message, gold_prices, hourly, index_history, section, stocks, tips,
+                    vn_num, weather)
 from chungkhoan import change, color, dong, google_news, index_rows, quotes
 
 # Từ khóa nhận ra tin quyền lợi cổ đông (so khớp sau khi đưa về chữ thường)
@@ -38,6 +40,15 @@ def mark_done(job, now):
 
 
 # ---- Các việc --------------------------------------------------------------------
+
+def ban_tin_sang(now, chat):
+    """Bản tin sáng từ 6:45; lỡ giờ (lịch chạy trục trặc) thì vẫn gửi muộn tới trưa."""
+    if not between(now, (6, 45), (12, 0)) or done_today("ban_tin_sang", now):
+        return None
+    tg.send(chat, build_message(), BANTIN_BUTTONS)
+    mark_done("ban_tin_sang", now)
+    return "đã gửi"
+
 
 def canh_bao(now, chat):
     """Các cảnh báo của canhbao.py, trạng thái lưu trong kho thay cho state.json."""
@@ -268,7 +279,7 @@ def ban_tin_toi(now, chat):
     return "đã gửi"
 
 
-JOBS = [canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi]
+JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi]
 
 
 def run(now):

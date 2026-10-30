@@ -375,8 +375,8 @@ def main():
     load_env()
     text = build_message()
     if os.environ.get("GITHUB_EVENT_NAME") == "schedule":
-        # Lịch chính là cron-job.org; lịch của GitHub chỉ tới lượt khi nó không gọi được
-        text += "\n\n<i>⚠️ Gửi từ lịch dự phòng của GitHub: cron-job.org không gọi được (xem README)</i>"
+        # Lịch chính là bot trên Vercel; lịch của GitHub chỉ tới lượt khi Vercel không chạy được
+        text += "\n\n<i>⚠️ Gửi từ lịch dự phòng của GitHub: bot trên Vercel không chạy được (gõ /caidat để xem)</i>"
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
     if not (token and chat_id):

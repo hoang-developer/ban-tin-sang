@@ -102,9 +102,17 @@ def status_page(environ):
         lines = setup(host)
     except Exception as e:
         return f"Không cài được webhook: {e!r}"
-    store = "đã kết nối" if kho.ready() else "chưa có (xem README, mục Kho dữ liệu)"
-    return "\n".join(lines + [f"Chỉ trả lời chat ID: {tg.owner_chat()}", f"Kho dữ liệu: {store}",
-                              "", "Xong! Vào Telegram gõ /stock để thử."])
+    lines.append(f"Chỉ trả lời chat ID: {tg.owner_chat()}")
+    if kho.ready():
+        try:
+            last = kho.get("tick_cuoi")
+            lines += ["Kho dữ liệu: đã kết nối",
+                      f"Lịch chạy: {'lần gần nhất ' + last if last else 'chưa chạy lần nào (xem /caidat)'}"]
+        except Exception as e:
+            lines.append(f"Kho dữ liệu: lỗi {e!r}")
+    else:
+        lines.append("Kho dữ liệu: chưa có (xem README, mục Kho dữ liệu)")
+    return "\n".join(lines + ["", "Xong! Vào Telegram gõ /stock để thử."])
 
 
 def respond(start_response, status, text):
