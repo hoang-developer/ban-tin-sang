@@ -177,9 +177,9 @@ def normalize(text):
     return unicodedata.normalize("NFC", text).lower()
 
 
-def check_news(state, now):
+def check_news(state, now, keywords=None):
     seen = state.setdefault("news_seen", [])
-    keywords = [(k, normalize(k)) for k in KEYWORDS]
+    keywords = [(k, normalize(k)) for k in (KEYWORDS if keywords is None else keywords)]
     alerts = []
     for source, url in KEYWORD_FEEDS:
         try:
@@ -202,12 +202,16 @@ def check_news(state, now):
 CHECKS = [check_rain, check_air, check_gold, check_index, check_watchlist, check_news]
 
 
-def run(state, now, watchlist=None):
+def run(state, now, watchlist=None, keywords=None):
     """Chạy mọi bước kiểm tra, cập nhật state tại chỗ; trả về các cảnh báo cần gửi.
 
-    watchlist thay cho WATCHLIST khi danh sách theo dõi lấy từ kho dữ liệu của bot.
+    watchlist, keywords thay cho WATCHLIST, KEYWORDS khi lấy từ kho dữ liệu của bot.
     """
-    extra = {check_watchlist: {"watchlist": watchlist}} if watchlist is not None else {}
+    extra = {}
+    if watchlist is not None:
+        extra[check_watchlist] = {"watchlist": watchlist}
+    if keywords is not None:
+        extra[check_news] = {"keywords": keywords}
     alerts = []
     for check in CHECKS:
         try:

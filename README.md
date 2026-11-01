@@ -19,6 +19,8 @@ Gõ trong chat với bot hoặc bấm nút **Menu** cạnh ô nhập ([lenh.py](
 | `/stock` | Phiên hiện tại: VN-Index, VN30, HNX, UPCoM, mã VN30 tăng/giảm mạnh, khối ngoại |
 | `/stock FPT` | Chi tiết mã (tối đa 3 mã một lần). Nút ⭐ Theo dõi, 📰 Thêm tin, 🔁 Làm mới |
 | `/theodoi` | Mã đang theo dõi. `/theodoi FPT` thêm mã, `/theodoi FPT 50 60` báo khi giá ≤ 50.000 hoặc ≥ 60.000 |
+| `/tin` | Tin nổi bật. `/tin giá vàng` tìm tin mới nhất theo từ khóa (7 ngày qua; thêm `24h`, `3ngay` để giới hạn). Nút 🔔 báo khi có tin mới |
+| `/tukhoa` | Từ khóa báo tin mới: `/tukhoa giá xăng` thêm, bấm ❌ để bỏ |
 | `/vang` | Giá vàng SJC lúc này |
 | `/vivang` | Ví vàng: `/vivang nhan 2 chi 136` (giá mua triệu/lượng, có thể bỏ), `/vivang sjc 1 luong`, `/vivang xoa` |
 | `/neu` | Nếu ngày xưa mua: `/neu FPT 10tr 1nam`, `/neu vnindex 50tr 6thang`, `/neu vang 100tr 3thang` |
@@ -42,7 +44,8 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
 - **Cảnh báo** (6h–22h, [canhbao.py](canhbao.py)), chỉ nhắn khi có chuyện:
   ☔ sắp mưa trong 2 tiếng tới · 😷 không khí xấu đi, vượt AQI 150 · 🪙 vàng SJC đổi từ 1 triệu/lượng
   (kèm giá trị ví vàng) · 📉 VN-Index tăng/giảm mỗi 1,5% · 🎯 mã chạm giá đặt bằng `/theodoi` hoặc
-  `WATCHLIST` · 📰 tin có từ khóa trong `KEYWORDS`. Ngưỡng, từ khóa: phần "Cấu hình" đầu file.
+  `WATCHLIST` · 📰 tin có từ khóa trong `KEYWORDS` hoặc thêm bằng `/tukhoa` (tối đa 5 tin/lần).
+  Ngưỡng, từ khóa cài sẵn: phần "Cấu hình" đầu file.
 - **📌 Bảng điện** (ngày giao dịch, 9h–15h): một tin ghim đầu chat với VN-Index, VN30, HNX, UPCoM,
   các mã đang theo dõi và giá vàng, tự sửa lại mỗi 15 phút.
 - **🎯 Đoán xanh/đỏ**: 8:15 bot hỏi VN-Index hôm nay xanh hay đỏ (nhận đoán tới 9:15), 15h chấm điểm.
@@ -92,6 +95,7 @@ GitHub không tự tắt lịch khi repo 60 ngày không có commit.
 python bantin.py                    # bản tin sáng
 python lenh.py /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
 python thoitiet.py Đà Nẵng
+python tintuc.py giá vàng 24h
 python amlich.py 17/2/2026
 python canhbao.py --xem             # cảnh báo, không gửi
 ```
@@ -106,6 +110,7 @@ TELEGRAM_CHAT_ID=...
 ## Nguồn dữ liệu
 
 Open-Meteo (thời tiết, AQI, tìm địa danh), SJC (dự phòng: PNJ), VNDirect (dự phòng: SSI), RSS VnExpress
-và Dân trí. Chứng khoán trong phiên: VPS (chỉ số), Vietcap (giá từng mã, dự phòng: VPS), Google News
-(tin theo mã, tin cổ tức). Âm lịch tính theo thuật toán của Hồ Ngọc Đức ([amlich.py](amlich.py)).
+và Dân trí. Chứng khoán trong phiên: VPS (chỉ số), Vietcap (giá từng mã, dự phòng: VPS). Google News:
+tìm tin theo từ khóa ([tintuc.py](tintuc.py), dự phòng: RSS VnExpress, Dân trí, Tuổi Trẻ, Thanh Niên),
+tin theo mã, tin cổ tức. Âm lịch tính theo thuật toán của Hồ Ngọc Đức ([amlich.py](amlich.py)).
 Lịch sử giá vàng không có nguồn công khai: bot tự ghi giá SJC mỗi tối.
