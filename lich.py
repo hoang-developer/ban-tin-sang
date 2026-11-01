@@ -55,7 +55,8 @@ def canh_bao(now, chat):
     if not between(now, (6, 0), (22, 0)):
         return None
     state = kho.get("canhbao", {})
-    alerts = canhbao.run(state, now, watchlist={**canhbao.WATCHLIST, **lenh.price_alerts()})
+    alerts = canhbao.run(state, now, watchlist={**canhbao.WATCHLIST, **lenh.price_alerts()},
+                         keywords=lenh.all_keywords())
     items = kho.get("vivang", [])
     if items:
         alerts = [a + "\n" + lenh.wallet_brief(items) if a.startswith("🪙") else a for a in alerts]
@@ -203,7 +204,7 @@ def co_tuc(now, chat):
     found = []
     for symbol in kho.get("theodoi", {}):
         query = f'"{symbol}" (cổ tức OR "chốt quyền" OR "chốt danh sách" OR "không hưởng quyền") when:3d'
-        for title, link in google_news(query):
+        for title, link, *_ in google_news(query):
             if (link in seen or not re.search(rf"\b{symbol}\b", title)
                     or not any(w in normalize(title) for w in DIVIDEND_WORDS)):
                 continue

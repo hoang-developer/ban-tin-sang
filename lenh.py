@@ -15,11 +15,14 @@ import kho
 import tg
 from bantin import BUTTONS as BANTIN_BUTTONS
 from bantin import VN_TZ, WEEKDAYS, build_message, gold, gold_prices, index_history, section, vn_num
+from canhbao import KEYWORDS, normalize
 from chungkhoan import MAX_SYMBOLS, SYMBOL, dong, news, quote, quotes, stock_command
 from thoitiet import find_place, report
+from tintuc import headlines_text, parse_query, results_text
 
 # ---- Cấu hình -------------------------------------------------------------
 MAX_WATCH = 10            # số mã theo dõi tối đa
+MAX_KEYWORDS = 20         # số từ khóa báo tin mới tối đa
 MAX_REMINDERS = 30        # số ngày cần nhớ tối đa
 SAVINGS_RATE = 0.05       # lãi gửi tiết kiệm/năm để so sánh trong /neu
 GUESS_DEADLINE = (9, 15)  # nhận đoán xanh/đỏ tới giờ này (hết đợt khớp lệnh mở cửa)
@@ -392,7 +395,9 @@ GUESS_LABEL = {"xanh": "🟢 Xanh", "do": "🔴 Đỏ"}
 def record_guess(choice, now):
     if choice not in GUESS_LABEL:
         return "Lựa chọn không hợp lệ"
-    if now.weekday() >= 5 or (now.hour, now.minute) >= GUESS_DEADLINE:
+    if now.weekday() >= 5:
+        return "Cuối tuần không có phiên, thứ Hai đoán tiếp nhé"
+    if (now.hour, now.minute) >= GUESS_DEADLINE:
         return "Hết giờ đoán hôm nay rồi"
     kho.put(f"doan:{now.date()}", choice, 3 * 86400)
     return None
@@ -410,6 +415,93 @@ def doan(args):
     return (f"🎯 <b>Đoán xanh/đỏ</b>\nĐúng {s['dung']}/{s['tong']} ({s['dung'] / s['tong'] * 100:.0f}%) · "
             f"chuỗi đúng hiện tại {s['chuoi']} · dài nhất {s['chuoi_max']}\n"
             f"Tháng này: {right}/{total}")
+
+
+# ---- Tin tức theo từ khóa ------------------------------------------------------------
+
+def fits(data):
+    return len(data.encode()) <= 64  # Telegram giới hạn dữ liệu của nút 64 byte
+
+
+def keywords():
+    """Từ khóa báo tin mới người dùng thêm (ngoài KEYWORDS cài sẵn trong canhbao.py); [] nếu chưa có kho."""
+    if not kho.ready():
+        return []
+    try:
+        return kho.get("tukhoa", [])
+    except Exception as e:
+        print(f"[lỗi] đọc từ khóa: {e!r}", file=sys.stderr)
+        return []
+
+
+def all_keywords():
+    """KEYWORDS cài sẵn cộng từ khóa người dùng thêm, bỏ trùng (không phân biệt hoa thường)."""
+    out = {}
+    for k in KEYWORDS + keywords():
+        out.setdefault(normalize(k), k)
+    return list(out.values())
+
+
+def followed(keyword):
+    return normalize(keyword) in {normalize(k) for k in all_keywords()}
+
+
+def news_buttons(keyword, hours):
+    row = [(b, d) for b, d in [("✅ Đang báo tin mới" if followed(keyword) else "🔔 Báo khi có tin mới",
+                                f"tk:{keyword}"), ("🔁 Làm mới", f"tim:{hours}:{keyword}")] if fits(d)]
+    return [row] if row else None
+
+
+def check_keyword(keyword):
+    if not 2 <= len(keyword) <= 60:
+        return "Từ khóa dài từ 2 tới 60 ký tự. Ví dụ: /tin giá vàng, /tin giá vàng 24h"
+    return None
+
+
+def tin(args):
+    if not args:
+        return headlines_text()
+    keyword, hours = parse_query(args)
+    problem = check_keyword(keyword)
+    if problem:
+        return problem
+    return results_text(keyword, hours), news_buttons(keyword, hours)
+
+
+def toggle_keyword(keyword):
+    """Bấm 🔔: thêm hoặc bỏ từ khóa báo tin mới; trả câu thông báo ngắn."""
+    if normalize(keyword) in {normalize(k) for k in KEYWORDS}:
+        return "Từ khóa này cài sẵn trong canhbao.py, luôn được báo"
+    words = kho.get("tukhoa", [])
+    same = [w for w in words if normalize(w) == normalize(keyword)]
+    if same:
+        words.remove(same[0])
+        kho.put("tukhoa", words)
+        return f"Đã thôi báo tin về “{keyword}”"
+    if len(words) >= MAX_KEYWORDS:
+        return f"Đã có tối đa {MAX_KEYWORDS} từ khóa, bỏ bớt trong /tukhoa"
+    words.append(keyword)
+    kho.put("tukhoa", words)
+    return f"🔔 Sẽ báo tin mới về “{keyword}”"
+
+
+def tukhoa(args):
+    if not kho.ready():
+        return NEED_STORE
+    if args:
+        keyword = " ".join(args).strip()
+        problem = check_keyword(keyword)
+        if problem:
+            return problem
+        if followed(keyword):
+            return f"“{html.escape(keyword)}” đã có trong danh sách. Xem: /tukhoa"
+        return (html.escape(toggle_keyword(keyword)) + "\n<i>Bot xem tiêu đề VnExpress, Dân trí, Tuổi Trẻ, "
+                "Thanh Niên 15 phút một lần, mỗi lần báo tối đa 5 tin</i>")
+    words = kho.get("tukhoa", [])
+    lines = (["🔔 <b>Từ khóa báo tin mới</b>"] + [f"• {html.escape(k)} <i>(cài sẵn)</i>" for k in KEYWORDS]
+             + [f"• {html.escape(w)}" for w in words] + ["Thêm: /tukhoa giá xăng · tìm thử: /tin giá xăng"])
+    buttons = [(f"❌ {w[:16]}", f"botk:{w}") for w in words if fits(f"botk:{w}")]
+    return "\n".join(lines), rows_of(buttons, 2)
 
 
 # ---- Thời tiết, cài đặt ----------------------------------------------------------------
@@ -451,6 +543,8 @@ def caidat(args):
 COMMANDS = {
     "stock": ("Phiên chứng khoán; /stock FPT để xem một mã", stock),
     "theodoi": ("Mã theo dõi; /theodoi FPT 50 60 để báo khi chạm giá", theodoi),
+    "tin": ("Tin nổi bật; /tin giá vàng để tìm theo từ khóa", tin),
+    "tukhoa": ("Từ khóa báo tin mới: /tukhoa giá xăng", tukhoa),
     "vang": ("Giá vàng SJC", lambda args: section("🪙 Giá vàng", gold)),
     "vivang": ("Ví vàng: giá trị vàng bạn đang giữ", vivang),
     "neu": ("Nếu ngày xưa mua: /neu FPT 10tr 1nam", neu),
@@ -494,6 +588,10 @@ def on_button(data, message, now):
         return "Đang làm mới…", ("edit", lambda: stock(arg.split(",") if arg else []))
     if kind == "tin":
         return None, ("send", lambda: more_news(arg))
+    if kind == "tim":
+        hours, _, keyword = arg.partition(":")
+        return "Đang làm mới…", ("edit", lambda: (results_text(keyword, int(hours)),
+                                                  news_buttons(keyword, int(hours))))
     if kind == "doan":
         problem = record_guess(arg, now) if kho.ready() else "Chưa có kho dữ liệu"
         if problem:
@@ -501,13 +599,21 @@ def on_button(data, message, now):
         return f"Đã ghi: {GUESS_LABEL[arg]}", ("edit", lambda: f"{GUESS_TEXT}\n\nBạn chọn: <b>{GUESS_LABEL[arg]}</b>")
     if not kho.ready():
         return "Chưa có kho dữ liệu, gõ /caidat", None
+    # Dữ liệu các nút đang có dưới tin, để vẽ lại nút mà giữ nguyên nội dung tin
+    keys = [b.get("callback_data", "") for row in (message.get("reply_markup") or {}).get(
+        "inline_keyboard", []) for b in row]
     if kind == "theo":
         toast = toggle_follow(arg)
         # Giữ nguyên danh sách mã của tin: lấy từ nút "Làm mới" (stock:FPT,VNM)
-        keys = [b.get("callback_data", "") for row in (message.get("reply_markup") or {}).get(
-            "inline_keyboard", []) for b in row]
         symbols = next((k[6:].split(",") for k in keys if k.startswith("stock:") and k != "stock:"), [arg])
         return toast, ("buttons", lambda: stock_buttons(symbols))
+    if kind == "tk":
+        toast = toggle_keyword(arg)
+        hours = next((int(k.split(":")[1]) for k in keys if k.startswith("tim:")), parse_query([])[1])
+        return toast, ("buttons", lambda: news_buttons(arg, hours))
+    if kind == "botk":
+        toast = toggle_keyword(arg) if followed(arg) else "Từ khóa này đã bỏ rồi"
+        return toast, ("edit", lambda: tukhoa([]))
     if kind == "bo":
         watch = kho.get("theodoi", {})
         watch.pop(arg, None)

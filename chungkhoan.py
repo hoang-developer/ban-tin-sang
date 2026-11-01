@@ -14,6 +14,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 from bantin import UA, VN_TZ, WEEKDAYS, index_history, stocks, vn_num
 
@@ -233,17 +234,29 @@ def performance(symbol):
             f"52 tuần: thấp {dong(min(closes))} – cao {dong(max(closes))} <i>(giá đã điều chỉnh)</i>"]
 
 
+def published_at(text):
+    """Giờ đăng trong RSS ('Sun, 01 Nov 2026 02:23:43 GMT') -> datetime; None nếu không đọc được."""
+    try:
+        return parsedate_to_datetime(text)
+    except (TypeError, ValueError):
+        return None
+
+
 def google_news(query):
-    """Các tin Google News (tiếng Việt) khớp truy vấn: [(tiêu đề, link)]."""
+    """Các tin Google News (tiếng Việt) khớp truy vấn: [(tiêu đề, link, tên báo, giờ đăng)].
+
+    Tiêu đề Google để kèm tên báo ở cuối (" - VnExpress"); giờ đăng None nếu thiếu.
+    """
     q = urllib.parse.quote(query)
     items = ET.fromstring(get(f"https://news.google.com/rss/search?q={q}&hl=vi&gl=VN&ceid=VN:vi"))
-    return [((item.findtext("title") or "").strip(), (item.findtext("link") or "").strip())
+    return [((item.findtext("title") or "").strip(), (item.findtext("link") or "").strip(),
+             (item.findtext("source") or "").strip(), published_at(item.findtext("pubDate")))
             for item in items.findall(".//item")]
 
 
 def news(symbol, count=NEWS_COUNT):
     lines = []
-    for title, link in google_news(f'"cổ phiếu {symbol}" when:7d')[:count]:
+    for title, link, *_ in google_news(f'"cổ phiếu {symbol}" when:7d')[:count]:
         lines.append(f'• <a href="{html.escape(link)}">{html.escape(title, quote=False)}</a>')
     return lines or ["<i>Không có tin trong 7 ngày qua</i>"]
 
