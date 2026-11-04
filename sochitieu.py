@@ -762,7 +762,9 @@ def report(kind, day):
         change = (total - prev_total) / prev_total * 100
         lines.append(f"So với {prev_label}: {'↑' if change >= 0 else '↓'} {abs(change):.0f}% ({vnd(prev_total)})")
     if income:
-        lines.append(f"💰 Thu: {vnd(income)} · còn lại <b>{vnd(income - total)}</b>")
+        kinds = income_kinds([e for e in items if e["nhom"] == INCOME])
+        detail = f" ({' · '.join(f'{k} {vnd(v)}' for k, v in kinds)})" if len(kinds) > 1 else ""
+        lines.append(f"💰 Thu: {vnd(income)}{detail} · còn lại <b>{vnd(income - total)}</b>")
     biggest = sorted(spend, key=lambda e: -e["tien"])[:3]
     if biggest and len(spend) > 3:
         lines.append("Khoản lớn nhất: " + " · ".join(
@@ -774,6 +776,27 @@ def report(kind, day):
     if status:
         lines += ["", "<b>Ngân sách</b>"] + status
     return "\n".join(lines), len(spend)
+
+
+INCOME_KINDS = [("📈 Đầu tư", ["lãi bán", "cổ tức", "lãi tiết kiệm", "tiền lãi", "lãi"]), ("💼 Lương", ["lương"]),
+                ("🎁 Thưởng", ["thưởng"]), ("🧑‍💻 Làm thêm", ["làm thêm", "freelance", "hoa hồng", "dự án", "bán hàng",
+                                                             "kinh doanh", "cho thuê"])]
+
+
+def income_kind(note):
+    """Loại thu nhập theo ghi chú: lương, thưởng, đầu tư (lãi bán cổ phiếu, cổ tức, lãi tiết kiệm), làm thêm, khác."""
+    bare = plain(note or "")
+    for label, words in INCOME_KINDS:
+        if any(re.search(rf"(?<!\w){re.escape(plain(w))}(?!\w)", bare) for w in words):
+            return label
+    return "💰 Khác"
+
+
+def income_kinds(items):
+    sums = {}
+    for e in items:
+        sums[income_kind(e["ghichu"])] = sums.get(income_kind(e["ghichu"]), 0) + e["tien"]
+    return sorted(sums.items(), key=lambda x: -x[1])
 
 
 def budget_status(day):
@@ -790,7 +813,8 @@ HELP = ("💸 <b>Bot ghi chi tiêu</b>\nNhắn số tiền kèm nội dung, bot 
         "Nhiều khoản thì mỗi khoản một dòng; gõ không dấu cũng được.\n"
         "Xếp sai nhóm thì bấm ✏️ Đổi nhóm, lần sau bot tự nhớ. Khoản chưa rõ nhóm thì bot hỏi luôn.\n"
         "Tự tạo nhóm, thêm từ khóa: /nhom\n"
-        "Hỏi bằng câu thường: tháng này cà phê hết bao nhiêu?\n\n")
+        "Hỏi bằng câu thường: tháng này cà phê hết bao nhiêu?\n"
+        "Tài sản: /taisan · mua bán cổ phiếu: bán 500 FPT giá 120 · khám sức khỏe tài chính: /suckhoe\n\n")
 
 
 def baocao(args):
@@ -1042,6 +1066,11 @@ def xuat(args):
             "caption": f"Chi tiêu tháng {month}/{year}: {len(items)} khoản"}
 
 
+def taisan():
+    import taisan as module  # tài sản, mua bán cổ phiếu, khám sức khỏe tài chính
+    return module
+
+
 def phantich():
     import phantich as module  # nạp khi cần: phantich.py cũng dùng các hàm trong file này
     return module
@@ -1068,6 +1097,9 @@ COMMANDS = {
     "dubao": ("Dự báo cuối tháng, hôm nay còn được tiêu bao nhiêu", lambda args: phantich().forecast_text(today())),
     "hoi": ("Hỏi bằng câu thường: /hoi tháng này cà phê hết bao nhiêu", lambda args: phantich().hoi(" ".join(args), today())),
     "bieudo": ("Biểu đồ chi tiêu tháng; /bieudo 10 cho tháng 10", lambda args: phantich().chart_reply(period_kind(args), today())),
+    "taisan": ("Tài sản ròng: tiền, tiết kiệm, cổ phiếu, vàng, quỹ, nợ…; /taisan huongdan", lambda args: taisan().taisan(args)),
+    "suckhoe": ("Khám sức khỏe tài chính cá nhân", lambda args: taisan().health(today())),
+    "luong": ("Nhắc ngày nhận lương: /luong 10 25tr", lambda args: taisan().luong(args)),
     "nhanxet": ("Nhận xét chi tiêu tháng (AI); /nhanxet 10 cho tháng 10", lambda args: phantich().commentary(period_kind(args), today())),
     "xuat": ("Xuất file CSV mở bằng Excel: /xuat 10", xuat),
 }
@@ -1084,6 +1116,9 @@ def answer(text, now):
     if parts and parts[0].startswith("/"):
         command = parts[0][1:].split("@")[0].lower()
         return COMMANDS[command][1](parts[1:]) if command in COMMANDS else HELP
+    traded = taisan().trade(text, now)  # "mua 1000 FPT giá 95", "bán 500 FPT giá 120"
+    if traded:
+        return traded
     if phantich().is_question(text):
         return phantich().hoi(text, now.date())
     entries = add(text, now)
@@ -1128,6 +1163,8 @@ def on_button(data, message, now):
     day = now.date()
     if kind == "bc":
         return None, ("edit", lambda: (report(arg, day)[0], REPORT_BUTTONS))
+    if kind == "ts":
+        return taisan().on_button(arg, message, now)
     if kind == "bd":
         return "Đang vẽ biểu đồ…", ("send", lambda: phantich().chart_reply(arg, day))
     if kind == "db":

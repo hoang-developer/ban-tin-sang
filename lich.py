@@ -14,6 +14,7 @@ import kho
 import lenh
 import phantich
 import sochitieu as chitieu
+import taisan
 import tg
 from bantin import BUTTONS as BANTIN_BUTTONS
 from bantin import (WEEKDAYS, build_message, gold_prices, hourly, index_history, section, stocks, tips,
@@ -336,8 +337,39 @@ def chi_tieu_thang(now, chat):
     return expense_summary(now, "chi_tieu_thang", "thangtruoc", "🗓 <b>Tổng kết tháng</b>")
 
 
+def tai_chinh_sang(now, chat):
+    """Từ 9h: nhắc đã nhận lương chưa (3 ngày từ ngày lương), sổ tiết kiệm sắp đáo hạn (qua bot chi tiêu)."""
+    tok = chitieu.token()
+    if not between(now, (9, 0), (21, 0)) or not tok or done_today("tai_chinh_sang", now):
+        return None
+    chitieu.reset()
+    due = taisan.salary_due(now.date())
+    notes = taisan.maturity_notes(now.date())
+    for owner in chitieu.owner_chats():
+        if due:
+            tg.send(owner, due[0], due[1], tok=tok)
+        if notes:
+            tg.send(owner, "\n".join(notes), tok=tok)
+    mark_done("tai_chinh_sang", now)
+    return f"nhắc lương: {'có' if due else 'không'}, đáo hạn: {len(notes)}"
+
+
+def tai_san_cuoi_ngay(now, chat):
+    """Từ 18h (sau giờ giao dịch): lưu tài sản ròng hôm nay để xem tăng giảm và vẽ biểu đồ."""
+    if not between(now, (18, 0), (23, 45)) or not chitieu.token() or done_today("tai_san_cuoi_ngay", now):
+        return None
+    chitieu.reset()
+    if not taisan.load()["items"] and not kho.get(taisan.K_GOLD):
+        mark_done("tai_san_cuoi_ngay", now)
+        return "chưa khai báo tài sản"
+    v = taisan.valuation(now.date(), fresh=True)
+    taisan.snapshot(now.date(), v)
+    mark_done("tai_san_cuoi_ngay", now)
+    return f"tài sản ròng {round(v['net'])}"
+
+
 JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi,
-        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y]
+        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y, tai_chinh_sang, tai_san_cuoi_ngay]
 
 
 def run(now):
