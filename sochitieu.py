@@ -338,11 +338,17 @@ def parse_line(line, day, learned=None):
 
 
 # ---- Xếp nhóm bằng AI (tùy chọn) ------------------------------------------------------
-# Chỉ hỏi AI những khoản từ khóa không nhận ra (rơi vào Khác). Bật bằng biến AI_API_KEY trên Vercel.
-# API dạng OpenAI (chat/completions), mặc định OpenRouter với các model miễn phí; AI_MODEL nhiều model
-# cách nhau dấu phẩy thì model đầu bận/lỗi OpenRouter tự chuyển sang model sau. AI lỗi thì khoản vẫn
-# ghi vào Khác.
+# Chỉ hỏi AI những khoản từ khóa không nhận ra (rơi vào Khác); AI cũng hiểu câu hỏi, viết nhận xét.
+# Hai nhà cung cấp, cùng kiểu API của OpenAI (chat/completions), có cái nào dùng cái đó:
+# - Google Gemini (biến GEMINI_API_KEY), dùng trước: gói miễn phí không giới hạn chung 50 lượt/ngày.
+#   Thử ngày 04/11/2026: Gemini 3.5 Flash-Lite xếp đúng 13/13 khoản lạ trong khoảng 1 giây, Flash cũng
+#   13/13 (khoảng 8 giây, gói miễn phí 5 lượt/phút). Model trước lỗi, bận, hết lượt thì thử model sau.
+# - OpenRouter (biến AI_API_KEY), dự phòng: model miễn phí, cả tài khoản 50 lượt/ngày; AI_MODEL nhiều
+#   model cách nhau dấu phẩy thì OpenRouter tự chuyển. AI_API_URL đổi được sang nhà cung cấp khác.
+# AI lỗi hết thì khoản vào Khác và bot hỏi người dùng.
 
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+GEMINI_MODELS = "gemini-3.5-flash-lite,gemini-3.5-flash"
 AI_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Chọn ngày 04/11/2026: thử 13 khoản lạ, Nemotron 3 Ultra đúng 12, Dots 3 đúng 12 (dự phòng).
 # Không thêm openrouter/free: nó chọn ngẫu nhiên model miễn phí, có lần chỉ đúng 7/13.
@@ -350,17 +356,42 @@ AI_MODELS = "nvidia/nemotron-3-ultra-550b-a55b:free,dots-studio/dots-3-note-prev
 AI_TIMEOUT = 25  # giây; model miễn phí có "suy nghĩ" trước khi trả lời nên chậm, quá thì thôi
 
 
-def ai_key():
+def env_list(name, default):
+    return [m.strip() for m in os.environ.get(name, default).split(",") if m.strip()]
+
+
+def gemini_key():
+    return os.environ.get("GEMINI_API_KEY", "").strip()
+
+
+def openrouter_key():
     return os.environ.get("AI_API_KEY", "").strip()
 
 
+def ai_key():
+    """Có AI không (Gemini hoặc OpenRouter)."""
+    return gemini_key() or openrouter_key()
+
+
 def ai_models():
-    return [m.strip() for m in os.environ.get("AI_MODEL", AI_MODELS).split(",") if m.strip()]
+    """Các model OpenRouter (hoặc nhà cung cấp AI_API_URL)."""
+    return env_list("AI_MODEL", AI_MODELS)
 
 
-def ai_post(payload):
-    req = urllib.request.Request(os.environ.get("AI_API_URL", AI_URL), data=json.dumps(payload).encode(), headers={
-        "Content-Type": "application/json", "Authorization": f"Bearer {ai_key()}", "X-Title": "ban-tin-sang"})
+def ai_providers():
+    """[(tên, địa chỉ, key, các model)] theo thứ tự thử: Gemini trước, OpenRouter dự phòng."""
+    out = []
+    if gemini_key():
+        out.append(("Gemini", GEMINI_URL, gemini_key(), env_list("GEMINI_MODEL", GEMINI_MODELS)))
+    if openrouter_key():
+        url = os.environ.get("AI_API_URL", AI_URL)
+        out.append(("OpenRouter" if "openrouter.ai" in url else "AI", url, openrouter_key(), ai_models()))
+    return out
+
+
+def ai_post(payload, url=None, key=None):
+    req = urllib.request.Request(url or os.environ.get("AI_API_URL", AI_URL), data=json.dumps(payload).encode(), headers={
+        "Content-Type": "application/json", "Authorization": f"Bearer {key or ai_key()}", "X-Title": "ban-tin-sang"})
     try:
         with urllib.request.urlopen(req, timeout=AI_TIMEOUT) as r:
             return json.loads(r.read())
@@ -374,17 +405,26 @@ def ai_post(payload):
 
 
 def ai_chat(system, user, max_tokens=2000):
-    """Hỏi AI một lượt: (câu trả lời đã bỏ phần "suy nghĩ", model đã trả lời). Lỗi mạng, hết lượt... thì báo lỗi."""
-    models = ai_models()
-    payload = {
-        # Model có "suy nghĩ" tiêu nhiều token trước khi trả lời; ít quá thì câu trả lời bị cắt rỗng
-        "model": models[0], "temperature": 0, "max_tokens": max_tokens,
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
-    if len(models) > 1:
-        payload["models"] = models  # OpenRouter: model trước bận/lỗi thì dùng model sau
-    res = ai_post(payload)
-    text = res["choices"][0]["message"].get("content") or ""
-    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip(), res.get("model", models[0])
+    """Hỏi AI một lượt: (câu trả lời đã bỏ phần "suy nghĩ", model đã trả lời). Thử lần lượt từng nhà cung cấp,
+    từng model; tất cả đều lỗi (mạng, bận, hết lượt...) thì báo lỗi."""
+    errors = []
+    for provider, url, key, models in ai_providers():
+        # OpenRouter tự chuyển model khi nhận danh sách "models"; nơi khác thì bot tự thử từng model
+        tries = [(models[0], {"models": models})] if "openrouter.ai" in url and len(models) > 1 else \
+            [(m, {}) for m in models]
+        for model, extra in tries:
+            payload = {
+                # Model có "suy nghĩ" tiêu nhiều token trước khi trả lời; ít quá thì câu trả lời bị cắt rỗng
+                "model": model, "temperature": 0, "max_tokens": max_tokens, **extra,
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+            try:
+                res = ai_post(payload, url, key)
+                text = res["choices"][0]["message"].get("content") or ""
+                return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip(), res.get("model", model)
+            except Exception as e:
+                print(f"[lỗi] AI {provider} {model}: {e!r}", file=sys.stderr)
+                errors.append(f"{provider} {model}: {e}")
+    raise RuntimeError("; ".join(errors) or "chưa bật AI (thiếu GEMINI_API_KEY hoặc AI_API_KEY)")
 
 
 def first_json(text):
@@ -460,16 +500,17 @@ def ai_stats():
 def ai_quota():
     """(đã dùng, giới hạn) lượt gọi model miễn phí hôm nay của key OpenRouter (không tốn lượt);
     None nếu không dùng OpenRouter. Lượt tính lại lúc 0h giờ quốc tế, tức 7h sáng ở Việt Nam."""
-    if "openrouter.ai" not in os.environ.get("AI_API_URL", AI_URL):
+    if not openrouter_key() or "openrouter.ai" not in os.environ.get("AI_API_URL", AI_URL):
         return None
-    req = urllib.request.Request("https://openrouter.ai/api/v1/key", headers={"Authorization": f"Bearer {ai_key()}"})
+    req = urllib.request.Request("https://openrouter.ai/api/v1/key",
+                                 headers={"Authorization": f"Bearer {openrouter_key()}"})
     with urllib.request.urlopen(req, timeout=10) as r:
         used = (json.loads(r.read())["data"].get("free_model_daily_requests") or {})
     return (used["used"], used["limit"]) if "used" in used and "limit" in used else None
 
 
 def quota_text():
-    """'đã dùng 12/50 lượt miễn phí hôm nay' hoặc báo hết lượt; chuỗi rỗng nếu không xem được."""
+    """Lượt OpenRouter: 'đã dùng 12/50 lượt miễn phí hôm nay' hoặc báo hết lượt; rỗng nếu không dùng OpenRouter."""
     try:
         quota = ai_quota()
     except urllib.error.HTTPError as e:
@@ -480,22 +521,23 @@ def quota_text():
         return ""
     used, limit = quota
     return f"hôm nay đã dùng {used}/{limit} lượt miễn phí" + (
-        " – HẾT LƯỢT, 7h sáng mai có lại (khoản lạ bot sẽ hỏi bạn)" if used >= limit else "")
+        " – HẾT LƯỢT, 7h sáng mai có lại" if used >= limit else "")
 
 
 def ai_status(test=False):
     """Một dòng tình trạng AI cho trang cài đặt. test=True thì thử xếp một khoản mẫu (tốn 1 lượt)."""
     if not ai_key():
-        return "AI xếp nhóm: tắt (chưa có biến AI_API_KEY)"
+        return "AI xếp nhóm: tắt (chưa có biến GEMINI_API_KEY hoặc AI_API_KEY)"
+    chain = " → ".join(f"{name_} ({', '.join(models)})" for name_, _, _, models in ai_providers())
     if not test:
         quota = quota_text()
-        return (f"AI xếp nhóm: bật ({', '.join(ai_models())})" + (f", {quota}" if quota else "")
+        return (f"AI xếp nhóm: bật, thử lần lượt {chain}" + (f". OpenRouter {quota}" if quota else "")
                 + ". Thêm ?thu=1 vào địa chỉ trang để thử gọi AI")
     start = datetime.now()
     try:
         got, model = ai_request(["thay má phanh"])
     except Exception as e:
-        return f"AI xếp nhóm ({', '.join(ai_models())}): LỖI – {e}"
+        return f"AI xếp nhóm ({chain}): LỖI – {e}"
     seconds = (datetime.now() - start).total_seconds()
     return (f"AI xếp nhóm: hoạt động ({model}, {seconds:.1f} giây), thử 'thay má phanh' → "
             f"{name(got.get('thay má phanh', OTHER))}")

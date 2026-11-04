@@ -335,6 +335,7 @@ def rule_spec(question, day):
             spec["tu2"], spec["den2"] = spans[1][1], spans[1][2]
         else:
             spec["tu2"], spec["den2"] = previous_span(start, end)
+        spec["tu2"], spec["den2"] = same_period(spec)
     for code, (label, _, _) in ct.groups().items():  # tên nhóm nhắc trong câu: "ăn uống", "đi chợ", "đi lại"
         parts = [" ".join(ct.plain(p).split()) for p in re.split(r"[,&]", ct.bare(label))]
         if code != ct.INCOME and any(len(p) >= 4 and re.search(rf"(?<!\w){re.escape(p)}(?!\w)", bare) for p in parts):
@@ -393,7 +394,18 @@ def clean_spec(raw, day):
         prev = previous_span(start, end)
         a, b = when("tu2", prev[0]), when("den2", prev[1])
         spec["tu2"], spec["den2"] = min(a, b), max(a, b)
+        spec["tu2"], spec["den2"] = same_period(spec)
     return spec
+
+
+def same_period(spec):
+    """Tháng đang dở (1/11–20/11) mà đem so cả tháng trước thì so cùng kỳ (1/10–20/10) cho công bằng."""
+    start, end, start2, end2 = spec["tu"], spec["den"], spec["tu2"], spec["den2"]
+    month_end = (end.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    prev_end = (end2.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    if start.day == 1 and end < month_end and start2.day == 1 and end2 == prev_end and start2 < start:
+        return start2, min(start2 + (end - start), end2)
+    return start2, end2
 
 
 def matches(e, spec):
@@ -644,13 +656,13 @@ def commentary(kind, day):
         return f"Chưa có khoản chi nào trong {label} để nhận xét"
     text = [f"📌 <b>Số liệu {label}</b>"] + [f"• {line}" for line in lines]
     if not ct.ai_key():
-        return "\n".join(text + ["", "<i>Bật AI (biến AI_API_KEY) để có thêm nhận xét và gợi ý tiết kiệm</i>"])
+        return "\n".join(text + ["", "<i>Bật AI (biến GEMINI_API_KEY) để có thêm nhận xét và gợi ý tiết kiệm</i>"])
     plain_facts = re.sub(r"<[^>]+>", "", html.unescape("\n".join(lines)))
     system = ("Bạn là trợ lý tài chính cá nhân, viết tiếng Việt có dấu, ngắn gọn, thân thiện, xưng \"bạn\". "
               "Chỉ dùng số liệu được cho, không bịa thêm số. Trả lời đúng 4 dòng, không markdown: 3 dòng đầu mỗi "
               "dòng bắt đầu bằng \"• \" là 3 điểm đáng chú ý nhất (mỗi dòng dưới 25 chữ); dòng cuối bắt đầu bằng "
-              "\"💡 \" là 1 gợi ý tiết kiệm cụ thể có con số (vd bớt 2 ly trà sữa mỗi tuần thì để dành thêm "
-              "khoảng 400k/tháng).")
+              "\"💡 \" là 1 gợi ý tiết kiệm cụ thể có con số, làm được theo đúng số lần trong số liệu (vd trà "
+              "sữa 9 lần/tháng thì bớt một nửa để dành thêm khoảng 250k/tháng).")
     try:
         answer, _ = ct.ai_chat(system, f"Số liệu chi tiêu {label}:\n{plain_facts}")
         lines_ai = [line.strip() for line in answer.splitlines()]
