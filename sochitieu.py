@@ -11,6 +11,8 @@ import os
 import re
 import sys
 import unicodedata
+import urllib.error
+import urllib.request
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 
@@ -79,7 +81,7 @@ INCOME, OTHER = "thu", "khac"
 MAX_LEARNED = 500  # số cụm từ học được tối đa
 # ---------------------------------------------------------------------------------
 
-K_COUNTER, K_LEARN, K_BUDGET = "chitieu:dem", "chitieu:hoc", "chitieu:ngansach"
+K_COUNTER, K_LEARN, K_BUDGET, K_AI = "chitieu:dem", "chitieu:hoc", "chitieu:ngansach", "chitieu:ai"
 NEED_STORE = "⚠️ Bot chi tiêu cần kho dữ liệu (Upstash Redis trên Vercel), xem README."
 
 
@@ -113,28 +115,34 @@ def word_pattern(word):
     return re.compile(rf"(?<!\w){re.escape(word)}(?!\w)")
 
 
-# (mẫu có dấu, mẫu không dấu, điểm, mã nhóm); điểm là độ dài cụm, từ chung chung điểm thấp
-KEYWORDS = [(word_pattern(norm(k)), word_pattern(plain(k)), 0.5 if norm(k) in GENERIC else len(norm(k)), code)
+# Bỏ dấu rồi trùng với chữ thường gặp: "chợ"/"cho", "cá"/"ca", "quà"/"qua", "vở"/"vợ", "gà"/"ga"(gas)...
+# Câu gõ không dấu thì không dùng các dạng này để đoán nhóm.
+AMBIGUOUS_PLAIN = {"cho", "ca", "qua", "ta", "tu", "vo", "noi", "bo", "ga", "but", "che", "tang", "tra"}
+
+
+def plain_pattern(word):
+    bare = plain(word)
+    return None if bare in AMBIGUOUS_PLAIN and bare != norm(word) else word_pattern(bare)
+
+
+# (mẫu có dấu, mẫu không dấu hoặc None, điểm, mã nhóm); điểm là độ dài cụm, từ chung chung điểm thấp
+KEYWORDS = [(word_pattern(norm(k)), plain_pattern(k), 0.5 if norm(k) in GENERIC else len(norm(k)), code)
             for code, (_, words) in CATEGORIES.items() for k in words]
 
 
 def classify(note, learned=None):
-    """Mã nhóm của ghi chú. Cụm từ đã học (người dùng sửa nhóm) thắng từ khóa có sẵn."""
-    text, bare = norm(note), plain(note)
+    """Mã nhóm của ghi chú. Cụm từ đã học (người dùng sửa nhóm) thắng từ khóa có sẵn.
+
+    Câu có dấu chỉ so với từ khóa có dấu ("cho Lan" không phải "chợ", "trả" không phải "trà");
+    câu gõ không dấu so với từ khóa đã bỏ dấu ("cho be" là "cho bé", thắng "be" gọi xe).
+    """
+    text = norm(note)
+    typed_plain = text == plain(text)
     learned_rules = [(word_pattern(k), word_pattern(plain(k)), 100 + len(k), code)
                      for k, code in (learned or {}).items() if code in CATEGORIES]
-    rules = learned_rules + KEYWORDS
-    # So dạng bỏ dấu chỉ trên những chữ người dùng gõ không dấu; chữ đã có dấu thì che đi,
-    # kẻo "trả" bỏ dấu thành "tra" rồi bị hiểu là "trà".
-    typed_plain = " ".join(w if w == plain(w) else "#" for w in text.split())
-    # Câu có dấu: so có dấu trước, không khớp gì mới so phần gõ không dấu.
-    # Câu gõ không dấu: so dạng bỏ dấu ngay, để "cho be" (cho bé) thắng "be" (gọi xe).
-    passes = [(1, typed_plain)] if text == bare else [(0, text), (1, typed_plain)]
-    for index, subject in passes:
-        found = [(score, code) for *patterns, score, code in rules if patterns[index].search(subject)]
-        if found:
-            return max(found, key=lambda x: x[0])[1]
-    return OTHER
+    found = [(score, code) for exact, bare, score, code in learned_rules + KEYWORDS
+             if (bare if typed_plain else exact) and (bare if typed_plain else exact).search(text)]
+    return max(found, key=lambda x: x[0])[1] if found else OTHER
 
 
 MONEY = re.compile(
@@ -220,6 +228,92 @@ def parse_line(line, day, learned=None):
             "nhom": INCOME if income else classify(note, learned)}
 
 
+# ---- Xếp nhóm bằng AI (tùy chọn) ------------------------------------------------------
+# Chỉ hỏi AI những khoản từ khóa không nhận ra (rơi vào Khác). Bật bằng biến AI_API_KEY trên Vercel;
+# API dạng OpenAI (chat/completions), mặc định Viettel AI. AI lỗi thì khoản vẫn ghi vào Khác.
+
+AI_TIMEOUT = 10  # giây; quá thì thôi, không để bot treo
+
+
+def ai_key():
+    return os.environ.get("AI_API_KEY", "").strip()
+
+
+def ai_model():
+    return os.environ.get("AI_MODEL", "DeepSeek-V4-Flash")
+
+
+def ai_post(payload):
+    url = os.environ.get("AI_API_URL", "https://viettelai.vn/model-as-a-service/v1/chat/completions")
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
+        "Content-Type": "application/json", "Authorization": f"Bearer {ai_key()}"})
+    try:
+        with urllib.request.urlopen(req, timeout=AI_TIMEOUT) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        body = (e.read() or b"").decode(errors="replace")
+        try:
+            message = json.loads(body)["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            message = body[:200]
+        raise RuntimeError(f"AI báo lỗi {e.code}: {message}") from None
+
+
+def ai_request(notes):
+    """Hỏi AI nhóm của các ghi chú: {ghi chú: mã}. Lỗi mạng, hết credit... thì báo lỗi."""
+    groups = "\n".join(f"{code}: {label.split(' ', 1)[1]}" for code, (label, _) in CATEGORIES.items())
+    numbered = "\n".join(f"{i}. {note}" for i, note in enumerate(notes, 1))
+    res = ai_post({
+        "model": ai_model(), "temperature": 0, "max_tokens": 30 * len(notes) + 30,
+        "messages": [
+            {"role": "system", "content": (
+                "Bạn phân loại khoản chi tiêu cá nhân của người Việt. Các nhóm (mã: tên):\n" + groups
+                + "\nTrả lời đúng một dòng JSON, khóa là số thứ tự, giá trị là mã nhóm, ví dụ "
+                '{"1": "an", "2": "xe"}. Không chắc thì dùng "khac". Không giải thích.')},
+            {"role": "user", "content": numbered}]})
+    text = res["choices"][0]["message"]["content"] or ""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)  # bỏ phần "suy nghĩ" nếu model có
+    found = re.search(r"\{.*?\}", text, re.DOTALL)
+    if not found:
+        raise RuntimeError(f"AI trả lời không đúng dạng: {text[:100]!r}")
+    answer = json.loads(found[0])
+    return {note: str(answer.get(str(i), "")).strip().lower() for i, note in enumerate(notes, 1)
+            if str(answer.get(str(i), "")).strip().lower() in CATEGORIES}
+
+
+def ask_ai(entries):
+    """Khoản rơi vào Khác thì hỏi AI (có nhớ câu trả lời cũ); đánh dấu khoản do AI xếp."""
+    unknown = [e for e in entries if e["nhom"] == OTHER and e["ghichu"]]
+    if not unknown or not ai_key():
+        return
+    cache = kho.get(K_AI, {})
+    ask = list(dict.fromkeys(e["ghichu"] for e in unknown if norm(e["ghichu"]) not in cache))
+    if ask:
+        try:
+            for note, code in ai_request(ask).items():
+                cache[norm(note)] = code
+            kho.put(K_AI, dict(list(cache.items())[-MAX_LEARNED:]))
+        except Exception as e:
+            print(f"[lỗi] xếp nhóm bằng AI: {e!r}", file=sys.stderr)
+    for e in unknown:
+        code = cache.get(norm(e["ghichu"]), OTHER)
+        if code not in (OTHER, INCOME):  # khoản thu chỉ nhận khi người dùng ghi dấu +
+            e["nhom"], e["ai"] = code, True
+
+
+def ai_status():
+    """Một dòng tình trạng AI cho trang cài đặt: thử xếp một khoản mẫu."""
+    if not ai_key():
+        return "AI xếp nhóm: tắt (chưa có biến AI_API_KEY)"
+    start = datetime.now()
+    try:
+        got = ai_request(["bảo dưỡng ô tô"])
+    except Exception as e:
+        return f"AI xếp nhóm ({ai_model()}): LỖI – {e}"
+    seconds = (datetime.now() - start).total_seconds()
+    return f"AI xếp nhóm ({ai_model()}): hoạt động, {seconds:.1f} giây, thử 'bảo dưỡng ô tô' → {name(got.get('bảo dưỡng ô tô', OTHER))}"
+
+
 # ---- Lưu trữ: mỗi tháng một Redis hash, mỗi khoản một mục (id -> JSON) ---------------
 # Ghi/sửa/xóa từng mục riêng nên hai tin nhắn tới cùng lúc không đè mất khoản của nhau.
 
@@ -251,6 +345,7 @@ def add(text, now):
     """Ghi mọi khoản trong tin nhắn (mỗi dòng một khoản); trả về các khoản đã ghi."""
     learned = kho.get(K_LEARN, {})
     entries = [e for e in (parse_line(line, now.date(), learned) for line in text.splitlines()) if e]
+    ask_ai(entries)
     for e in entries:
         e["id"] = kho.command("INCR", K_COUNTER)
         e["gio"] = now.strftime("%H:%M")
@@ -297,7 +392,8 @@ def entry_text(e, day):
     when = "" if e["ngay"] == day.isoformat() else (
         " · hôm qua" if e["ngay"] == (day - timedelta(days=1)).isoformat() else f" · {e['ngay'][8:]}/{e['ngay'][5:7]}")
     note = html.escape(e["ghichu"]) if e["ghichu"] else "<i>không ghi chú</i>"
-    return f"<b>{vnd(e['tien'])}</b> · {name(e['nhom'])} — {note}{when}"
+    robot = " 🤖" if e.get("ai") else ""  # nhóm do AI đoán
+    return f"<b>{vnd(e['tien'])}</b> · {name(e['nhom'])}{robot} — {note}{when}"
 
 
 def budget_lines(codes, day):
@@ -323,6 +419,8 @@ def entries_message(entries, day):
     if not entries:
         return "🗑 Đã xóa", None
     budget = budget_lines([e["nhom"] for e in entries if e["nhom"] != INCOME], day)
+    if any(e.get("ai") for e in entries):
+        budget.append("<i>🤖 nhóm do AI đoán, sai thì bấm ✏️ để sửa, lần sau bot tự nhớ</i>")
     if len(entries) == 1:
         e = entries[0]
         text = "\n".join([f"✅ Đã ghi {entry_text(e, day)}"] + budget)
@@ -509,6 +607,7 @@ def nhom_cmd(args):
         sample = ", ".join(words[:6]) if words else "những khoản không khớp nhóm nào"
         lines.append(f"{label}: <i>{html.escape(sample)}</i>")
     lines.append(f"\nBot đã học {len(learned)} cụm từ từ những lần bạn bấm ✏️ Đổi nhóm.")
+    lines.append(f"🤖 AI xếp nhóm cho khoản lạ: {'bật, ' + ai_model() if ai_key() else 'tắt'}")
     return "\n".join(lines)
 
 
@@ -604,6 +703,7 @@ def on_button(data, message, now):
         if e is None or code not in CATEGORIES:
             return "Khoản này đã xóa rồi", ("edit", lambda: render(refs, day))
         e["nhom"] = code
+        e.pop("ai", None)  # người dùng đã chọn, không còn là AI đoán
         save(e)
         if code != INCOME:
             learn(e["ghichu"], code)

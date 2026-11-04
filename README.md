@@ -118,6 +118,22 @@ Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gử
 3. Mở `https://ban-tin-sang.vercel.app/api/chitieu` bằng trình duyệt: trang báo "Đã cài webhook".
 4. Vào Telegram, mở bot mới, nhắn `cà phê 35k`.
 
+### Xếp nhóm bằng AI (tùy chọn)
+
+Khoản nào từ khóa không nhận ra (rơi vào Khác) thì bot hỏi AI, khoản đó hiện dấu 🤖. AI lỗi hay hết
+credit thì khoản vẫn ghi vào Khác như thường. Bot nhớ câu trả lời của AI, cùng nội dung không hỏi lại;
+khoản đã sửa bằng ✏️ thì theo nhóm bạn chọn, không hỏi AI nữa. Nội dung các khoản lạ được gửi cho
+nhà cung cấp AI.
+
+Bật bằng biến môi trường trên Vercel (rồi Redeploy):
+- `AI_API_KEY`: khóa API (bắt buộc để bật)
+- `AI_MODEL`: mặc định `DeepSeek-V4-Flash`
+- `AI_API_URL`: mặc định `https://viettelai.vn/model-as-a-service/v1/chat/completions`; nhà cung cấp
+  khác có API dạng OpenAI (`/v1/chat/completions`) cũng dùng được
+
+Mở `https://ban-tin-sang.vercel.app/api/chitieu`: dòng "AI xếp nhóm" cho biết AI đang chạy hay lỗi gì
+(trang thử xếp một khoản mẫu mỗi lần mở).
+
 Dữ liệu nằm trong kho Upstash Redis của dự án (khóa `chitieu:...`). Bot chỉ trả lời chat có
 `TELEGRAM_CHAT_ID`; muốn dùng chung với người nhà thì thêm biến `CHITIEU_CHAT_ID` = các chat ID cách nhau
 dấu phẩy (người đó nhắn bot sẽ được báo chat ID của mình), mọi người ghi chung một sổ.
