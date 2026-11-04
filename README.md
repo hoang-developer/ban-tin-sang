@@ -130,9 +130,13 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/hoi` | Hỏi bằng câu thường, hoặc gõ thẳng câu hỏi: `tháng này cà phê hết bao nhiêu?` |
 | `/bieudo` | Biểu đồ tròn theo nhóm và cột theo ngày; `/bieudo 10` cho tháng 10 |
 | `/nhanxet` | Số liệu đáng chú ý của tháng + nhận xét và gợi ý tiết kiệm của AI; `/nhanxet 10` |
+| `/taisan` | Tài sản ròng: tiền, tiết kiệm, cổ phiếu, quỹ, vàng, tiền số, ngoại tệ, nợ (xem dưới) |
+| `/suckhoe` | Khám sức khỏe tài chính cá nhân |
+| `/luong` | Nhắc ngày nhận lương: `/luong 10 25tr` |
 
 Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước kèm biểu đồ và nhận
-xét, 21h hằng ngày báo nếu có gì cần để ý (qua lịch chạy `/api/tick` sẵn có).
+xét, 21h hằng ngày báo nếu có gì cần để ý, 9h nhắc lương và sổ tiết kiệm sắp đáo hạn, 18h lưu tài sản ròng
+(qua lịch chạy `/api/tick` sẵn có).
 
 ### Hiểu mình tiêu thế nào
 
@@ -159,6 +163,41 @@ Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câ
 - **Nhận xét** (`/nhanxet`, nút 💬, tự gửi ngày 1): tổng, so với kỳ trước và trung bình 3 tháng, nhóm
   tăng/giảm, khoản lặp lại nhiều (cà phê 22 lần…), khoản lớn nhất, ngày thường/cuối tuần, số ngày không
   tiêu, tỉ lệ để dành; AI viết 3 điểm đáng chú ý và 1 gợi ý tiết kiệm có con số.
+
+### Thu nhập, tài sản, khám sức khỏe tài chính
+
+Code ở [taisan.py](taisan.py).
+
+- **Thu nhập**: `+ lương 25tr`, `+ thưởng 3tr`, `+ cổ tức VNM 1tr2`. Báo cáo chia thu theo loại: lương,
+  thưởng, đầu tư (lãi bán cổ phiếu, cổ tức, lãi tiết kiệm), làm thêm, khác. `/luong 10 25tr`: từ ngày 10
+  (tối đa 3 ngày) bot hỏi đã nhận lương chưa, bấm nút là ghi.
+- **Mua bán cổ phiếu**: nhắn `mua 1000 FPT giá 95` hoặc `bán 500 FPT giá 120` (giá nghìn đồng hoặc đồng).
+  Mua: cộng vào danh mục, tính giá vốn bình quân. Bán: trừ thuế thu nhập 0,1% giá trị bán (DNSE miễn phí
+  giao dịch nên không có phí; công ty khác sửa `BROKER_FEE` trong taisan.py), tính lãi/lỗ so với giá vốn,
+  phần **lãi** ghi vào Thu nhập (phần vốn chỉ là đổi cổ phiếu ra tiền). Có khai báo tài khoản tiền tên
+  "DNSE" (`/taisan tien DNSE 50tr`) thì bot tự trừ/cộng tiền trong đó. Mua cổ phiếu không tính là khoản chi.
+- **Tài sản** (`/taisan`, `/taisan huongdan` xem cách khai báo):
+
+  | Loại | Khai báo | Giá |
+  |---|---|---|
+  | Tiền, tài khoản | `/taisan tien VCB 25tr` (cùng tên là cập nhật số dư) | Bạn tự cập nhật |
+  | Tiết kiệm | `/taisan tietkiem VCB 100tr 4,7% 6 thang 01/08/2026` | Bot tính lãi theo ngày, nhắc trước đáo hạn 3 ngày |
+  | Cổ phiếu | `/taisan cp FPT 1000 95` (số lượng, giá vốn) | Giá khớp gần nhất (Vietcap) |
+  | Quỹ mở | `/taisan quy VCBF-FIF 1200 15000` | Giá chứng chỉ quỹ trên Fmarket |
+  | Vàng | `/taisan vang sjc 1 luong 140` (chung ví `/vivang` của bot bản tin) | Giá cửa hàng mua vào SJC/PNJ |
+  | Tiền số | `/taisan coin btc 0,05` | CoinGecko, lỗi thì Coinbase × tỷ giá |
+  | Ngoại tệ | `/taisan usd 1000` | Vietcombank mua chuyển khoản |
+  | Khác, nợ | `/taisan khac xe máy 30tr` · `/taisan no vay mua nhà 500tr` | Bạn tự nhập |
+
+  Bot cho xem tài sản ròng (tài sản trừ nợ), từng loại chiếm bao nhiêu phần trăm, lãi/lỗ từng khoản, lãi/lỗ
+  đã chốt trong năm, so với khoảng 30 ngày trước; nút 📊 vẽ biểu đồ cơ cấu và đường tài sản ròng theo thời
+  gian (18h mỗi ngày bot lưu lại tài sản ròng). Nguồn giá lỗi thì dùng giá gần nhất và ghi chú. Sửa: khai
+  báo lại cùng tên/mã; xóa: `/taisan xoa`.
+- **Khám sức khỏe tài chính** (`/suckhoe`, nút 🩺): chấm điểm /100 theo quỹ dự phòng (tiền + tiết kiệm
+  đủ mấy tháng chi tiêu, nên 3–6), tỉ lệ để dành (nên từ 20% thu nhập), nợ so với tài sản (nên dưới 30%),
+  phân bổ (một mã quá 20% tài sản, tiền số quá 10%, một loại quá 70%), khoản đầu tư lỗ từ 20%, xu hướng
+  tài sản ròng. Chi và thu lấy từ sổ 90 ngày qua. AI (nếu bật) viết 2 nhận xét và 2–3 việc nên làm có
+  con số; được dặn không khuyên mua bán mã nào, không dự đoán giá. Chỉ để tham khảo.
 
 ### Cài bot chi tiêu (làm một lần)
 
