@@ -373,6 +373,29 @@ def ai_post(payload):
         raise RuntimeError(f"AI báo lỗi {e.code}: {message}") from None
 
 
+def ai_chat(system, user, max_tokens=2000):
+    """Hỏi AI một lượt: (câu trả lời đã bỏ phần "suy nghĩ", model đã trả lời). Lỗi mạng, hết lượt... thì báo lỗi."""
+    models = ai_models()
+    payload = {
+        # Model có "suy nghĩ" tiêu nhiều token trước khi trả lời; ít quá thì câu trả lời bị cắt rỗng
+        "model": models[0], "temperature": 0, "max_tokens": max_tokens,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+    if len(models) > 1:
+        payload["models"] = models  # OpenRouter: model trước bận/lỗi thì dùng model sau
+    res = ai_post(payload)
+    text = res["choices"][0]["message"].get("content") or ""
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip(), res.get("model", models[0])
+
+
+def first_json(text):
+    """Đối tượng JSON đầu tiên trong câu trả lời của AI (bỏ qua chữ, khối ```json bao quanh)."""
+    start = text.find("{")
+    try:
+        return json.JSONDecoder().raw_decode(text[start:])[0] if start >= 0 else None
+    except ValueError:
+        return None
+
+
 def ai_prompt(learned=None):
     """Lời dặn cho AI: các nhóm đang dùng (kể cả nhóm tự tạo) kèm vài từ khóa gợi ý, và những khoản
     người dùng đã tự xếp làm ví dụ để AI đoán theo thói quen của người dùng."""
@@ -393,23 +416,13 @@ def ai_prompt(learned=None):
 def ai_request(notes, learned=None):
     """Hỏi AI nhóm của các ghi chú: ({ghi chú: mã}, model đã trả lời). Lỗi mạng, hết lượt... thì báo lỗi."""
     numbered = "\n".join(f"{i}. {note}" for i, note in enumerate(notes, 1))
-    models = ai_models()
-    payload = {
-        # Model có "suy nghĩ" tiêu nhiều token trước khi trả lời; ít quá thì câu trả lời bị cắt rỗng
-        "model": models[0], "temperature": 0, "max_tokens": 2000,
-        "messages": [{"role": "system", "content": ai_prompt(learned)}, {"role": "user", "content": numbered}]}
-    if len(models) > 1:
-        payload["models"] = models  # OpenRouter: model trước bận/lỗi thì dùng model sau
-    res = ai_post(payload)
-    text = res["choices"][0]["message"].get("content") or ""
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)  # bỏ phần "suy nghĩ" nếu model có
-    found = re.search(r"\{.*?\}", text, re.DOTALL)
-    if not found:
+    text, model = ai_chat(ai_prompt(learned), numbered)
+    found = first_json(text)
+    if not isinstance(found, dict):
         raise RuntimeError(f"AI trả lời không đúng dạng: {text[:100]!r}")
-    answer = {k: str(v).strip().lower() for k, v in json.loads(found[0]).items()}
+    answer = {k: str(v).strip().lower() for k, v in found.items()}
     active = groups()
-    return ({note: answer[str(i)] for i, note in enumerate(notes, 1) if answer.get(str(i)) in active},
-            res.get("model", models[0]))
+    return {note: answer[str(i)] for i, note in enumerate(notes, 1) if answer.get(str(i)) in active}, model
 
 
 def ask_ai(entries, learned=None):
@@ -444,10 +457,40 @@ def ai_stats():
     return int(stats.get("doan", 0)), int(stats.get("sua", 0))
 
 
-def ai_status():
-    """Một dòng tình trạng AI cho trang cài đặt: thử xếp một khoản mẫu."""
+def ai_quota():
+    """(đã dùng, giới hạn) lượt gọi model miễn phí hôm nay của key OpenRouter (không tốn lượt);
+    None nếu không dùng OpenRouter. Lượt tính lại lúc 0h giờ quốc tế, tức 7h sáng ở Việt Nam."""
+    if "openrouter.ai" not in os.environ.get("AI_API_URL", AI_URL):
+        return None
+    req = urllib.request.Request("https://openrouter.ai/api/v1/key", headers={"Authorization": f"Bearer {ai_key()}"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        used = (json.loads(r.read())["data"].get("free_model_daily_requests") or {})
+    return (used["used"], used["limit"]) if "used" in used and "limit" in used else None
+
+
+def quota_text():
+    """'đã dùng 12/50 lượt miễn phí hôm nay' hoặc báo hết lượt; chuỗi rỗng nếu không xem được."""
+    try:
+        quota = ai_quota()
+    except urllib.error.HTTPError as e:
+        return "LỖI – key không hợp lệ, kiểm tra biến AI_API_KEY" if e.code == 401 else f"không xem được lượt dùng ({e})"
+    except Exception as e:
+        return f"không xem được lượt dùng ({e!r})"
+    if not quota:
+        return ""
+    used, limit = quota
+    return f"hôm nay đã dùng {used}/{limit} lượt miễn phí" + (
+        " – HẾT LƯỢT, 7h sáng mai có lại (khoản lạ bot sẽ hỏi bạn)" if used >= limit else "")
+
+
+def ai_status(test=False):
+    """Một dòng tình trạng AI cho trang cài đặt. test=True thì thử xếp một khoản mẫu (tốn 1 lượt)."""
     if not ai_key():
         return "AI xếp nhóm: tắt (chưa có biến AI_API_KEY)"
+    if not test:
+        quota = quota_text()
+        return (f"AI xếp nhóm: bật ({', '.join(ai_models())})" + (f", {quota}" if quota else "")
+                + ". Thêm ?thu=1 vào địa chỉ trang để thử gọi AI")
     start = datetime.now()
     try:
         got, model = ai_request(["thay má phanh"])
@@ -600,7 +643,7 @@ def budget_lines(codes, day):
 SORT_TITLE = "🗂"  # tin /chuaxep bắt đầu bằng biểu tượng này, vẽ lại vẫn giữ kiểu tin
 
 
-def entries_message(entries, day, sorting=False, focus=None):
+def entries_message(entries, day, sorting=False, focus=None, extra=()):
     """Tin báo các khoản vừa ghi, kèm nút ✏️ đổi nhóm và ❌ xóa từng khoản. Khoản chưa rõ nhóm (Khác)
     thì hiện luôn nút chọn nhóm, từng khoản một, để ít khoản phải nằm ở Khác. focus: khoản vừa bấm ✏️."""
     if not entries:
@@ -614,6 +657,7 @@ def entries_message(entries, day, sorting=False, focus=None):
         notes.append(f"❓ Chưa rõ nhóm của «{what}»: chọn nhóm bên dưới, lần sau bot tự xếp")
     elif ask:
         notes.append(f"✏️ Chọn nhóm đúng cho «{what}»")
+    notes += list(extra)
     if any(e.get("ai") for e in entries):
         notes.append("<i>🤖 nhóm do AI đoán, sai thì bấm ✏️ để sửa, lần sau bot tự nhớ</i>")
     if sorting:
@@ -660,7 +704,8 @@ def with_picker(rows, reference, keep="↩️ Thôi"):
 # ---- Báo cáo ------------------------------------------------------------------------
 
 REPORT_BUTTONS = [[("Hôm nay", "bc:ngay"), ("Tuần này", "bc:tuan"), ("Tháng này", "bc:thang"),
-                   ("Tháng trước", "bc:thangtruoc")]]
+                   ("Tháng trước", "bc:thangtruoc")],
+                  [("📈 Biểu đồ", "bd:thang"), ("🔮 Dự báo", "db"), ("💬 Nhận xét", "nx:thang")]]
 
 
 def period(kind, day):
@@ -744,7 +789,8 @@ HELP = ("💸 <b>Bot ghi chi tiêu</b>\nNhắn số tiền kèm nội dung, bot 
         "• đóng họ 1tr #tiết kiệm (tự chọn nhóm bằng dấu #)\n"
         "Nhiều khoản thì mỗi khoản một dòng; gõ không dấu cũng được.\n"
         "Xếp sai nhóm thì bấm ✏️ Đổi nhóm, lần sau bot tự nhớ. Khoản chưa rõ nhóm thì bot hỏi luôn.\n"
-        "Tự tạo nhóm, thêm từ khóa: /nhom\n\n")
+        "Tự tạo nhóm, thêm từ khóa: /nhom\n"
+        "Hỏi bằng câu thường: tháng này cà phê hết bao nhiêu?\n\n")
 
 
 def baocao(args):
@@ -955,7 +1001,9 @@ def nhom_cmd(args):
     guessed, fixed = ai_stats()
     accuracy = f"; đã đoán {guessed} khoản, bạn sửa {fixed}" + (
         f" (đúng {100 - fixed / guessed * 100:.0f}%)" if guessed else "") if guessed or fixed else ""
-    lines.append(f"🤖 AI xếp nhóm cho khoản lạ: {'bật' if ai_key() else 'tắt'}{accuracy}")
+    quota = quota_text() if ai_key() else ""
+    lines.append(f"🤖 AI xếp nhóm cho khoản lạ: {'bật' if ai_key() else 'tắt'}{accuracy}"
+                 + (f"\n🤖 AI {html.escape(quota)}" if quota else ""))
     return "\n".join(lines + ["", NHOM_USAGE])
 
 
@@ -994,6 +1042,19 @@ def xuat(args):
             "caption": f"Chi tiêu tháng {month}/{year}: {len(items)} khoản"}
 
 
+def phantich():
+    import phantich as module  # nạp khi cần: phantich.py cũng dùng các hàm trong file này
+    return module
+
+
+def period_kind(args):
+    """Tham số kỳ của /bieudo, /nhanxet: trống là tháng này, '10' là tháng 10, 'thangtruoc'..."""
+    word = plain("".join(args))
+    if word.isdigit() and 1 <= int(word) <= 12:
+        return str(int(word))
+    return {"thangtruoc": "thangtruoc", "tuan": "tuan", "tuannay": "tuan", "homnay": "ngay"}.get(word, "thang")
+
+
 COMMANDS = {
     "baocao": ("Báo cáo chi tiêu, có nút chọn kỳ", baocao),
     "homnay": ("Chi tiêu hôm nay", lambda args: (report("ngay", today())[0], REPORT_BUTTONS)),
@@ -1004,6 +1065,10 @@ COMMANDS = {
     "ngansach": ("Ngân sách tháng: /ngansach ăn uống 3tr", ngansach),
     "nhom": ("Các nhóm chi tiêu; tự tạo nhóm, thêm từ khóa", nhom_cmd),
     "chuaxep": ("Xếp nhóm các khoản đang ở Khác", chuaxep),
+    "dubao": ("Dự báo cuối tháng, hôm nay còn được tiêu bao nhiêu", lambda args: phantich().forecast_text(today())),
+    "hoi": ("Hỏi bằng câu thường: /hoi tháng này cà phê hết bao nhiêu", lambda args: phantich().hoi(" ".join(args), today())),
+    "bieudo": ("Biểu đồ chi tiêu tháng; /bieudo 10 cho tháng 10", lambda args: phantich().chart_reply(period_kind(args), today())),
+    "nhanxet": ("Nhận xét chi tiêu tháng (AI); /nhanxet 10 cho tháng 10", lambda args: phantich().commentary(period_kind(args), today())),
     "xuat": ("Xuất file CSV mở bằng Excel: /xuat 10", xuat),
 }
 HELP += "Lệnh:\n" + "\n".join(f"/{n} – {desc}" for n, (desc, _) in COMMANDS.items())
@@ -1019,10 +1084,17 @@ def answer(text, now):
     if parts and parts[0].startswith("/"):
         command = parts[0][1:].split("@")[0].lower()
         return COMMANDS[command][1](parts[1:]) if command in COMMANDS else HELP
+    if phantich().is_question(text):
+        return phantich().hoi(text, now.date())
     entries = add(text, now)
     if not entries:
         return "Không thấy số tiền. Nhắn kiểu: <b>cà phê 35k</b> hoặc gõ /start để xem hướng dẫn"
-    return entries_message(entries, now.date())
+    try:
+        extra = phantich().after_record(entries, now.date())
+    except Exception as e:  # phần phân tích lỗi thì vẫn báo đã ghi
+        print(f"[lỗi] phân tích sau khi ghi: {e!r}", file=sys.stderr)
+        extra = []
+    return entries_message(entries, now.date(), extra=extra)
 
 
 def button_ref(data):
@@ -1056,6 +1128,12 @@ def on_button(data, message, now):
     day = now.date()
     if kind == "bc":
         return None, ("edit", lambda: (report(arg, day)[0], REPORT_BUTTONS))
+    if kind == "bd":
+        return "Đang vẽ biểu đồ…", ("send", lambda: phantich().chart_reply(arg, day))
+    if kind == "db":
+        return None, ("send", lambda: phantich().forecast_text(day))
+    if kind == "nx":
+        return "AI đang viết nhận xét, chờ chút…", ("send", lambda: phantich().commentary(arg, day))
     if kind == "xls":
         gone = delete(arg)
         return ("Đã xóa" if gone else "Khoản này đã xóa rồi"), ("edit", lambda: lichsu([]))

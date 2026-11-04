@@ -12,6 +12,7 @@ import amlich
 import canhbao
 import kho
 import lenh
+import phantich
 import sochitieu as chitieu
 import tg
 from bantin import BUTTONS as BANTIN_BUTTONS
@@ -288,11 +289,37 @@ def expense_summary(now, job, kind, title):
         return None
     chitieu.reset()  # đọc lại nhóm tự chỉnh mới nhất
     text, count = chitieu.report(kind, now.date())
+    extras = []
+    if count and kind == "thangtruoc":  # tổng kết tháng: kèm biểu đồ và nhận xét (1 lượt AI mỗi tháng)
+        for make in (phantich.chart_reply, phantich.commentary):
+            try:
+                extras.append(make(kind, now.date()))
+            except Exception as e:
+                print(f"[lỗi] {make.__name__}: {e!r}", file=sys.stderr)
     if count:
         for chat in chitieu.owner_chats():
             tg.send(chat, f"{title}\n{text}", chitieu.REPORT_BUTTONS, tok=tok)
+            for reply in extras:
+                try:
+                    tg.send_reply(chat, reply, tok)
+                except Exception as e:
+                    print(f"[lỗi] gửi phần thêm của tổng kết: {e!r}", file=sys.stderr)
     mark_done(job, now)
     return f"{count} khoản"
+
+
+def chi_tieu_de_y(now, chat):
+    """21h hằng ngày: nhóm tiêu tăng vọt, nhóm đang trên đà vượt ngân sách (qua bot chi tiêu, có mới báo)."""
+    tok = chitieu.token()
+    if not between(now, (21, 0), (23, 0)) or not tok or done_today("chi_tieu_de_y", now):
+        return None
+    chitieu.reset()
+    lines = phantich.alerts(now.date())
+    if lines:
+        for owner in chitieu.owner_chats():
+            tg.send(owner, "👀 <b>Để ý chi tiêu</b>\n" + "\n".join(lines) + "\nXem thêm: /dubao · /nhanxet", tok=tok)
+    mark_done("chi_tieu_de_y", now)
+    return f"{len(lines)} điều cần để ý"
 
 
 def chi_tieu_tuan(now, chat):
@@ -310,7 +337,7 @@ def chi_tieu_thang(now, chat):
 
 
 JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi,
-        chi_tieu_tuan, chi_tieu_thang]
+        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y]
 
 
 def run(now):
