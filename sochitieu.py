@@ -229,24 +229,29 @@ def parse_line(line, day, learned=None):
 
 
 # ---- Xếp nhóm bằng AI (tùy chọn) ------------------------------------------------------
-# Chỉ hỏi AI những khoản từ khóa không nhận ra (rơi vào Khác). Bật bằng biến AI_API_KEY trên Vercel;
-# API dạng OpenAI (chat/completions), mặc định Viettel AI. AI lỗi thì khoản vẫn ghi vào Khác.
+# Chỉ hỏi AI những khoản từ khóa không nhận ra (rơi vào Khác). Bật bằng biến AI_API_KEY trên Vercel.
+# API dạng OpenAI (chat/completions), mặc định OpenRouter với các model miễn phí; AI_MODEL nhiều model
+# cách nhau dấu phẩy thì model đầu bận/lỗi OpenRouter tự chuyển sang model sau. AI lỗi thì khoản vẫn
+# ghi vào Khác.
 
-AI_TIMEOUT = 10  # giây; quá thì thôi, không để bot treo
+AI_URL = "https://openrouter.ai/api/v1/chat/completions"
+# Chọn ngày 04/11/2026: thử 13 khoản lạ, Nemotron 3 Ultra đúng 12, Dots 3 đúng 12 (dự phòng).
+# Không thêm openrouter/free: nó chọn ngẫu nhiên model miễn phí, có lần chỉ đúng 7/13.
+AI_MODELS = "nvidia/nemotron-3-ultra-550b-a55b:free,dots-studio/dots-3-note-preview:free"
+AI_TIMEOUT = 25  # giây; model miễn phí có "suy nghĩ" trước khi trả lời nên chậm, quá thì thôi
 
 
 def ai_key():
     return os.environ.get("AI_API_KEY", "").strip()
 
 
-def ai_model():
-    return os.environ.get("AI_MODEL", "DeepSeek-V4-Flash")
+def ai_models():
+    return [m.strip() for m in os.environ.get("AI_MODEL", AI_MODELS).split(",") if m.strip()]
 
 
 def ai_post(payload):
-    url = os.environ.get("AI_API_URL", "https://viettelai.vn/model-as-a-service/v1/chat/completions")
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={
-        "Content-Type": "application/json", "Authorization": f"Bearer {ai_key()}"})
+    req = urllib.request.Request(os.environ.get("AI_API_URL", AI_URL), data=json.dumps(payload).encode(), headers={
+        "Content-Type": "application/json", "Authorization": f"Bearer {ai_key()}", "X-Title": "ban-tin-sang"})
     try:
         with urllib.request.urlopen(req, timeout=AI_TIMEOUT) as r:
             return json.loads(r.read())
@@ -260,25 +265,30 @@ def ai_post(payload):
 
 
 def ai_request(notes):
-    """Hỏi AI nhóm của các ghi chú: {ghi chú: mã}. Lỗi mạng, hết credit... thì báo lỗi."""
+    """Hỏi AI nhóm của các ghi chú: ({ghi chú: mã}, model đã trả lời). Lỗi mạng, hết lượt... thì báo lỗi."""
     groups = "\n".join(f"{code}: {label.split(' ', 1)[1]}" for code, (label, _) in CATEGORIES.items())
     numbered = "\n".join(f"{i}. {note}" for i, note in enumerate(notes, 1))
-    res = ai_post({
-        "model": ai_model(), "temperature": 0, "max_tokens": 30 * len(notes) + 30,
+    models = ai_models()
+    payload = {
+        # Model có "suy nghĩ" tiêu nhiều token trước khi trả lời; ít quá thì câu trả lời bị cắt rỗng
+        "model": models[0], "temperature": 0, "max_tokens": 2000,
         "messages": [
             {"role": "system", "content": (
                 "Bạn phân loại khoản chi tiêu cá nhân của người Việt. Các nhóm (mã: tên):\n" + groups
                 + "\nTrả lời đúng một dòng JSON, khóa là số thứ tự, giá trị là mã nhóm, ví dụ "
                 '{"1": "an", "2": "xe"}. Không chắc thì dùng "khac". Không giải thích.')},
-            {"role": "user", "content": numbered}]})
-    text = res["choices"][0]["message"]["content"] or ""
+            {"role": "user", "content": numbered}]}
+    if len(models) > 1:
+        payload["models"] = models  # OpenRouter: model trước bận/lỗi thì dùng model sau
+    res = ai_post(payload)
+    text = res["choices"][0]["message"].get("content") or ""
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)  # bỏ phần "suy nghĩ" nếu model có
     found = re.search(r"\{.*?\}", text, re.DOTALL)
     if not found:
         raise RuntimeError(f"AI trả lời không đúng dạng: {text[:100]!r}")
-    answer = json.loads(found[0])
-    return {note: str(answer.get(str(i), "")).strip().lower() for i, note in enumerate(notes, 1)
-            if str(answer.get(str(i), "")).strip().lower() in CATEGORIES}
+    answer = {k: str(v).strip().lower() for k, v in json.loads(found[0]).items()}
+    return ({note: answer[str(i)] for i, note in enumerate(notes, 1) if answer.get(str(i)) in CATEGORIES},
+            res.get("model", models[0]))
 
 
 def ask_ai(entries):
@@ -290,7 +300,7 @@ def ask_ai(entries):
     ask = list(dict.fromkeys(e["ghichu"] for e in unknown if norm(e["ghichu"]) not in cache))
     if ask:
         try:
-            for note, code in ai_request(ask).items():
+            for note, code in ai_request(ask)[0].items():
                 cache[norm(note)] = code
             kho.put(K_AI, dict(list(cache.items())[-MAX_LEARNED:]))
         except Exception as e:
@@ -307,11 +317,12 @@ def ai_status():
         return "AI xếp nhóm: tắt (chưa có biến AI_API_KEY)"
     start = datetime.now()
     try:
-        got = ai_request(["bảo dưỡng ô tô"])
+        got, model = ai_request(["thay má phanh"])
     except Exception as e:
-        return f"AI xếp nhóm ({ai_model()}): LỖI – {e}"
+        return f"AI xếp nhóm ({', '.join(ai_models())}): LỖI – {e}"
     seconds = (datetime.now() - start).total_seconds()
-    return f"AI xếp nhóm ({ai_model()}): hoạt động, {seconds:.1f} giây, thử 'bảo dưỡng ô tô' → {name(got.get('bảo dưỡng ô tô', OTHER))}"
+    return (f"AI xếp nhóm: hoạt động ({model}, {seconds:.1f} giây), thử 'thay má phanh' → "
+            f"{name(got.get('thay má phanh', OTHER))}")
 
 
 # ---- Lưu trữ: mỗi tháng một Redis hash, mỗi khoản một mục (id -> JSON) ---------------
@@ -607,7 +618,7 @@ def nhom_cmd(args):
         sample = ", ".join(words[:6]) if words else "những khoản không khớp nhóm nào"
         lines.append(f"{label}: <i>{html.escape(sample)}</i>")
     lines.append(f"\nBot đã học {len(learned)} cụm từ từ những lần bạn bấm ✏️ Đổi nhóm.")
-    lines.append(f"🤖 AI xếp nhóm cho khoản lạ: {'bật, ' + ai_model() if ai_key() else 'tắt'}")
+    lines.append(f"🤖 AI xếp nhóm cho khoản lạ: {'bật, ' + ', '.join(ai_models()) if ai_key() else 'tắt'}")
     return "\n".join(lines)
 
 

@@ -29,6 +29,10 @@ def handle_message(message, tok):
         return
     if not text:
         return
+    try:  # hiện "đang nhập…": khoản lạ phải hỏi AI có khi mất chục giây
+        tg.call("sendChatAction", tok, chat_id=chat_id, action="typing")
+    except Exception as e:
+        print(f"[lỗi] sendChatAction: {e!r}", file=sys.stderr)
     try:
         reply = chitieu.answer(text, datetime.now(VN_TZ))
     except Exception as e:

@@ -9,7 +9,7 @@
       "maxDuration": 120
     },
     "api/chitieu.py": {
-      "maxDuration": 30
+      "maxDuration": 60
     }
   }
 }
