@@ -12,6 +12,7 @@ import amlich
 import canhbao
 import kho
 import lenh
+import sochitieu as chitieu
 import tg
 from bantin import BUTTONS as BANTIN_BUTTONS
 from bantin import (WEEKDAYS, build_message, gold_prices, hourly, index_history, section, stocks, tips,
@@ -280,7 +281,35 @@ def ban_tin_toi(now, chat):
     return "đã gửi"
 
 
-JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi]
+def expense_summary(now, job, kind, title):
+    """Gửi báo cáo chi tiêu qua bot chi tiêu (nếu đã cài và kỳ đó có khoản chi)."""
+    tok = chitieu.token()
+    if not tok or done_today(job, now):
+        return None
+    text, count = chitieu.report(kind, now.date())
+    if count:
+        for chat in chitieu.owner_chats():
+            tg.send(chat, f"{title}\n{text}", chitieu.REPORT_BUTTONS, tok=tok)
+    mark_done(job, now)
+    return f"{count} khoản"
+
+
+def chi_tieu_tuan(now, chat):
+    """Tối Chủ nhật: tổng kết chi tiêu tuần."""
+    if now.weekday() != 6 or not between(now, (20, 0), (23, 0)):
+        return None
+    return expense_summary(now, "chi_tieu_tuan", "tuan", "🗓 <b>Tổng kết tuần</b>")
+
+
+def chi_tieu_thang(now, chat):
+    """Ngày 1 hằng tháng: tổng kết chi tiêu tháng trước."""
+    if now.day != 1 or not between(now, (8, 0), (23, 0)):
+        return None
+    return expense_summary(now, "chi_tieu_thang", "thangtruoc", "🗓 <b>Tổng kết tháng</b>")
+
+
+JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi,
+        chi_tieu_tuan, chi_tieu_thang]
 
 
 def run(now):
