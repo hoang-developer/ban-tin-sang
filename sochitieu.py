@@ -25,8 +25,8 @@ CATEGORIES = {
         "ăn", "ăn sáng", "ăn trưa", "ăn tối", "ăn đêm", "ăn vặt", "cơm", "cơm văn phòng", "phở", "bún", "miến",
         "mì", "mỳ", "hủ tiếu", "bánh mì", "bánh cuốn", "bánh", "bánh ngọt", "xôi", "cháo", "lẩu", "nướng", "gà",
         "vịt", "bò", "pizza", "burger", "kfc", "lotteria", "jollibee", "mcdonald", "cà phê", "cafe", "coffee",
-        "highlands", "starbucks", "phúc long", "katinat", "trà", "trà sữa", "trà đá", "nước", "nước ngọt",
-        "nước mía", "nước ép", "sinh tố", "bia", "rượu", "nhậu", "chè", "kem", "sữa chua", "hoa quả", "trái cây",
+        "highlands", "highland", "starbucks", "starbuck", "phúc long", "katinat", "trà", "trà sữa", "trà đá",
+        "nước", "nước ngọt", "nước suối", "nước lọc", "nước mía", "nước ép", "sinh tố", "bia", "rượu", "nhậu", "chè", "kem", "sữa chua", "hoa quả", "trái cây",
         "đồ ăn", "nhà hàng", "quán", "buffet", "grabfood", "shopeefood", "baemin", "gofood", "đặt đồ ăn",
         "bim bim", "snack", "kẹo", "liên hoan", "tiệc"]),
     "cho": ("🛒 Đi chợ, siêu thị", [
@@ -37,8 +37,8 @@ CATEGORIES = {
     "xe": ("🛵 Đi lại", [
         "xăng", "đổ xăng", "grab", "grabbike", "grabcar", "be", "xanh sm", "taxi", "gojek", "xe ôm", "gửi xe",
         "trông xe", "đỗ xe", "vé xe", "xe khách", "xe buýt", "bus", "tàu", "vé tàu", "máy bay", "vé máy bay",
-        "metro", "rửa xe", "sửa xe", "thay dầu", "thay nhớt", "bảo dưỡng xe", "vá xe", "lốp", "phí đường",
-        "cầu đường", "vetc", "epass", "đăng kiểm", "bảo hiểm xe"]),
+        "metro", "xe", "xe máy", "ô tô", "oto", "rửa xe", "sửa xe", "thay dầu", "thay nhớt", "bảo dưỡng",
+        "bảo dưỡng xe", "vá xe", "lốp", "phí đường", "cầu đường", "vetc", "epass", "đăng kiểm", "bảo hiểm xe", "phạt nguội", "nộp phạt"]),
     "nha": ("🏠 Nhà cửa, hóa đơn", [
         "tiền nhà", "thuê nhà", "tiền phòng", "tiền trọ", "trọ", "điện", "tiền điện", "hóa đơn điện",
         "tiền nước", "hóa đơn nước", "internet", "wifi", "tiền mạng", "cước", "điện thoại", "nạp điện thoại",
@@ -49,7 +49,7 @@ CATEGORIES = {
         "mua", "quần", "áo", "quần áo", "váy", "giày", "dép", "túi", "ví", "đồng hồ", "kính", "mỹ phẩm", "son",
         "nước hoa", "skincare", "shopee", "lazada", "tiki", "tiktok shop", "sendo", "uniqlo", "zara",
         "mua điện thoại", "laptop", "máy tính", "tai nghe", "ốp lưng", "sạc", "đồ điện tử", "phụ kiện",
-        "trang sức", "cắt tóc", "làm tóc", "gội đầu", "làm nail", "spa"]),
+        "trang sức", "cây cảnh", "đồ trang trí", "cắt tóc", "làm tóc", "gội đầu", "làm nail", "spa"]),
     "khoe": ("💊 Sức khỏe", [
         "thuốc", "nhà thuốc", "pharmacity", "long châu", "khám", "khám bệnh", "bệnh viện", "phòng khám",
         "nha khoa", "răng", "xét nghiệm", "tiêm", "vắc xin", "vitamin", "thực phẩm chức năng", "bảo hiểm",
@@ -60,21 +60,21 @@ CATEGORIES = {
         "karaoke", "bi a", "bida", "concert", "vé xem", "du lịch", "khách sạn", "homestay", "resort", "tour",
         "vé tham quan", "dã ngoại", "picnic", "cắm trại", "đi chơi"]),
     "hoc": ("📚 Học tập", [
-        "học phí", "học", "học thêm", "lớp", "khóa học", "sách", "vở", "bút", "văn phòng phẩm", "giáo trình",
-        "udemy", "coursera", "tiếng anh", "ielts", "lệ phí thi"]),
+        "học phí", "tiền học", "đóng học", "học", "học thêm", "lớp", "khóa học", "sách", "vở", "bút",
+        "văn phòng phẩm", "giáo trình", "udemy", "coursera", "tiếng anh", "ielts", "lệ phí thi"]),
     "qua": ("🎁 Hiếu hỷ, quà tặng", [
         "đám cưới", "cưới", "mừng cưới", "sinh nhật", "quà", "tặng", "biếu", "đám ma", "đám hiếu", "phúng",
         "viếng", "lì xì", "mừng tuổi", "từ thiện", "ủng hộ", "hoa", "đi lễ", "lễ chùa", "công đức"]),
     "giadinh": ("👨‍👩‍👧 Gia đình, con cái", [
         "cho con", "của con", "con đi học", "cho bé", "bỉm", "tã", "sữa bột", "đồ chơi", "gửi bố mẹ",
         "biếu bố mẹ", "bố mẹ", "ông bà", "giúp việc", "osin", "trông trẻ", "nhà trẻ", "mầm non", "thú cưng",
-        "thức ăn cho chó", "thức ăn cho mèo", "pate"]),
+        "cho chó", "cho mèo", "thức ăn cho chó", "thức ăn cho mèo", "pate"]),
     "khac": ("📦 Khác", []),
     "thu": ("💰 Thu nhập", [
         "lương", "nhận lương", "thưởng", "tiền thưởng", "hoa hồng", "lãi tiết kiệm", "cổ tức", "bán",
         "thu nhập", "được cho", "được tặng", "hoàn tiền", "cashback", "freelance", "làm thêm"]),
 }
-GENERIC = {"mua", "ăn", "quán", "học", "bánh", "nước"}  # từ chung chung: chỉ dùng khi không có từ nào rõ hơn
+GENERIC = {"mua", "ăn", "quán", "học", "bánh", "nước", "xe"}  # từ chung chung: chỉ dùng khi không có từ nào rõ hơn
 INCOME, OTHER = "thu", "khac"
 MAX_LEARNED = 500  # số cụm từ học được tối đa
 # ---------------------------------------------------------------------------------
@@ -124,9 +124,12 @@ def classify(note, learned=None):
     learned_rules = [(word_pattern(k), word_pattern(plain(k)), 100 + len(k), code)
                      for k, code in (learned or {}).items() if code in CATEGORIES]
     rules = learned_rules + KEYWORDS
-    # Câu có dấu: so có dấu trước, không khớp gì mới thử bỏ dấu (tránh "bé" bị hiểu là "be" gọi xe).
-    # Câu gõ không dấu: so dạng bỏ dấu ngay, để "cho be" (cho bé) thắng "be".
-    passes = [(1, bare)] if text == bare else [(0, text), (1, bare)]
+    # So dạng bỏ dấu chỉ trên những chữ người dùng gõ không dấu; chữ đã có dấu thì che đi,
+    # kẻo "trả" bỏ dấu thành "tra" rồi bị hiểu là "trà".
+    typed_plain = " ".join(w if w == plain(w) else "#" for w in text.split())
+    # Câu có dấu: so có dấu trước, không khớp gì mới so phần gõ không dấu.
+    # Câu gõ không dấu: so dạng bỏ dấu ngay, để "cho be" (cho bé) thắng "be" (gọi xe).
+    passes = [(1, typed_plain)] if text == bare else [(0, text), (1, typed_plain)]
     for index, subject in passes:
         found = [(score, code) for *patterns, score, code in rules if patterns[index].search(subject)]
         if found:
