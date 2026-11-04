@@ -18,11 +18,6 @@ from bantin import VN_TZ  # noqa: E402
 from lenh import MENU, answer, answer_location, on_button  # noqa: E402
 
 
-def send_reply(chat_id, reply):
-    text, buttons = reply if isinstance(reply, tuple) else (reply, None)
-    tg.send(chat_id, text, buttons)
-
-
 def handle_message(message):
     chat_id = (message.get("chat") or {}).get("id")
     text = message.get("text") or ""
@@ -46,38 +41,15 @@ def handle_message(message):
         print(f"[lỗi] trả lời {text or location!r}: {e!r}", file=sys.stderr)
         reply = "⚠️ Bot gặp lỗi khi lấy dữ liệu, thử lại sau nhé."
     if reply:
-        send_reply(chat_id, reply)
+        tg.send_reply(chat_id, reply)
 
 
 def handle_button(query):
-    message = query.get("message") or {}
-    chat_id = (message.get("chat") or {}).get("id")
+    chat_id = ((query.get("message") or {}).get("chat") or {}).get("id")
     if str(chat_id) != tg.owner_chat():
         tg.call("answerCallbackQuery", callback_query_id=query["id"])
         return
-    try:
-        toast, action = on_button(query.get("data") or "", message, datetime.now(VN_TZ))
-    except Exception as e:
-        print(f"[lỗi] nút {query.get('data')!r}: {e!r}", file=sys.stderr)
-        toast, action = "⚠️ Bot gặp lỗi, thử lại sau nhé", None
-    # Trả lời ngay cho nút thôi quay, việc chậm (cập nhật bản tin...) làm sau
-    tg.call("answerCallbackQuery", callback_query_id=query["id"], **({"text": toast} if toast else {}))
-    if not action:
-        return
-    how, make = action
-    try:
-        reply = make()
-    except Exception as e:
-        print(f"[lỗi] nút {query.get('data')!r}: {e!r}", file=sys.stderr)
-        reply = "⚠️ Bot gặp lỗi khi lấy dữ liệu, thử lại sau nhé."
-        how = "send"
-    if how == "send":
-        send_reply(chat_id, reply)
-    elif how == "buttons":
-        tg.edit_buttons(chat_id, message["message_id"], reply)
-    else:
-        text, buttons = reply if isinstance(reply, tuple) else (reply, None)
-        tg.edit(chat_id, message["message_id"], text, buttons)
+    tg.handle_button(query, on_button, datetime.now(VN_TZ))
 
 
 def setup(host):

@@ -9,6 +9,8 @@ Bot Telegram riêng: bản tin mỗi sáng, bản tin tối, cảnh báo tức t
 - **Bot trên Vercel** ([api/telegram.py](api/telegram.py)) trả lời lệnh, và mỗi 15 phút chạy các việc theo
   giờ ([api/tick.py](api/tick.py), [lich.py](lich.py)): bản tin sáng, cảnh báo, bảng điện ghim, đoán
   xanh/đỏ, nhắc ngày, tin cổ tức, bản tin tối. Cài theo mục **Cài bot lên Vercel**.
+- **Bot chi tiêu** ([api/chitieu.py](api/chitieu.py), [sochitieu.py](sochitieu.py)): một bot Telegram thứ hai,
+  nhắn "cà phê 35k" là bot ghi lại và tự xếp nhóm. Xem mục **Bot chi tiêu**.
 
 ## Lệnh trên Telegram
 
@@ -79,6 +81,47 @@ Về sau mỗi lần merge vào `main`, Vercel tự cập nhật bot. Thêm hay 
 để menu lệnh cập nhật. Bot không trả lời thì cũng mở link đó: trang cài lại webhook và hiện lỗi gần
 nhất mà Telegram gặp.
 
+## Bot chi tiêu
+
+Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot tự hiểu số tiền và xếp nhóm:
+
+- `cà phê 35k` · `đổ xăng 80000` · `tiền nhà 5tr` · `tien dien 1tr2` (gõ không dấu cũng được)
+- `hôm qua ăn tối 250k` · `02/11 cắt tóc 100k` · `+ lương 20tr` (dấu `+` là khoản thu)
+- Nhiều khoản một lúc: mỗi khoản một dòng.
+
+Số tiền hiểu được: `35k`, `35.000đ`, `35 nghìn`, `1tr2` (1.200.000đ), `2tr500`, `1,5tr`, `1k5`; số trơn
+dưới 1.000 hiểu là nghìn (`cà phê 35` là 35.000đ). Nhóm có sẵn: Ăn uống, Đi chợ, Đi lại, Nhà cửa và hóa
+đơn, Mua sắm, Sức khỏe, Giải trí và du lịch, Học tập, Hiếu hỷ và quà, Gia đình và con cái, Khác, Thu nhập.
+Xếp sai thì bấm **✏️ Đổi nhóm** dưới tin: bot đổi và nhớ, lần sau gặp nội dung đó tự xếp đúng.
+Từ khóa của từng nhóm: phần "Nhóm chi tiêu" đầu [sochitieu.py](sochitieu.py).
+
+| Lệnh | Làm gì |
+|---|---|
+| `/baocao` | Báo cáo kèm nút chọn kỳ: hôm nay, tuần này, tháng này, tháng trước |
+| `/homnay`, `/tuan`, `/thang` | Báo cáo nhanh; `/thang 10` cho tháng 10. Có tổng chi, từng nhóm, so với kỳ trước, thu, khoản lớn nhất |
+| `/ngansach` | Ngân sách tháng: `/ngansach ăn uống 3tr`, `/ngansach tổng 15tr`, bỏ: `/ngansach ăn uống 0`. Ghi khoản mới thì bot báo ⚠️ khi quá 80%, 🚨 khi vượt |
+| `/lichsu` | 10 khoản gần nhất, bấm ❌ để xóa |
+| `/xoa` | Xóa khoản vừa ghi |
+| `/xuat` | File CSV mở bằng Excel; `/xuat 10` cho tháng 10 |
+| `/nhom` | Các nhóm và vài từ khóa |
+
+Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước (qua lịch chạy
+`/api/tick` sẵn có).
+
+### Cài bot chi tiêu (làm một lần)
+
+1. Trong Telegram nhắn **@BotFather** → `/newbot` → đặt tên (ví dụ "Chi tiêu của tôi") và username
+   (phải kết thúc bằng `bot`) → sao chép token.
+2. Trên Vercel, dự án `ban-tin-sang` → **Settings** → **Environment Variables** → thêm
+   `CHITIEU_BOT_TOKEN` = token vừa sao chép → **Save** → tab **Deployments** → **⋯** ở bản Production →
+   **Redeploy**.
+3. Mở `https://ban-tin-sang.vercel.app/api/chitieu` bằng trình duyệt: trang báo "Đã cài webhook".
+4. Vào Telegram, mở bot mới, nhắn `cà phê 35k`.
+
+Dữ liệu nằm trong kho Upstash Redis của dự án (khóa `chitieu:...`). Bot chỉ trả lời chat có
+`TELEGRAM_CHAT_ID`; muốn dùng chung với người nhà thì thêm biến `CHITIEU_CHAT_ID` = các chat ID cách nhau
+dấu phẩy (người đó nhắn bot sẽ được báo chat ID của mình), mọi người ghi chung một sổ.
+
 ## Gửi bản tin ngay
 
 Gõ `/bantin` trong Telegram, hoặc trên GitHub: tab **Actions** → **Bản tin sáng** → **Run workflow**
@@ -96,6 +139,7 @@ python bantin.py                    # bản tin sáng
 python lenh.py /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
 python thoitiet.py Đà Nẵng
 python tintuc.py giá vàng 24h
+python sochitieu.py "cà phê 35k"   # bot chi tiêu: chỉ đọc và xếp nhóm, không ghi
 python amlich.py 17/2/2026
 python canhbao.py --xem             # cảnh báo, không gửi
 ```
