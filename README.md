@@ -209,34 +209,37 @@ Code ở [taisan.py](taisan.py).
 3. Mở `https://ban-tin-sang.vercel.app/api/chitieu` bằng trình duyệt: trang báo "Đã cài webhook".
 4. Vào Telegram, mở bot mới, nhắn `cà phê 35k`.
 
-### Xếp nhóm bằng AI (tùy chọn, miễn phí)
+### AI (tùy chọn, miễn phí): Google Gemini, OpenRouter dự phòng
 
-Khoản nào từ khóa không nhận ra (rơi vào Khác) thì bot hỏi AI, khoản đó hiện dấu 🤖. AI được biết cả
-nhóm bạn tự tạo (kèm từ khóa) và những khoản bạn đã tự xếp để đoán theo thói quen của bạn; không chắc thì
-AI để Khác và bot hỏi bạn. Bot nhớ câu trả lời, cùng nội dung không hỏi lại; khoản đã sửa bằng ✏️ thì theo
-nhóm bạn chọn. AI lỗi, bận hay quá 25 giây thì khoản vào Khác và bot hỏi bạn như thường. Thử ngày
-04/11/2026 với 2 nhóm tự tạo (Trả nợ, Tiết kiệm) và 13 khoản lạ: đúng 13/13 và 12/13 (khoản còn lại AI để
-Khác chứ không xếp sai).
+AI giúp bot ở các việc: xếp nhóm khoản lạ (dấu 🤖), hiểu câu hỏi, viết nhận xét tháng và khám sức khỏe tài
+chính. Mọi con số vẫn do bot tự tính. Khoản nào từ khóa không nhận ra thì bot hỏi AI; AI được biết cả nhóm
+bạn tự tạo (kèm từ khóa) và những khoản bạn đã tự xếp để đoán theo thói quen của bạn; không chắc thì AI để
+Khác và bot hỏi bạn. Bot nhớ câu trả lời, cùng nội dung không hỏi lại. AI lỗi, bận hay hết lượt thì bot vẫn
+chạy: khoản lạ bot hỏi bạn, câu hỏi bot tự hiểu cách đơn giản, nhận xét chỉ có số liệu.
 
-Mặc định dùng model miễn phí trên [OpenRouter](https://openrouter.ai): `nvidia/nemotron-3-ultra-550b-a55b:free`,
-bận thì chuyển sang `dots-studio/dots-3-note-preview:free` (thử 13 khoản lạ ngày 04/11/2026: mỗi model đúng
-12, mất khoảng 10–20 giây; một khoản lạ thường vài giây). Model miễn phí chậm và có lúc bận. OpenRouter
-giới hạn **50 lượt gọi model miễn phí mỗi ngày** (cả tài khoản; theo OpenRouter, nạp 5 USD một lần thì lên 1.000 lượt), tính
-lại lúc 7h sáng giờ Việt Nam. Bot gọi AI cho: khoản lạ chưa gặp, mỗi câu hỏi, mỗi lần xem nhận xét (tổng kết
-tháng 1 lượt); trang cài đặt không tốn lượt. Hết lượt thì khoản lạ bot hỏi bạn, câu hỏi bot tự hiểu cách
-đơn giản.
-Nội dung các khoản lạ được gửi cho OpenRouter và bên chạy model miễn phí (bên này có thể lưu lại).
+**Google Gemini (dùng trước).** Thử ngày 04/11/2026: `gemini-3.5-flash-lite` xếp đúng 13/13 khoản lạ trong
+khoảng 1 giây, hiểu đúng 5/5 câu hỏi mẫu (dưới 1 giây mỗi câu), đọc đúng số tiền 7/7 ảnh hóa đơn/chuyển
+khoản; `gemini-3.5-flash` cũng 13/13 nhưng chậm hơn. Bot thử Flash-Lite trước, lỗi/bận/hết lượt thì Flash,
+rồi tới OpenRouter. Gói miễn phí không cần thẻ; giới hạn tính theo dự án và theo từng model (Flash: 5 lượt
+mỗi phút), số lượt mỗi ngày xem ở [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit),
+tính lại lúc 0h giờ Mỹ (khoảng 15h chiều Việt Nam). Ở gói miễn phí Google dùng nội dung gửi lên để cải thiện
+sản phẩm.
 
-Bật bằng biến môi trường trên Vercel (rồi Redeploy):
-- `AI_API_KEY`: khóa API của OpenRouter (tạo ở openrouter.ai → Keys)
-- `AI_MODEL` (không bắt buộc): đổi model, nhiều model cách nhau dấu phẩy là danh sách dự phòng. Model
-  miễn phí trên OpenRouter có đuôi `:free` và thay đổi theo thời gian; model mặc định bị gỡ thì đặt
-  biến này sang model khác
-- `AI_API_URL` (không bắt buộc): nhà cung cấp khác có API dạng OpenAI (`/v1/chat/completions`)
+**OpenRouter (dự phòng).** Model miễn phí `nvidia/nemotron-3-ultra-550b-a55b:free`, bận thì
+`dots-studio/dots-3-note-preview:free` (thử 13 khoản lạ: mỗi model đúng 12, mất 10–20 giây). Cả tài khoản
+chỉ **50 lượt model miễn phí mỗi ngày** (nạp tiền một lần thì lên 1.000 lượt), tính lại lúc 7h sáng.
 
-Mở `https://ban-tin-sang.vercel.app/api/chitieu`: dòng "AI xếp nhóm" cho biết AI bật hay tắt và hôm nay
-đã dùng bao nhiêu lượt miễn phí (không tốn lượt). Thêm `?thu=1` vào cuối địa chỉ để thử gọi AI thật (tốn
-1 lượt): trang báo model nào trả lời, mất bao lâu, hay lỗi gì. `/nhom` cũng báo số lượt đã dùng.
+Bật bằng biến môi trường trên Vercel (rồi Redeploy), có một trong hai là được:
+- `GEMINI_API_KEY`: khóa của Google AI Studio (aistudio.google.com → Get API key → Create API key)
+- `GEMINI_MODEL` (không bắt buộc): đổi model Gemini, nhiều model cách nhau dấu phẩy, thử lần lượt
+- `AI_API_KEY`: khóa OpenRouter (openrouter.ai → Keys), làm dự phòng
+- `AI_MODEL`, `AI_API_URL` (không bắt buộc): đổi model OpenRouter, hoặc dùng nhà cung cấp khác có API
+  dạng OpenAI (`/v1/chat/completions`). Model miễn phí thay đổi theo thời gian; model mặc định bị gỡ thì
+  đặt biến sang model khác
+
+Mở `https://ban-tin-sang.vercel.app/api/chitieu`: dòng "AI xếp nhóm" cho biết bot sẽ thử những model nào,
+theo thứ tự, và số lượt OpenRouter đã dùng hôm nay (không tốn lượt). Thêm `?thu=1` vào cuối địa chỉ để thử
+gọi AI thật (tốn 1 lượt): trang báo model nào trả lời, mất bao lâu, hay lỗi gì.
 
 Dữ liệu nằm trong kho Upstash Redis của dự án (khóa `chitieu:...`). Bot chỉ trả lời chat có
 `TELEGRAM_CHAT_ID`; muốn dùng chung với người nhà thì thêm biến `CHITIEU_CHAT_ID` = các chat ID cách nhau
