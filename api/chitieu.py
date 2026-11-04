@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import các file ở thư mục gốc
 
+import docanh  # noqa: E402
 import kho  # noqa: E402
 import sochitieu as chitieu  # noqa: E402 (file lõi đặt tên khác file này để khỏi import nhầm)
 import tg  # noqa: E402
@@ -27,16 +28,20 @@ def handle_message(message, tok):
                              "Nếu bạn là chủ bot: thêm số này vào CHITIEU_CHAT_ID trên Vercel rồi Redeploy.",
                     tok=tok)
         return
-    if not text:
+    image = docanh.image_of(message)
+    if not text and not image:
         return
-    try:  # hiện "đang nhập…": khoản lạ phải hỏi AI có khi mất chục giây
+    try:  # hiện "đang nhập…": khoản lạ, ảnh phải hỏi AI có khi mất chục giây
         tg.call("sendChatAction", tok, chat_id=chat_id, action="typing")
     except Exception as e:
         print(f"[lỗi] sendChatAction: {e!r}", file=sys.stderr)
     try:
-        reply = chitieu.answer(text, datetime.now(VN_TZ))
+        if image:  # ảnh hóa đơn, màn hình chuyển khoản (chữ kèm ảnh là ghi chú / #nhóm)
+            reply = docanh.photo(message, tok, datetime.now(VN_TZ))
+        else:
+            reply = chitieu.answer(text, datetime.now(VN_TZ))
     except Exception as e:
-        print(f"[lỗi] trả lời {text!r}: {e!r}", file=sys.stderr)
+        print(f"[lỗi] trả lời {text or 'ảnh'!r}: {e!r}", file=sys.stderr)
         reply = "⚠️ Bot gặp lỗi, thử lại sau nhé."
     tg.send_reply(chat_id, reply, tok)
 

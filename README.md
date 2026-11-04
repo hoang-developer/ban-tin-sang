@@ -90,6 +90,7 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
 - `đóng họ 1tr #tiết kiệm`: tự chọn nhóm bằng dấu `#` (tên nhóm, gõ tắt hay không dấu đều được); bot nhớ
   cho lần sau
 - Nhiều khoản một lúc: mỗi khoản một dòng.
+- 📷 **Gửi ảnh** hóa đơn hoặc màn hình chuyển khoản: bot đọc rồi ghi (xem mục Ghi bằng ảnh).
 
 Số tiền hiểu được: `35k`, `35.000đ`, `35 nghìn`, `1tr2` (1.200.000đ), `2tr500`, `1,5tr`, `1k5`; số trơn
 dưới 1.000 hiểu là nghìn (`cà phê 35` là 35.000đ). Nhóm có sẵn: Ăn uống, Đi chợ, Đi lại, Nhà cửa và hóa
@@ -163,6 +164,25 @@ Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câ
 - **Nhận xét** (`/nhanxet`, nút 💬, tự gửi ngày 1): tổng, so với kỳ trước và trung bình 3 tháng, nhóm
   tăng/giảm, khoản lặp lại nhiều (cà phê 22 lần…), khoản lớn nhất, ngày thường/cuối tuần, số ngày không
   tiêu, tỉ lệ để dành; AI viết 3 điểm đáng chú ý và 1 gợi ý tiết kiệm có con số.
+
+### Ghi bằng ảnh
+
+Chụp hóa đơn, hoặc chụp màn hình chuyển khoản / nhận tiền rồi gửi vào bot. AI (Gemini, cần `GEMINI_API_KEY`;
+không có thì OpenRouter với model đọc ảnh `AI_VISION_MODEL`, mặc định Nemotron 3.5 Super VL) đọc tổng tiền,
+ngày, nội dung; bot ghi như tin nhắn thường, vẫn có nút ✏️ đổi nhóm, ❌ xóa. Code ở [docanh.py](docanh.py).
+
+- Lấy **tổng** hóa đơn (dòng Tổng cộng / Tong tien), không lấy tiền khách đưa, tiền thừa, số dư hay từng
+  phương thức thanh toán. Nhận tiền vào tài khoản thì ghi vào Thu nhập.
+- Hóa đơn có phần trả bằng voucher, Got It, điểm thưởng: bot hiện nút "➕ Ghi … vào Thu nhập" (điểm đổi từ
+  chi tiêu thẻ là khoản thu; chi vẫn ghi đủ giá).
+- Chữ kèm ảnh là ghi chú, có `#nhóm` thì vào nhóm đó: gửi ảnh kèm `cà phê với khách #giải trí`.
+- Nhóm: cụm từ bạn đã dạy và từ khóa đi trước, không khớp mới dùng nhóm AI đoán (dấu 🤖).
+- Ngày trên ảnh ở tương lai hoặc quá 1 năm thì lấy hôm nay. Gửi lại đúng ảnh cũ thì bot báo đã ghi rồi.
+- Thử ngày 04/11/2026 với Gemini 3.5 Flash-Lite: đúng số tiền 7/7 ảnh, gồm hóa đơn Highlands chụp thật (tổng
+  29.000đ trả bằng Got It 20.000 + MoMo 9.000), hóa đơn chụp nghiêng mờ, màn hình chuyển/nhận tiền; ảnh
+  không phải hóa đơn thì bot báo không thấy. Lúc Gemini đông mỗi ảnh mất 10–20 giây (bot hiện "đang nhập…").
+- Ảnh được gửi cho nhà cung cấp AI (ở gói miễn phí Google dùng để cải thiện sản phẩm), bot không lưu ảnh.
+  Màn hình chuyển khoản có tên, số tài khoản: che bớt trước khi gửi nếu muốn.
 
 ### Thu nhập, tài sản, khám sức khỏe tài chính
 

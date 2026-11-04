@@ -3,6 +3,7 @@
 Mỗi lệnh trả về tin nhắn HTML, hoặc (tin nhắn, nút bấm) như lenh.py; /xuat trả về file CSV.
 Xem thử (chỉ đọc và xếp nhóm, không ghi): python sochitieu.py "cà phê 35k"
 """
+import base64
 import csv
 import html
 import io
@@ -354,6 +355,9 @@ AI_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Không thêm openrouter/free: nó chọn ngẫu nhiên model miễn phí, có lần chỉ đúng 7/13.
 AI_MODELS = "nvidia/nemotron-3-ultra-550b-a55b:free,dots-studio/dots-3-note-preview:free"
 AI_TIMEOUT = 25  # giây; model miễn phí có "suy nghĩ" trước khi trả lời nên chậm, quá thì thôi
+# Đọc ảnh: model Gemini ở trên đều xem được ảnh; trên OpenRouter phải dùng model riêng (thử 04/11/2026:
+# Nemotron 3.5 Super VL đọc đúng số tiền 6/6 ảnh mẫu)
+AI_VISION_MODELS = "nvidia/nemotron-3.5-super-vl:free"
 
 
 def env_list(name, default):
@@ -378,22 +382,24 @@ def ai_models():
     return env_list("AI_MODEL", AI_MODELS)
 
 
-def ai_providers():
-    """[(tên, địa chỉ, key, các model)] theo thứ tự thử: Gemini trước, OpenRouter dự phòng."""
+def ai_providers(vision=False):
+    """[(tên, địa chỉ, key, các model)] theo thứ tự thử: Gemini trước, OpenRouter dự phòng.
+    vision=True: model xem được ảnh."""
     out = []
     if gemini_key():
         out.append(("Gemini", GEMINI_URL, gemini_key(), env_list("GEMINI_MODEL", GEMINI_MODELS)))
     if openrouter_key():
         url = os.environ.get("AI_API_URL", AI_URL)
-        out.append(("OpenRouter" if "openrouter.ai" in url else "AI", url, openrouter_key(), ai_models()))
+        models = env_list("AI_VISION_MODEL", AI_VISION_MODELS) if vision else ai_models()
+        out.append(("OpenRouter" if "openrouter.ai" in url else "AI", url, openrouter_key(), models))
     return out
 
 
-def ai_post(payload, url=None, key=None):
+def ai_post(payload, url=None, key=None, timeout=AI_TIMEOUT):
     req = urllib.request.Request(url or os.environ.get("AI_API_URL", AI_URL), data=json.dumps(payload).encode(), headers={
         "Content-Type": "application/json", "Authorization": f"Bearer {key or ai_key()}", "X-Title": "ban-tin-sang"})
     try:
-        with urllib.request.urlopen(req, timeout=AI_TIMEOUT) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         body = (e.read() or b"").decode(errors="replace")
@@ -404,21 +410,31 @@ def ai_post(payload, url=None, key=None):
         raise RuntimeError(f"AI báo lỗi {e.code}: {message}") from None
 
 
-def ai_chat(system, user, max_tokens=2000):
+def ai_chat(system, user, max_tokens=2000, image=None, timeout=AI_TIMEOUT, budget=45):
     """Hỏi AI một lượt: (câu trả lời đã bỏ phần "suy nghĩ", model đã trả lời). Thử lần lượt từng nhà cung cấp,
-    từng model; tất cả đều lỗi (mạng, bận, hết lượt...) thì báo lỗi."""
+    từng model; tất cả đều lỗi (mạng, bận, hết lượt...) thì báo lỗi. image=(bytes, kiểu ảnh) để gửi kèm ảnh.
+    timeout: chờ mỗi model tối đa bao lâu; budget: tổng thời gian cho mọi lần thử (Vercel cắt hàm ở 60 giây)."""
+    started = datetime.now()
+    if image:
+        data, mime = image
+        user = [{"type": "text", "text": user}, {"type": "image_url", "image_url": {
+            "url": f"data:{mime};base64,{base64.b64encode(data).decode()}"}}]
     errors = []
-    for provider, url, key, models in ai_providers():
+    for provider, url, key, models in ai_providers(vision=bool(image)):
         # OpenRouter tự chuyển model khi nhận danh sách "models"; nơi khác thì bot tự thử từng model
         tries = [(models[0], {"models": models})] if "openrouter.ai" in url and len(models) > 1 else \
             [(m, {}) for m in models]
         for model, extra in tries:
+            left = budget - (datetime.now() - started).total_seconds()
+            if left < 5:
+                errors.append(f"{provider} {model}: hết thời gian chờ")
+                continue
             payload = {
                 # Model có "suy nghĩ" tiêu nhiều token trước khi trả lời; ít quá thì câu trả lời bị cắt rỗng
                 "model": model, "temperature": 0, "max_tokens": max_tokens, **extra,
                 "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
             try:
-                res = ai_post(payload, url, key)
+                res = ai_post(payload, url, key, min(timeout, left))
                 text = res["choices"][0]["message"].get("content") or ""
                 return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip(), res.get("model", model)
             except Exception as e:
@@ -852,6 +868,7 @@ HELP = ("💸 <b>Bot ghi chi tiêu</b>\nNhắn số tiền kèm nội dung, bot 
         "• cà phê 35k\n• đổ xăng 80000\n• tiền nhà 5tr · 1tr2 là 1.200.000đ\n"
         "• hôm qua ăn tối 250k · 02/11 cắt tóc 100k\n• + lương 20tr (dấu + là khoản thu)\n"
         "• đóng họ 1tr #tiết kiệm (tự chọn nhóm bằng dấu #)\n"
+        "• 📷 gửi ảnh hóa đơn, màn hình chuyển khoản: bot đọc rồi ghi\n"
         "Nhiều khoản thì mỗi khoản một dòng; gõ không dấu cũng được.\n"
         "Xếp sai nhóm thì bấm ✏️ Đổi nhóm, lần sau bot tự nhớ. Khoản chưa rõ nhóm thì bot hỏi luôn.\n"
         "Tự tạo nhóm, thêm từ khóa: /nhom\n"
@@ -1207,6 +1224,9 @@ def on_button(data, message, now):
         return None, ("edit", lambda: (report(arg, day)[0], REPORT_BUTTONS))
     if kind == "ts":
         return taisan().on_button(arg, message, now)
+    if kind == "anh":
+        import docanh
+        return docanh.on_button(arg, message, now)
     if kind == "bd":
         return "Đang vẽ biểu đồ…", ("send", lambda: phantich().chart_reply(arg, day))
     if kind == "db":
