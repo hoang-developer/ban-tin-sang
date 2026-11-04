@@ -87,13 +87,34 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
 
 - `cà phê 35k` · `đổ xăng 80000` · `tiền nhà 5tr` · `tien dien 1tr2` (gõ không dấu cũng được)
 - `hôm qua ăn tối 250k` · `02/11 cắt tóc 100k` · `+ lương 20tr` (dấu `+` là khoản thu)
+- `đóng họ 1tr #tiết kiệm`: tự chọn nhóm bằng dấu `#` (tên nhóm, gõ tắt hay không dấu đều được); bot nhớ
+  cho lần sau
 - Nhiều khoản một lúc: mỗi khoản một dòng.
 
 Số tiền hiểu được: `35k`, `35.000đ`, `35 nghìn`, `1tr2` (1.200.000đ), `2tr500`, `1,5tr`, `1k5`; số trơn
 dưới 1.000 hiểu là nghìn (`cà phê 35` là 35.000đ). Nhóm có sẵn: Ăn uống, Đi chợ, Đi lại, Nhà cửa và hóa
 đơn, Mua sắm, Sức khỏe, Giải trí và du lịch, Học tập, Hiếu hỷ và quà, Gia đình và con cái, Khác, Thu nhập.
 Xếp sai thì bấm **✏️ Đổi nhóm** dưới tin: bot đổi và nhớ, lần sau gặp nội dung đó tự xếp đúng.
-Từ khóa của từng nhóm: phần "Nhóm chi tiêu" đầu [sochitieu.py](sochitieu.py).
+Từ khóa có sẵn của từng nhóm: phần "Nhóm chi tiêu" đầu [sochitieu.py](sochitieu.py).
+
+### Tự xếp nhóm, ít khoản rơi vào Khác
+
+Bot xếp mỗi khoản theo thứ tự: nhóm bạn đã tự chọn cho nội dung đó → từ khóa (bạn thêm, rồi có sẵn) →
+AI (nếu bật, khoản có dấu 🤖) → nếu vẫn chưa rõ thì **hỏi bạn ngay** bằng nút chọn nhóm dưới tin (bấm
+"📦 Để ở Khác" nếu đúng là khoản lặt vặt). Chọn một lần là bot nhớ, các khoản cùng nội dung đang ở Khác
+cũng được xếp luôn; số và ngày tháng trong ghi chú được bỏ qua khi nhớ ("tiền rác tháng 11" nhớ thành
+"tiền rác", tháng sau vẫn nhận ra).
+
+| Lệnh | Làm gì |
+|---|---|
+| `/nhom them 🏦 Trả nợ: trả nợ, trả góp, vay` | Tạo nhóm mới kèm từ khóa (biểu tượng không bắt buộc). Khoản đang ở Khác khớp từ khóa được xếp lại ngay |
+| `/nhom tukhoa Ăn uống: bún chả, bánh tráng` | Thêm từ khóa cho nhóm bất kỳ; từ khóa bạn thêm thắng từ khóa có sẵn |
+| `/nhom doiten Đi lại: 🚗 Xe cộ` | Đổi tên nhóm |
+| `/nhom xoa Học tập` | Ẩn nhóm không dùng (khoản cũ giữ nguyên); `/nhom them Học tập` để dùng lại |
+| `/chuaxep` | Các khoản còn ở Khác: xếp lại theo những gì bot đã học, hỏi lại AI, còn lại bấm chọn từng khoản |
+
+Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm đã ẩn, số cụm bot đã học và AI đã
+đoán bao nhiêu khoản, bạn phải sửa bao nhiêu.
 
 | Lệnh | Làm gì |
 |---|---|
@@ -103,7 +124,8 @@ Từ khóa của từng nhóm: phần "Nhóm chi tiêu" đầu [sochitieu.py](so
 | `/lichsu` | 10 khoản gần nhất, bấm ❌ để xóa |
 | `/xoa` | Xóa khoản vừa ghi |
 | `/xuat` | File CSV mở bằng Excel; `/xuat 10` cho tháng 10 |
-| `/nhom` | Các nhóm và vài từ khóa |
+| `/nhom` | Các nhóm, từ khóa; tự tạo nhóm, thêm từ khóa (xem dưới) |
+| `/chuaxep` | Xếp nhóm các khoản đang ở Khác |
 
 Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước (qua lịch chạy
 `/api/tick` sẵn có).
@@ -120,9 +142,12 @@ Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gử
 
 ### Xếp nhóm bằng AI (tùy chọn, miễn phí)
 
-Khoản nào từ khóa không nhận ra (rơi vào Khác) thì bot hỏi AI, khoản đó hiện dấu 🤖. Bot nhớ câu trả lời,
-cùng nội dung không hỏi lại; khoản đã sửa bằng ✏️ thì theo nhóm bạn chọn. AI lỗi, bận hay quá 25 giây thì
-khoản vẫn ghi vào Khác như thường.
+Khoản nào từ khóa không nhận ra (rơi vào Khác) thì bot hỏi AI, khoản đó hiện dấu 🤖. AI được biết cả
+nhóm bạn tự tạo (kèm từ khóa) và những khoản bạn đã tự xếp để đoán theo thói quen của bạn; không chắc thì
+AI để Khác và bot hỏi bạn. Bot nhớ câu trả lời, cùng nội dung không hỏi lại; khoản đã sửa bằng ✏️ thì theo
+nhóm bạn chọn. AI lỗi, bận hay quá 25 giây thì khoản vào Khác và bot hỏi bạn như thường. Thử ngày
+04/11/2026 với 2 nhóm tự tạo (Trả nợ, Tiết kiệm) và 13 khoản lạ: đúng 13/13 và 12/13 (khoản còn lại AI để
+Khác chứ không xếp sai).
 
 Mặc định dùng model miễn phí trên [OpenRouter](https://openrouter.ai): `nvidia/nemotron-3-ultra-550b-a55b:free`,
 bận thì chuyển sang `dots-studio/dots-3-note-preview:free` (thử 13 khoản lạ ngày 04/11/2026: mỗi model đúng

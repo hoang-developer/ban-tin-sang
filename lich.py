@@ -286,6 +286,7 @@ def expense_summary(now, job, kind, title):
     tok = chitieu.token()
     if not tok or done_today(job, now):
         return None
+    chitieu.reset()  # đọc lại nhóm tự chỉnh mới nhất
     text, count = chitieu.report(kind, now.date())
     if count:
         for chat in chitieu.owner_chats():
