@@ -44,15 +44,34 @@ def call(method, tok=None, **params):
     return post(method, json.dumps(params).encode(), "application/json", tok)
 
 
-def send_document(chat_id, filename, data, caption="", tok=None):
-    """Gửi file (bytes) vào chat, ví dụ bảng chi tiêu CSV."""
+def post_files(method, fields, files, tok=None):
+    """Gọi Telegram kiểu multipart: fields là các trường chữ, files là {tên trường: (tên file, bytes, kiểu)}."""
     boundary = uuid.uuid4().hex
     parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
-             for k, v in (("chat_id", chat_id), ("caption", caption)) if v]
-    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="document"; filename="{filename}"\r\n'
-                 f"Content-Type: application/octet-stream\r\n\r\n".encode() + data + b"\r\n")
+             for k, v in fields.items() if v not in (None, "")]
+    for field, (filename, data, kind) in files.items():
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+                     f"Content-Type: {kind}\r\n\r\n".encode() + data + b"\r\n")
     body = b"".join(parts) + f"--{boundary}--\r\n".encode()
-    return post("sendDocument", body, f"multipart/form-data; boundary={boundary}", tok)
+    return post(method, body, f"multipart/form-data; boundary={boundary}", tok)
+
+
+def send_document(chat_id, filename, data, caption="", tok=None):
+    """Gửi file (bytes) vào chat, ví dụ bảng chi tiêu CSV."""
+    return post_files("sendDocument", {"chat_id": chat_id, "caption": caption},
+                      {"document": (filename, data, "application/octet-stream")}, tok)
+
+
+def send_photos(chat_id, photos, caption="", tok=None):
+    """Gửi ảnh PNG (bytes): một ảnh là sendPhoto, nhiều ảnh gộp một album; chú thích HTML ở ảnh đầu."""
+    if len(photos) == 1:
+        return post_files("sendPhoto", {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+                          {"photo": ("anh.png", photos[0], "image/png")}, tok)
+    media = [{"type": "photo", "media": f"attach://p{i}", **({"caption": caption, "parse_mode": "HTML"}
+                                                           if i == 0 and caption else {})}
+             for i in range(len(photos))]
+    return post_files("sendMediaGroup", {"chat_id": chat_id, "media": json.dumps(media, ensure_ascii=False)},
+                      {f"p{i}": (f"anh{i}.png", photo, "image/png") for i, photo in enumerate(photos)}, tok)
 
 
 def keyboard(buttons):
@@ -84,7 +103,13 @@ def edit_buttons(chat_id, message_id, buttons, tok=None):
 
 
 def send_reply(chat_id, reply, tok=None):
-    """Gửi câu trả lời của một lệnh: tin HTML, (tin, nút bấm), hoặc {"file", "name", "caption"}."""
+    """Gửi câu trả lời của một lệnh: tin HTML, (tin, nút bấm), {"file", "name", "caption"} (gửi file)
+    hoặc {"photos": [PNG...], "caption", "text"} (gửi ảnh, kèm một tin chữ sau ảnh nếu có)."""
+    if isinstance(reply, dict) and "photos" in reply:
+        sent = send_photos(chat_id, reply["photos"], reply.get("caption", ""), tok)
+        if reply.get("text"):
+            send_reply(chat_id, reply["text"], tok)
+        return sent
     if isinstance(reply, dict):
         return send_document(chat_id, reply["name"], reply["file"], reply.get("caption", ""), tok)
     text, buttons = reply if isinstance(reply, tuple) else (reply, None)

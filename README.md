@@ -126,9 +126,39 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/xuat` | File CSV mở bằng Excel; `/xuat 10` cho tháng 10 |
 | `/nhom` | Các nhóm, từ khóa; tự tạo nhóm, thêm từ khóa (xem dưới) |
 | `/chuaxep` | Xếp nhóm các khoản đang ở Khác |
+| `/dubao` | Dự báo cả tháng, mỗi ngày còn lại / hôm nay còn được tiêu bao nhiêu (xem dưới) |
+| `/hoi` | Hỏi bằng câu thường, hoặc gõ thẳng câu hỏi: `tháng này cà phê hết bao nhiêu?` |
+| `/bieudo` | Biểu đồ tròn theo nhóm và cột theo ngày; `/bieudo 10` cho tháng 10 |
+| `/nhanxet` | Số liệu đáng chú ý của tháng + nhận xét và gợi ý tiết kiệm của AI; `/nhanxet 10` |
 
-Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước (qua lịch chạy
-`/api/tick` sẵn có).
+Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước kèm biểu đồ và nhận
+xét, 21h hằng ngày báo nếu có gì cần để ý (qua lịch chạy `/api/tick` sẵn có).
+
+### Hiểu mình tiêu thế nào
+
+Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câu hỏi và viết nhận xét. Code ở
+[phantich.py](phantich.py).
+
+- **Dự báo** (`/dubao`, nút 🔮 dưới báo cáo): đã chi + nhịp tiêu hằng ngày (trung bình các khoản dưới 1tr
+  trong 28 ngày qua) × số ngày còn lại + khoản lớn tháng trước có mà tháng này chưa thấy (tiền nhà, học
+  phí...). Có ngân sách tổng (`/ngansach tổng 15tr`) thì bot tính mỗi ngày còn lại được tiêu bao nhiêu,
+  và mỗi lần ghi khoản chi đều báo "💡 Hôm nay còn được tiêu …". Nhóm có ngân sách: dự báo và ngày có thể
+  vượt.
+- **Báo bất thường**: ghi một khoản từ 200k mà gấp 3 lần mức thường của nhóm (trung vị 90 ngày, cần từ 5
+  khoản) thì bot nói ngay. 21h hằng ngày bot xem: nhóm nào 7 ngày qua tiêu gấp 1,6 lần mức thường (và
+  nhiều hơn 300k), nhóm nào đang trên đà vượt ngân sách; có thì nhắn "👀 Để ý chi tiêu", mỗi chuyện chỉ
+  báo một lần mỗi tuần.
+- **Hỏi bằng câu thường**: "tháng này cà phê hết bao nhiêu?", "tuần này tiêu vào đâu nhiều nhất",
+  "so tháng 11 với tháng 10", "khoản lớn nhất tháng trước", "liệt kê các lần đổ xăng tháng này",
+  "ngày nào tiêu nhiều nhất", "tháng này thu nhập bao nhiêu". Tin có dấu `?` hay từ để hỏi (bao nhiêu,
+  so với, nhiều nhất, liệt kê, … không/chưa ở cuối) là câu hỏi, bot không ghi thành khoản. Dòng đầu câu
+  trả lời cho biết bot hiểu thế nào (khoảng ngày, nhóm, chữ cần có trong ghi chú) để bạn kiểm tra. Có AI
+  thì AI hiểu câu hỏi; AI bận/hết lượt thì bot tự hiểu theo cách đơn giản (thời gian, tên nhóm, từ khóa).
+- **Biểu đồ** (`/bieudo`, nút 📈): vẽ bằng [QuickChart](https://quickchart.io) (miễn phí), chỉ gửi tên
+  nhóm và số tiền, không gửi ghi chú.
+- **Nhận xét** (`/nhanxet`, nút 💬, tự gửi ngày 1): tổng, so với kỳ trước và trung bình 3 tháng, nhóm
+  tăng/giảm, khoản lặp lại nhiều (cà phê 22 lần…), khoản lớn nhất, ngày thường/cuối tuần, số ngày không
+  tiêu, tỉ lệ để dành; AI viết 3 điểm đáng chú ý và 1 gợi ý tiết kiệm có con số.
 
 ### Cài bot chi tiêu (làm một lần)
 
@@ -151,8 +181,11 @@ Khác chứ không xếp sai).
 
 Mặc định dùng model miễn phí trên [OpenRouter](https://openrouter.ai): `nvidia/nemotron-3-ultra-550b-a55b:free`,
 bận thì chuyển sang `dots-studio/dots-3-note-preview:free` (thử 13 khoản lạ ngày 04/11/2026: mỗi model đúng
-12, mất khoảng 10–20 giây; một khoản lạ thường vài giây). Model miễn phí chậm và có lúc bận, OpenRouter
-cũng giới hạn số lượt gọi mỗi ngày; bot chỉ gọi cho khoản lạ chưa gặp nên thường không chạm giới hạn.
+12, mất khoảng 10–20 giây; một khoản lạ thường vài giây). Model miễn phí chậm và có lúc bận. OpenRouter
+giới hạn **50 lượt gọi model miễn phí mỗi ngày** (cả tài khoản; theo OpenRouter, nạp 5 USD một lần thì lên 1.000 lượt), tính
+lại lúc 7h sáng giờ Việt Nam. Bot gọi AI cho: khoản lạ chưa gặp, mỗi câu hỏi, mỗi lần xem nhận xét (tổng kết
+tháng 1 lượt); trang cài đặt không tốn lượt. Hết lượt thì khoản lạ bot hỏi bạn, câu hỏi bot tự hiểu cách
+đơn giản.
 Nội dung các khoản lạ được gửi cho OpenRouter và bên chạy model miễn phí (bên này có thể lưu lại).
 
 Bật bằng biến môi trường trên Vercel (rồi Redeploy):
@@ -162,8 +195,9 @@ Bật bằng biến môi trường trên Vercel (rồi Redeploy):
   biến này sang model khác
 - `AI_API_URL` (không bắt buộc): nhà cung cấp khác có API dạng OpenAI (`/v1/chat/completions`)
 
-Mở `https://ban-tin-sang.vercel.app/api/chitieu`: dòng "AI xếp nhóm" cho biết AI đang chạy (model nào
-trả lời, mất bao lâu) hay lỗi gì; trang thử xếp một khoản mẫu mỗi lần mở.
+Mở `https://ban-tin-sang.vercel.app/api/chitieu`: dòng "AI xếp nhóm" cho biết AI bật hay tắt và hôm nay
+đã dùng bao nhiêu lượt miễn phí (không tốn lượt). Thêm `?thu=1` vào cuối địa chỉ để thử gọi AI thật (tốn
+1 lượt): trang báo model nào trả lời, mất bao lâu, hay lỗi gì. `/nhom` cũng báo số lượt đã dùng.
 
 Dữ liệu nằm trong kho Upstash Redis của dự án (khóa `chitieu:...`). Bot chỉ trả lời chat có
 `TELEGRAM_CHAT_ID`; muốn dùng chung với người nhà thì thêm biến `CHITIEU_CHAT_ID` = các chat ID cách nhau

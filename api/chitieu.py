@@ -52,7 +52,8 @@ def handle_button(query, tok):
 def status_page(environ, tok):
     if not tok:
         return ("Chưa có biến CHITIEU_BOT_TOKEN trên Vercel. Tạo bot qua @BotFather, thêm token vào biến đó "
-                "rồi Redeploy (xem README, mục Bot chi tiêu).\n" + chitieu.ai_status())
+                "rồi Redeploy (xem README, mục Bot chi tiêu).\n"
+                + chitieu.ai_status(test="thu=1" in environ.get("QUERY_STRING", "")))
     if not chitieu.owner_chats():
         return "Thiếu TELEGRAM_CHAT_ID (hoặc CHITIEU_CHAT_ID) trên Vercel. Thêm vào rồi Redeploy."
     host = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL") or environ.get("HTTP_HOST")
@@ -70,7 +71,7 @@ def status_page(environ, tok):
         lines.append(f"Lỗi gần nhất từ Telegram: {info['last_error_message']}")
     lines += [f"Chỉ trả lời chat ID: {', '.join(chitieu.owner_chats())}",
               f"Kho dữ liệu: {'đã kết nối' if kho.ready() else 'chưa có (xem README)'}",
-              chitieu.ai_status(), "", f"Xong! Vào Telegram nhắn @{me.get('username')}: cà phê 35k"]
+              chitieu.ai_status(test="thu=1" in environ.get("QUERY_STRING", "")), "", f"Xong! Vào Telegram nhắn @{me.get('username')}: cà phê 35k"]
     return "\n".join(lines)
 
 
