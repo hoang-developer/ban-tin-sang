@@ -26,7 +26,7 @@ K_GOLD = "vivang"  # ví vàng của bot bản tin: [{"loai": "sjc"|"nhan", "luo
 K_SALARY = "chitieu:luong"  # {"ngay": ngày nhận lương, "tien": số tiền}
 SELL_TAX = 0.001  # thuế thu nhập cá nhân khi bán chứng khoán: 0,1% giá trị bán
 BROKER_FEE = 0.0  # DNSE miễn phí giao dịch; công ty khác thường thu 0,1–0,35% mỗi chiều
-TYPES = {"tien": "🏦 Tiền, tài khoản", "tietkiem": "🐷 Tiết kiệm", "cp": "📈 Cổ phiếu", "quy": "💹 Quỹ mở",
+TYPES = {"tien": "🏦 Tiền, tài khoản", "tietkiem": "🐷 Tiết kiệm", "etf": "🧺 ETF", "cp": "📈 Cổ phiếu", "quy": "💹 Quỹ mở",
          "vang": "🥇 Vàng", "coin": "🪙 Tiền số", "ngoaite": "💵 Ngoại tệ", "khac": "🏠 Tài sản khác", "no": "💳 Nợ"}
 COINS = {"btc": "bitcoin", "eth": "ethereum", "usdt": "tether", "bnb": "binancecoin", "sol": "solana",
          "xrp": "ripple", "ada": "cardano", "doge": "dogecoin", "ton": "the-open-network", "trx": "tron"}
@@ -139,7 +139,7 @@ def fx_rates(codes=None):
 
 
 SOURCES = {  # loại: (hàm lấy giá theo danh sách mã, số phút còn dùng được giá đã lưu)
-    "cp": (stock_prices, 5), "vang": (gold_table, 30), "quy": (fund_navs, 120), "coin": (coin_prices, 30),
+    "cp": (stock_prices, 5), "etf": (stock_prices, 5), "vang": (gold_table, 30), "quy": (fund_navs, 120), "coin": (coin_prices, 30),
     "ngoaite": (fx_rates, 60)}
 
 
@@ -194,7 +194,7 @@ def valuation(day, fresh=False):
     for it in items:
         by_kind.setdefault(it["loai"], []).append(it)
     quotes, notes = {}, []
-    for kind in ("cp", "quy", "coin", "ngoaite"):
+    for kind in ("cp", "etf", "quy", "coin", "ngoaite"):
         codes = [it["ma"] for it in by_kind.get(kind, [])]
         quotes[kind], when, stale = prices(kind, codes, fresh)
         if codes and stale:
@@ -218,7 +218,7 @@ def valuation(day, fresh=False):
             price = quotes.get(kind, {}).get(it["ma"])
             cost = it["sl"] * it["gia_von"] if it.get("gia_von") else None
             value = it["sl"] * price if price else (cost or 0)
-            unit = {"cp": "cp", "quy": "ccq", "coin": it["ma"].upper(), "ngoaite": it["ma"]}[kind]
+            unit = {"cp": "cp", "etf": "ccq", "quy": "ccq", "coin": it["ma"].upper(), "ngoaite": it["ma"]}[kind]
             detail = f"{qty_text(it['sl'])} {unit} × {vn_num(price, 0) + 'đ' if price else 'chưa có giá'}"
             rows.append((kind, rid, it["ma"].upper(), value, cost, detail))
     for i, g in enumerate(gold):
@@ -265,11 +265,12 @@ USAGE = ("💼 <b>Khai báo tài sản</b> (số tiền viết kiểu 25tr, 1t�
          "• Tiền, tài khoản: /taisan tien VCB 25tr (cùng tên thì cập nhật số dư)\n"
          "• Tiết kiệm: /taisan tietkiem VCB 100tr 4,7% 6 thang 01/08/2026\n"
          "• Cổ phiếu: /taisan cp FPT 1000 95 (số lượng, giá vốn nghìn đồng)\n"
+         "• ETF: /taisan etf E1VFVN30 1000 30 (ETF VN30 của Dragon Capital)\n"
          "• Quỹ mở: /taisan quy VCBF-FIF 1200 15000 (số ccq, giá vốn)\n"
          "• Vàng: /taisan vang sjc 1 luong 140 · /taisan vang nhan 2 chi\n"
          "• Tiền số: /taisan coin btc 0,05 · Ngoại tệ: /taisan usd 1000\n"
          "• Khác: /taisan khac xe máy 30tr · Nợ: /taisan no vay mua nhà 500tr\n"
-         "Mua bán cổ phiếu: nhắn <b>mua 1000 FPT giá 95</b> hoặc <b>bán 500 FPT giá 120</b>\n"
+         "Mua bán cổ phiếu, ETF: nhắn <b>mua 1000 FPT giá 95</b>, <b>mua 500 E1VFVN30 giá 33,6</b>, <b>bán 500 FPT giá 120</b>\n"
          "Xem: /taisan · Sửa, xóa: /taisan xoa · Khám sức khỏe tài chính: /suckhoe")
 FX_CODES = {"usd", "eur", "jpy", "gbp", "aud", "cad", "chf", "cny", "sgd", "krw", "thb", "hkd", "twd"}
 
@@ -348,25 +349,31 @@ def add_saving(data, args):
     return f"✅ Đã thêm sổ tiết kiệm {html.escape(name)} {ct.vnd(amount)}, lãi {rate[1]}%/năm{due}"
 
 
+def is_etf(code):
+    """Mã chứng chỉ quỹ ETF trên HOSE: E1VFVN30 (DCVFMVN30 của Dragon Capital), FUEVFVND, FUESSVFL..."""
+    return code.upper().startswith(("E1VF", "FUE"))
+
+
 def add_holding(data, kind, args):
-    """cp/quy/coin: mã, số lượng, giá vốn (không bắt buộc với coin). Mã đã có thì ghi đè (khai báo lại)."""
+    """cp/etf/quy/coin: mã, số lượng, giá vốn (không bắt buộc với coin). Mã đã có thì ghi đè (khai báo lại)."""
     if len(args) < 2 or (kind != "coin" and len(args) < 3):
         return None
     code = args[0].upper() if kind != "coin" else args[0].lower()
     try:
         qty = number(args[1])
-        cost = (stock_price(args[2]) if kind in ("cp", "quy") else number(args[2])) if len(args) > 2 else None
+        cost = (stock_price(args[2]) if kind in ("cp", "etf", "quy") else number(args[2])) if len(args) > 2 else None
     except ValueError:
         return None
     if qty <= 0:
         return None
-    if kind == "cp" and not re.fullmatch(r"[A-Z0-9]{3}", code):
-        return None
-    if kind == "cp":
-        listed, _, stale = prices("cp", [code])
+    if kind in ("cp", "etf"):
+        if not re.fullmatch(r"[A-Z0-9]{3,8}", code):
+            return None
+        kind = "etf" if is_etf(code) else "cp"  # "/taisan cp E1VFVN30 ..." cũng vào ETF
+        listed, _, stale = prices(kind, [code])
         if code not in listed and not stale:
             return f"Không thấy mã {html.escape(code)} trên sàn"
-    data["items"] = [it for it in data["items"] if not (it["loai"] == kind and it["ma"] == code)]
+    data["items"] = [it for it in data["items"] if not (it["loai"] in (kind, "cp", "etf") and it["ma"] == code)]
     data["items"].append({"id": new_id(data), "loai": kind, "ma": code, "sl": qty, "gia_von": cost})
     return (f"✅ Đã khai báo {TYPES[kind]} {html.escape(code.upper())}: {qty_text(qty)}"
             + (f", giá vốn {ct.vnd(cost)}" if cost else ""))
@@ -400,7 +407,7 @@ def add_gold(args):
 
 
 ALIASES = {"tien": "tien", "taikhoan": "tien", "tk": "tien", "vi": "tien", "tietkiem": "tietkiem", "so": "tietkiem",
-           "sotietkiem": "tietkiem", "cp": "cp", "cophieu": "cp", "quy": "quy", "ccq": "quy", "vang": "vang",
+           "sotietkiem": "tietkiem", "cp": "cp", "cophieu": "cp", "etf": "etf", "chungchiquy": "etf", "quy": "quy", "ccq": "quy", "vang": "vang",
            "coin": "coin", "crypto": "coin", "khac": "khac", "nha": "khac", "xe": "khac", "no": "no", "vay": "no"}
 
 
@@ -425,7 +432,7 @@ def taisan(args):
         result = add_gold(rest)
     elif kind == "tietkiem":
         result = add_saving(data, rest)
-    elif kind in ("cp", "quy", "coin"):
+    elif kind in ("cp", "etf", "quy", "coin"):
         result = add_holding(data, kind, rest)
     elif kind == "ngoaite":
         result = add_fx(data, word, rest)
@@ -545,7 +552,8 @@ def chart_reply(day):
 
 # ---- Mua bán cổ phiếu bằng tin nhắn ----------------------------------------------------
 
-TRADE = re.compile(r"^\s*(mua|ban)\s+(\d[\d.,]*)\s*(?:cp|co phieu|cổ phiếu)?\s+([A-Za-z0-9]{3})\s*(?:gia|giá|@)?\s*"
+TRADE = re.compile(r"^\s*(mua|ban)\s+(\d[\d.,]*)\s*(?:cp|ccq|co phieu|cổ phiếu|chung chi quy)?\s+([A-Za-z0-9]{3,8})\s*"
+                   r"(?:gia|giá|@)?\s*"
                    r"(\d[\d.,]*)\s*(k|nghin|nghìn|đ|d|dong|đồng)?\s*$", re.IGNORECASE)
 
 
@@ -580,11 +588,12 @@ def trade(text, now):
         return None
     side, qty, code, price = found
     data = load()
-    holding = next((it for it in data["items"] if it["loai"] == "cp" and it["ma"] == code), None)
+    kind = "etf" if is_etf(code) else "cp"
+    holding = next((it for it in data["items"] if it["loai"] in ("cp", "etf") and it["ma"] == code), None)
     cash = broker_cash(data)
     value = qty * price
     if side == "mua":
-        listed, _, stale = prices("cp", [code])
+        listed, _, stale = prices(kind, [code])
         if code not in listed and not stale:
             return None  # không phải mã chứng khoán: để ghi như khoản chi
         paid = value * (1 + BROKER_FEE)
@@ -593,7 +602,7 @@ def trade(text, now):
             holding["sl"] += qty
             holding["gia_von"] = total_cost / holding["sl"]
         else:
-            holding = {"id": new_id(data), "loai": "cp", "ma": code, "sl": qty, "gia_von": paid / qty}
+            holding = {"id": new_id(data), "loai": kind, "ma": code, "sl": qty, "gia_von": paid / qty}
             data["items"].append(holding)
         lines = [f"📈 Đã mua {vn_num(qty, 0)} {code} giá {ct.vnd(price)}: <b>{ct.vnd(round(paid))}</b>"
                  + (" (DNSE miễn phí giao dịch)" if not BROKER_FEE else ""),
@@ -754,7 +763,7 @@ def health_checks(day):
         checks.append((score, "✅" if not warnings else "⚠️", "Phân bổ: " + ("không dồn quá nhiều vào một chỗ"
                                                                           if not warnings else "; ".join(warnings))))
         losers = [f"{html.escape(name)} {(value - cost) / cost * 100:.0f}%" for kind, _, name, value, cost, _ in v["rows"]
-                  if kind in ("cp", "quy", "coin", "vang") and cost and value and (value - cost) / cost <= -0.2]
+                  if kind in ("cp", "etf", "quy", "coin", "vang") and cost and value and (value - cost) / cost <= -0.2]
         trend = compare_line(day, v["net"])
         score = 20 if not losers else 10
         checks.append((score, "✅" if not losers else "⚠️",

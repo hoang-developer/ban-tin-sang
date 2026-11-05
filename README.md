@@ -222,7 +222,8 @@ Code ở [taisan.py](taisan.py).
 - **Thu nhập**: `+ lương 25tr`, `+ thưởng 3tr`, `+ cổ tức VNM 1tr2`. Báo cáo chia thu theo loại: lương,
   thưởng, đầu tư (lãi bán cổ phiếu, cổ tức, lãi tiết kiệm), làm thêm, khác. `/luong 10 25tr`: từ ngày 10
   (tối đa 3 ngày) bot hỏi đã nhận lương chưa, bấm nút là ghi.
-- **Mua bán cổ phiếu**: nhắn `mua 1000 FPT giá 95` hoặc `bán 500 FPT giá 120` (giá nghìn đồng hoặc đồng).
+- **Mua bán cổ phiếu, ETF**: nhắn `mua 1000 FPT giá 95`, `mua 500 E1VFVN30 giá 33,6` hoặc `bán 500 FPT giá 120` (giá
+  nghìn đồng hoặc đồng).
   Mua: cộng vào danh mục, tính giá vốn bình quân. Bán: trừ thuế thu nhập 0,1% giá trị bán (DNSE miễn phí
   giao dịch nên không có phí; công ty khác sửa `BROKER_FEE` trong taisan.py), tính lãi/lỗ so với giá vốn,
   phần **lãi** ghi vào Thu nhập (phần vốn chỉ là đổi cổ phiếu ra tiền). Có khai báo tài khoản tiền tên
@@ -234,6 +235,7 @@ Code ở [taisan.py](taisan.py).
   | Tiền, tài khoản | `/taisan tien VCB 25tr` (cùng tên là cập nhật số dư) | Bạn tự cập nhật |
   | Tiết kiệm | `/taisan tietkiem VCB 100tr 4,7% 6 thang 01/08/2026` | Bot tính lãi theo ngày, nhắc trước đáo hạn 3 ngày |
   | Cổ phiếu | `/taisan cp FPT 1000 95` (số lượng, giá vốn) | Giá khớp gần nhất (Vietcap) |
+  | ETF | `/taisan etf E1VFVN30 1000 30` (ETF VN30 của Dragon Capital; mã E1VF…, FUE… tự vào nhóm ETF) | Giá khớp gần nhất (Vietcap) |
   | Quỹ mở | `/taisan quy VCBF-FIF 1200 15000` | Giá chứng chỉ quỹ trên Fmarket |
   | Vàng | `/taisan vang sjc 1 luong 140` (chung ví `/vivang` của bot bản tin) | Giá cửa hàng mua vào SJC/PNJ |
   | Tiền số | `/taisan coin btc 0,05` | CoinGecko, lỗi thì Coinbase × tỷ giá |
@@ -266,8 +268,8 @@ Code ở [duphong.py](duphong.py). `/duphong` cho xem:
   không tính là khoản chi. Chạm mốc thì bot chúc mừng.
 - **Ngày nhận lương**: ghi `+ lương …` (hoặc ảnh lịch sử có lương) thì bot gợi ý "🛟 tháng này nên để …" kèm nút để
   luôn vào quỹ.
-- **🏦 Để quỹ ở đâu**: tiết kiệm không kỳ hạn hoặc kỳ hạn 1–3 tháng, quỹ thị trường tiền tệ trên Fmarket (lãi, phí),
-  lãi suất các sổ bạn đã khai báo; không nên để ở cổ phiếu, vàng, tiền số, bất động sản.
+- **🏦 Để quỹ ở đâu**: tiết kiệm không kỳ hạn hoặc tiết kiệm online kỳ hạn 1–3 tháng (chia vài sổ nhỏ), 1 tháng chi
+  có thể để ở tài khoản thanh toán; lãi suất các sổ bạn đã khai báo; không để ở cổ phiếu, ETF, vàng.
 - `/suckhoe` dùng đúng số liệu quỹ; tổng kết đầu tháng kèm tiến độ quỹ.
 
 ### Cài bot chi tiêu (làm một lần)
