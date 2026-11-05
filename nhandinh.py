@@ -42,6 +42,7 @@ BUTTONS = [[("🔥 Ngành", "nd:nganh"), ("🎯 Khuyến nghị", "nd:kn"), ("�
 NOT_ADVICE = ("<i>Tổng hợp tự động từ khuyến nghị của các CTCK (qua VNDirect), giá Vietcap, tin CafeF/Vietstock/"
               "VnExpress; AI có thể sai. Chỉ để tham khảo, không phải lời khuyên đầu tư.</i>")
 SHORT_NOTE = "<i>🤖 AI tổng hợp từ khuyến nghị CTCK, giá, tin · tham khảo, không phải lời khuyên đầu tư</i>"
+SHORT_REF = "<i>Nguồn VNDirect · tham khảo, không phải lời khuyên đầu tư</i>"
 OFF = "nhandinh:tat"  # có khóa này thì không tự gửi nhận định trong phiên
 TICKER = re.compile(r"(?<![A-Za-z0-9])[A-Z][A-Z0-9]{2}(?![A-Za-z0-9])")
 
@@ -178,7 +179,8 @@ def rec_rows(recs, prices):
         latest = items[0]
         target = (latest.get("avgTargetPrice") or latest.get("targetPrice") or 0) * 1000
         price = prices.get(code)
-        rows.append({"ma": code, "so": len(items), "ctck": list(dict.fromkeys(i["firm"] for i in items))[:4],
+        firms = list(dict.fromkeys(i["firm"] for i in items))
+        rows.append({"ma": code, "so": len(firms), "ctck": firms,
                      "loai": RATING.get((latest.get("type") or "").upper(), latest.get("type") or ""),
                      "ngay": latest.get("reportDate") or "", "muc_tieu": target, "gia": price,
                      "con_tang": (target / price - 1) * 100 if target and price else None})
@@ -252,12 +254,17 @@ def sector_lines(data, top=8, bottom=3):
     return lines
 
 
+def whole_pct(x):
+    return f"{x:+.0f}%"
+
+
 def rec_line(r):
-    target = f"mục tiêu TB {vn_num(r['muc_tieu'], 0)}" if r["muc_tieu"] else "chưa có giá mục tiêu"
-    now = f" · giá {vn_num(r['gia'], 0)}" if r["gia"] else ""
-    upside = f" → còn {pct(r['con_tang'])}" if r["con_tang"] is not None else ""
-    return (f"<b>{r['ma']}</b> {r['loai']} · {html.escape(', '.join(r['ctck']))} ({r['so']} lần, mới nhất "
-            f"{r['ngay'][8:10]}/{r['ngay'][5:7]}) · {target}{now}{upside}")
+    """'MWG · 4 CTCK MUA · mục tiêu 109k (+45%)': số CTCK, không liệt kê tên."""
+    target = ""
+    if r["muc_tieu"]:
+        target = f" · mục tiêu {pt_short(r['muc_tieu'])}" + (
+            f" ({whole_pct(r['con_tang'])})" if r["con_tang"] is not None else "")
+    return f"<b>{r['ma']}</b> · {r['so']} CTCK {r['loai']}{target}"
 
 
 def news_line(item, now=None):
@@ -284,21 +291,23 @@ def khuyennghi(args):
             return f"Không có khuyến nghị nào cho {html.escape(code)} trong 180 ngày qua (nguồn VNDirect)"
         q = (safe(chungkhoan.quotes, [code]) or {}).get(code)
         price = (q["price"] or q["ref"]) if q else None
-        lines = [f"🎯 <b>Khuyến nghị cho {code}</b> (180 ngày)" + (f" · giá {vn_num(price, 0)}" if price else "")]
-        for i in items[:10]:
+        firms = len(set(i["firm"] for i in items))
+        lines = [f"🎯 <b>{code}</b>" + (f" · giá {pt_short(price)}" if price else "")
+                 + f" · {firms} CTCK khuyến nghị trong 180 ngày"]
+        for i in items[:8]:
             target = (i.get("targetPrice") or 0) * 1000
-            upside = f" ({pct((target / price - 1) * 100)})" if target and price else ""
-            lines.append(f"• {i['reportDate'][8:10]}/{i['reportDate'][5:7]}/{i['reportDate'][:4]} {html.escape(i['firm'])}: "
-                         f"{RATING.get((i.get('type') or '').upper(), i.get('type'))} · mục tiêu "
-                         f"{vn_num(target, 0) if target else '—'}{upside}")
-        return "\n".join(lines + [NOT_ADVICE])
+            upside = f" ({whole_pct((target / price - 1) * 100)})" if target and price else ""
+            lines.append(f"{i['reportDate'][8:10]}/{i['reportDate'][5:7]} {html.escape(i['firm'])} "
+                         f"{RATING.get((i.get('type') or '').upper(), i.get('type'))}"
+                         + (f" {pt_short(target)}{upside}" if target else ""))
+        return "\n".join(lines + [SHORT_REF])
     data = gather()
     rows = data["recs"]
     if not rows:
         return "Chưa lấy được khuyến nghị của các CTCK, thử lại sau"
-    return "\n".join([f"🎯 <b>Khuyến nghị của các CTCK, 30 ngày qua</b> ({len(rows)} mã)",
-                      "<i>Nhiều CTCK cùng khuyến nghị xếp trước; còn tăng = giá mục tiêu TB so với giá hiện tại</i>"]
-                     + [rec_line(r) for r in rows[:15]] + ["Xem một mã: /khuyennghi FPT", NOT_ADVICE])
+    return "\n".join([f"🎯 <b>Khuyến nghị CTCK 30 ngày</b> · {len(rows)} mã",
+                      "<i>(số CTCK khuyến nghị · giá mục tiêu TB · còn tăng so với giá hiện tại)</i>"]
+                     + [rec_line(r) for r in rows[:12]] + ["Chi tiết một mã: /khuyennghi FPT", SHORT_REF])
 
 
 def tin_text(data=None):
@@ -355,8 +364,9 @@ SYSTEM = ("Bạn là chuyên viên tổng hợp thông tin chứng khoán Việt
           "(109k, 1.643 tỷ, +45%), không nhắc lại VN-Index:\n"
           "🔥 1 dòng: 2–3 ngành hot nhất (ưu tiên vừa tăng vừa hút tiền hoặc khối ngoại mua), mỗi ngành: % và tiền "
           "vào. Ví dụ: 🔥 Chứng khoán +0,7% (1.643 tỷ, ngoại mua 372 tỷ) · BĐS +1,8% (544 tỷ)\n"
-          "🎯 2–3 dòng: mỗi dòng một mã đáng chú ý: % hôm nay và một lý do ngắn (CTCK nào khuyến nghị, mục tiêu, "
-          "còn tăng %; hoặc tin). Ví dụ: 🎯 MWG +1,3%: HSC, UBS khuyến nghị MUA, mục tiêu 109k (+45%)\n"
+          "🎯 2–3 dòng: mỗi dòng một mã đáng chú ý: % hôm nay và một lý do ngắn (số CTCK khuyến nghị, không liệt kê "
+          "tên CTCK; mục tiêu, còn tăng %; hoặc tin). Ví dụ: 🎯 MWG +1,3%: 4 CTCK khuyến nghị MUA, mục tiêu 109k "
+          "(+45%)\n"
           "⚠️ 1 dòng: rủi ro chính (ngành/mã giảm mạnh, khối ngoại bán, tin xấu).")
 PREFIXES = ("🔥", "🎯", "⚠️", "⚠")
 
@@ -421,16 +431,18 @@ def short_fallback(data):
     for r in data["recs"][:2]:
         move = f" {pct(today_pct[r['ma']])}" if r["ma"] in today_pct else ""
         target = f", mục tiêu {pt_short(r['muc_tieu'])}" if r["muc_tieu"] else ""
-        upside = f" ({pct(r['con_tang'])})" if r["con_tang"] is not None else ""
-        lines.append(f"🎯 {r['ma']}{move}: {html.escape(', '.join(r['ctck'][:2]))} khuyến nghị {r['loai']}{target}{upside}")
+        upside = f" ({whole_pct(r['con_tang'])})" if r["con_tang"] is not None else ""
+        lines.append(f"🎯 {r['ma']}{move}: {r['so']} CTCK khuyến nghị {r['loai']}{target}{upside}")
     if data["news"]:
         lines.append(news_line(data["news"][0]))
     return lines
 
 
 def pt_short(x):
-    """109461 -> '109k'."""
-    return f"{round(x / 1000)}k"
+    """Giá gọn: 109.461 -> '109k'; 53.600 -> '53,6k'; 33.000 -> '33k'."""
+    if x >= 100_000:
+        return f"{round(x / 1000)}k"
+    return f"{x / 1000:.1f}".rstrip("0").rstrip(".").replace(".", ",") + "k"
 
 
 def brief(now=None, data=None):
