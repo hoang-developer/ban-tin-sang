@@ -22,7 +22,7 @@ Gõ trong chat với bot hoặc bấm nút **Menu** cạnh ô nhập ([lenh.py](
 | `/stock FPT` | Chi tiết mã (tối đa 3 mã một lần). Nút ⭐ Theo dõi, 📰 Thêm tin, 🔁 Làm mới |
 | `/nhandinh` | Nhận định trong phiên: AI tổng hợp ngành hot, mã đáng chú ý (kèm khuyến nghị của CTCK nào, giá mục tiêu), tin, rủi ro. Nút 🔥 Ngành, 🎯 Khuyến nghị, 📰 Tin. `/nhandinh tat` / `bat`: tắt/bật tự gửi |
 | `/nganh` | Ngành trên HOSE: % (theo vốn hóa), giá trị giao dịch, khối ngoại ròng, mã dẫn dắt; ngành hút tiền nhất |
-| `/khuyennghi` | Khuyến nghị của các CTCK 30 ngày qua, còn tăng bao nhiêu so với giá mục tiêu. `/khuyennghi FPT` cho một mã (180 ngày) |
+| `/khuyennghi` | Khuyến nghị của các CTCK 30 ngày qua, gọn: số CTCK khuyến nghị, giá mục tiêu TB, còn tăng bao nhiêu. `/khuyennghi FPT`: từng CTCK với một mã (180 ngày) |
 | `/theodoi` | Mã đang theo dõi. `/theodoi FPT` thêm mã, `/theodoi FPT 50 60` báo khi giá ≤ 50.000 hoặc ≥ 60.000 |
 | `/tin` | Tin nổi bật. `/tin giá vàng` tìm tin mới nhất theo từ khóa (7 ngày qua; thêm `24h`, `3ngay` để giới hạn). Nút 🔔 báo khi có tin mới |
 | `/tukhoa` | Từ khóa báo tin mới: `/tukhoa giá xăng` thêm, bấm ❌ để bỏ |
