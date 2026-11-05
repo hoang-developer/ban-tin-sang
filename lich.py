@@ -12,6 +12,7 @@ import amlich
 import canhbao
 import kho
 import lenh
+import nhandinh
 import phantich
 import sochitieu as chitieu
 import taisan
@@ -368,8 +369,23 @@ def tai_san_cuoi_ngay(now, chat):
     return f"tài sản ròng {round(v['net'])}"
 
 
+def nhan_dinh_phien(now, chat):
+    """Ngày giao dịch: nhận định trong phiên lúc 10h15 và 13h45 (tắt bằng /nhandinh tat)."""
+    if not trading_day(now):
+        return None
+    for job, start, end in (("nhan_dinh_sang", (10, 15), (11, 25)), ("nhan_dinh_chieu", (13, 45), (14, 25))):
+        if between(now, start, end) and not done_today(job, now):
+            mark_done(job, now)  # đánh dấu trước: lỗi thì bỏ lượt này, khỏi gọi AI lại mỗi 15 phút
+            message = nhandinh.scheduled(now)
+            if not message:
+                return "không gửi (đã tắt hoặc hôm nay không giao dịch)"
+            tg.send(chat, *message)
+            return "đã gửi"
+    return None
+
+
 JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi,
-        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y, tai_chinh_sang, tai_san_cuoi_ngay]
+        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien]
 
 
 def run(now):

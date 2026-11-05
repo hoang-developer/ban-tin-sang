@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import amlich
 import kho
+import nhandinh
 import tg
 from bantin import BUTTONS as BANTIN_BUTTONS
 from bantin import VN_TZ, WEEKDAYS, build_message, gold, gold_prices, index_history, section, vn_num
@@ -542,6 +543,9 @@ def caidat(args):
 # tên lệnh -> (mô tả trong menu Telegram, hàm nhận các tham số sau lệnh)
 COMMANDS = {
     "stock": ("Phiên chứng khoán; /stock FPT để xem một mã", stock),
+    "nhandinh": ("Nhận định trong phiên: ngành, khuyến nghị CTCK, tin (AI tổng hợp)", nhandinh.nhandinh),
+    "nganh": ("Ngành trên HOSE: tăng giảm, dòng tiền, khối ngoại", lambda args: nhandinh.nganh_text()),
+    "khuyennghi": ("Khuyến nghị của các CTCK; /khuyennghi FPT cho một mã", nhandinh.khuyennghi),
     "theodoi": ("Mã theo dõi; /theodoi FPT 50 60 để báo khi chạm giá", theodoi),
     "tin": ("Tin nổi bật; /tin giá vàng để tìm theo từ khóa", tin),
     "tukhoa": ("Từ khóa báo tin mới: /tukhoa giá xăng", tukhoa),
@@ -578,6 +582,8 @@ def on_button(data, message, now):
     "buttons" chỉ thay nút.
     """
     kind, _, arg = data.partition(":")
+    if kind == "nd":
+        return nhandinh.on_button(arg)
     if kind == "bantin":
         return "Đang cập nhật bản tin…", ("edit", lambda: (build_message(), BANTIN_BUTTONS))
     if kind == "vn30":
