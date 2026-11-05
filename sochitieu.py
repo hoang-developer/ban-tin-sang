@@ -682,6 +682,10 @@ def entry_text(e, day):
     return f"<b>{vnd(e['tien'])}</b> · {name(e['nhom'])}{robot} — {note}{when}"
 
 
+def budget_label(code):
+    return {"tong": "Tổng chi", "hangngay": "Chi hằng ngày"}.get(code) or name(code)
+
+
 def budget_lines(codes, day):
     """Tiến độ ngân sách tháng của các nhóm vừa ghi (và ngân sách tổng)."""
     budgets = kho.get(K_BUDGET, {})
@@ -689,11 +693,16 @@ def budget_lines(codes, day):
         return []
     items = [e for e in load(day.strftime("%Y-%m")) if e["nhom"] != INCOME]
     lines = []
-    for code in [c for c in dict.fromkeys(codes) if c in budgets] + (["tong"] if "tong" in budgets else []):
-        spent = sum(e["tien"] for e in items if code == "tong" or e["nhom"] == code)
+    daily = phantich().daily_groups() if "hangngay" in budgets else []
+    extra = (["hangngay"] if daily and set(codes) & set(daily + ["hangngay"]) else []) + (["tong"] if "tong" in budgets else [])
+    for code in list(dict.fromkeys([c for c in codes if c in budgets and c not in ("tong", "hangngay")] + extra)):
+        if code == "hangngay":  # chi tiêu hằng ngày, không tính khoản đột biến
+            spent = phantich().daily_spent(day)
+        else:
+            spent = sum(e["tien"] for e in items if code == "tong" or e["nhom"] == code)
         limit = budgets[code]
         pct = spent / limit * 100
-        label = "Tổng chi" if code == "tong" else name(code)
+        label = budget_label(code)
         mark = "🚨" if pct >= 100 else "⚠️" if pct >= 80 else "🎯"
         extra = f", vượt {vnd(spent - limit)}" if pct > 100 else ""
         lines.append(f"{mark} {label} tháng {day.month}: {vnd(spent)} / {vnd(limit)} ({pct:.0f}%{extra})")
@@ -922,12 +931,15 @@ def find_category(text):
     """Tên nhóm người dùng gõ ('ăn uống', 'di lai', 'tổng') -> mã, None nếu không rõ."""
     if plain(text).strip() in ("tong", "tat ca", "tong chi"):
         return "tong"
+    if plain(text).strip() in ("hang ngay", "hangngay", "sinh hoat", "thuong ngay", "chi hang ngay"):
+        return "hangngay"
     code = find_group(text) or classify(text)
     return None if code == OTHER else code
 
 
 def ngansach(args):
     usage = ("Đặt ngân sách tháng: /ngansach ăn uống 3tr · /ngansach tổng 15tr\n"
+             "Chi tiêu hằng ngày (ăn uống, đi chợ, đi lại…): /ngansach hằng ngày 9tr\n"
              "Bỏ ngân sách: /ngansach ăn uống 0")
     budgets = kho.get(K_BUDGET, {})
     if not args:
@@ -939,13 +951,13 @@ def ngansach(args):
     if args[-1] == "0":
         budgets.pop(code, None)
         kho.put(K_BUDGET, budgets)
-        return f"Đã bỏ ngân sách {'tổng' if code == 'tong' else name(code)}"
+        return f"Đã bỏ ngân sách {budget_label(code)}"
     found = parse_amount(args[-1])
     if found is None:
         return usage
     budgets[code] = found[0]
     kho.put(K_BUDGET, budgets)
-    label = "Tổng chi" if code == "tong" else name(code)
+    label = budget_label(code)
     return "\n".join([f"🎯 Ngân sách {label}: {vnd(found[0])}/tháng"] + budget_lines([code], today()))
 
 
@@ -1155,7 +1167,8 @@ COMMANDS = {
     "ngansach": ("Ngân sách tháng: /ngansach ăn uống 3tr", ngansach),
     "nhom": ("Các nhóm chi tiêu; tự tạo nhóm, thêm từ khóa", nhom_cmd),
     "chuaxep": ("Xếp nhóm các khoản đang ở Khác", chuaxep),
-    "dubao": ("Dự báo cuối tháng, hôm nay còn được tiêu bao nhiêu", lambda args: phantich().forecast_text(today())),
+    "dubao": ("Dự báo chi tiêu hằng ngày (ăn uống, sinh hoạt); /dubao tatca cho mọi khoản",
+              lambda args: phantich().dubao(args)),
     "hoi": ("Hỏi bằng câu thường: /hoi tháng này cà phê hết bao nhiêu", lambda args: phantich().hoi(" ".join(args), today())),
     "bieudo": ("Biểu đồ chi tiêu tháng; /bieudo 10 cho tháng 10", lambda args: phantich().chart_reply(period_kind(args), today())),
     "taisan": ("Tài sản ròng: tiền, tiết kiệm, cổ phiếu, vàng, quỹ, nợ…; /taisan huongdan", lambda args: taisan().taisan(args)),
@@ -1232,7 +1245,7 @@ def on_button(data, message, now):
     if kind == "bd":
         return "Đang vẽ biểu đồ…", ("send", lambda: phantich().chart_reply(arg, day))
     if kind == "db":
-        return None, ("send", lambda: phantich().forecast_text(day))
+        return None, ("send", lambda: phantich().daily_text(day))
     if kind == "nx":
         return "AI đang viết nhận xét, chờ chút…", ("send", lambda: phantich().commentary(arg, day))
     if kind == "xls":
