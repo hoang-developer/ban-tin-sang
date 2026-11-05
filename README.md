@@ -113,6 +113,13 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
 - Nhiều khoản một lúc: mỗi khoản một dòng.
 - 📷 **Gửi ảnh** hóa đơn hoặc màn hình chuyển khoản: bot đọc rồi ghi (xem mục Ghi bằng ảnh).
 
+**Menu** ([menu.py](menu.py)): `/menu` (hoặc `/start`) mở màn hình tổng quan: tháng này đã chi bao nhiêu, quỹ dự
+phòng, nợ, tài sản ròng và việc nên làm, kèm 6 nút **📊 Chi tiêu · 💼 Tài sản · 💳 Nợ · 🎯 Kế hoạch · 📝 Cách ghi ·
+⚙️ Cài đặt**. Bấm nút thì mở ngay trong tin đó, có nút ⬅️ Menu để quay lại. Lần đầu bot gửi thêm hàng nút cố định
+dưới ô chat (🏠 Menu · 📊 Chi tiêu · 💼 Tài sản · 🎯 Kế hoạch). Nút Menu của Telegram chỉ còn 8 lệnh chính (`/menu`,
+`/baocao`, `/no`, `/kehoach`, `/taisan`, `/duphong`, `/hoi`, `/huongdan`); các lệnh khác vẫn gõ được, xem `/huongdan`.
+Khai báo nhiều thứ một lần: dán nhiều lệnh trong một tin, mỗi lệnh một dòng, bot chạy lần lượt.
+
 Số tiền hiểu được: `35k`, `35.000đ`, `35 nghìn`, `1tr2` (1.200.000đ), `2tr500`, `1,5tr`, `1k5`; số trơn
 dưới 1.000 hiểu là nghìn (`cà phê 35` là 35.000đ). Nhóm có sẵn: Ăn uống, Đi chợ, Đi lại, Nhà cửa và hóa
 đơn, Mua sắm, Sức khỏe, Giải trí và du lịch, Học tập, Hiếu hỷ và quà, Gia đình và con cái, Khác, Thu nhập.
@@ -247,7 +254,7 @@ Code ở [taisan.py](taisan.py).
   gian (18h mỗi ngày bot lưu lại tài sản ròng). Nguồn giá lỗi thì dùng giá gần nhất và ghi chú. Sửa: khai
   báo lại cùng tên/mã; xóa: `/taisan xoa`.
 - **Khám sức khỏe tài chính** (`/suckhoe`, nút 🩺): chấm điểm /100 theo quỹ dự phòng (tiền + tiết kiệm
-  đủ mấy tháng chi tiêu, nên 3–6), tỉ lệ để dành (nên từ 20% thu nhập), nợ so với tài sản (nên dưới 30%),
+  đủ mấy tháng chi tiêu, nên 3–6), tỉ lệ để dành (nên từ 20% thu nhập), nợ (xem mục Sổ nợ),
   phân bổ (một mã quá 20% tài sản, tiền số quá 10%, một loại quá 70%), khoản đầu tư lỗ từ 20%, xu hướng
   tài sản ròng. Chi và thu lấy từ sổ 90 ngày qua. AI (nếu bật) viết 2 nhận xét và 2–3 việc nên làm có
   con số; được dặn không khuyên mua bán mã nào, không dự đoán giá. Chỉ để tham khảo.
@@ -266,11 +273,50 @@ Code ở [duphong.py](duphong.py). `/duphong` cho xem:
 - **Số dư quỹ**: tài khoản "Quỹ dự phòng" trong `/taisan` (`/duphong nap 2tr`, nút ➕, `/duphong rut 1tr` khi phải
   dùng) cộng các sổ tiết kiệm, quỹ có sẵn bạn gắn vào (`/duphong tinh ACB`). Để tiền vào quỹ là chuyển tiền,
   không tính là khoản chi. Chạm mốc thì bot chúc mừng.
-- **Ngày nhận lương**: ghi `+ lương …` (hoặc ảnh lịch sử có lương) thì bot gợi ý "🛟 tháng này nên để …" kèm nút để
-  luôn vào quỹ.
+- **Ngày nhận lương**: ghi `+ lương …` (hoặc ảnh lịch sử có lương) thì bot gợi ý chia lương (trả nợ → chi tiêu →
+  quỹ dự phòng, xem mục Kế hoạch) kèm nút để luôn vào quỹ. Mỗi lần nạp được cộng vào số đã nạp của tháng.
 - **🏦 Để quỹ ở đâu**: tiết kiệm không kỳ hạn hoặc tiết kiệm online kỳ hạn 1–3 tháng (chia vài sổ nhỏ), 1 tháng chi
   có thể để ở tài khoản thanh toán; lãi suất các sổ bạn đã khai báo; không để ở cổ phiếu, ETF, vàng.
 - `/suckhoe` dùng đúng số liệu quỹ; tổng kết đầu tháng kèm tiến độ quỹ.
+
+### Sổ nợ
+
+Code ở [sono.py](sono.py). Khoản nợ lưu chung với tài sản (loại "Nợ" trong `/taisan`) nên tài sản ròng luôn đúng;
+`/no` thêm phần trả dần:
+
+- **Khai báo**: `/no chú Tư 300tr đã trả 32tr, trả 5tr/tháng, không lãi` ·
+  `/no thẻ tín dụng trả góp 8,2tr, trả 4,39tr/tháng, ngày 5` · có lãi thì ghi `lãi 12%` (hoặc `lãi 1%/tháng`).
+  Gõ lại cùng tên để sửa (`/no chú Tư trả 6tr/tháng`). Khoản mới tính kỳ trả từ tháng sau (số dư khai báo đã gồm lần
+  trả tháng này); chưa trả tháng này thì thêm `tháng này chưa trả`. Lần đầu bot tạo nhóm chi 🏦 Trả nợ.
+- **`/no`**: mỗi khoản còn bao nhiêu / tổng ban đầu, thanh tiến độ, có lãi hay không, mỗi tháng trả bao nhiêu, còn
+  mấy tháng và tháng nào xong, tháng này đã trả chưa (nút ✅ Trả). Khoản sắp xong thì báo trước mỗi tháng dư ra bao
+  nhiêu.
+- **Trả nợ tự trừ dư nợ**: bấm ✅ Trả; nhắn `trả nợ chú Tư 5tr`; hoặc gửi ảnh chuyển khoản. Bot so tên khoản nợ với
+  nội dung, với khoản ở nhóm Trả nợ thì so cả số tiền với mức trả mỗi tháng; chưa chắc thì hỏi "trừ vào khoản nào".
+  Có nút ↩️ Không trừ; xóa khoản chi đó thì dư nợ được cộng lại. Khoản trả nợ vẫn là khoản chi nhóm Trả nợ.
+- **Nhắc**: tháng nào chưa trả, 9h ngày hạn (không đặt thì 2 ngày sau ngày lương, không có ngày lương thì ngày 10)
+  bot nhắc kèm nút "Đã trả", 5 ngày sau nhắc thêm một lần.
+- **Trả xong** một khoản: bot chúc mừng; từ tháng sau khoản tiền đó được gợi ý chuyển vào quỹ dự phòng.
+- **Khám sức khỏe** chấm nợ theo tiền trả mỗi tháng so với thu nhập (nên dưới 30%), ghi riêng nợ có lãi và nợ không
+  lãi (người thân); chưa biết thu nhập thì theo nợ có lãi so với tài sản. Tổng kết đầu tháng kèm sổ nợ.
+
+### Kế hoạch: lộ trình xây tài sản và chia lương
+
+Code ở [kehoach.py](kehoach.py). `/kehoach` cho xem lộ trình 5 bước, bot tự đánh dấu ✅ đã xong, 👉 đang làm:
+
+1. Ghi chép chi tiêu ít nhất 2 tuần
+2. Quỹ dự phòng mốc đầu: 1 tháng chi thiết yếu
+3. Trả hết nợ có lãi (thẻ tín dụng, trả góp, vay tiêu dùng)
+4. Quỹ dự phòng đủ mục tiêu (mặc định 6 tháng chi thiết yếu)
+5. Đầu tư đều mỗi tháng: tiết kiệm, vàng, ETF, cổ phiếu (hiện đang có bao nhiêu mỗi loại)
+
+Nợ không lãi (người thân) trả đều theo hẹn, song song với mọi bước. Dưới lộ trình là việc nên làm bây giờ (trả
+khoản nợ tới kỳ, nạp quỹ tháng này, xếp nhóm khoản chưa rõ).
+
+**Chia lương** (`/kehoach chia`, nút 📋, tự gợi ý khi ghi lương): thu tháng này → trả nợ tới kỳ (đã trả ✅ hay chưa)
+→ chi tiêu dự kiến (trung bình 90 ngày qua, không tính trả nợ; có ngân sách tổng thì theo ngân sách) → quỹ dự phòng
+(mức để kịp hạn, cộng tiền trước đây trả các khoản nợ đã xong; không quá phần thu còn lại) → còn lại. Nút trả nợ, nạp
+quỹ ngay trên tin. Chưa ghi lương thì dùng số ở `/luong`, không có thì thu trung bình 3 tháng.
 
 ### Cài bot chi tiêu (làm một lần)
 

@@ -228,7 +228,8 @@ def find_group(text, include_hidden=False, cfg=None):
 
 MONEY = re.compile(
     r"(?<![\w.,])(\d+(?:[.,]\d+)*)\s*"                                   # 35 | 35.000 | 1,5
-    r"(k|nghìn|nghin|ngàn|ngan|tr|triệu|trieu|củ|cu|tỷ|ty|tỏi)?(\d{1,3})?"  # đơn vị, phần lẻ: 1tr2, 1k5
+    r"(?:(k|nghìn|nghin|ngàn|ngan|tr|triệu|trieu|củ|cu|tỷ|ty|tỏi)(\d{1,3})?)?"  # đơn vị, phần lẻ: 1tr2, 1k5
+    # (phần lẻ chỉ đi sau đơn vị: "tháng 11 19,1tr" là 19,1 triệu, không phải "11 19")
     r"\s*(đ|đồng|dong|vnđ|vnd)?(?!\w)", re.IGNORECASE)
 UNITS = {"k": 1e3, "nghìn": 1e3, "nghin": 1e3, "ngàn": 1e3, "ngan": 1e3, "tr": 1e6, "triệu": 1e6, "trieu": 1e6,
          "củ": 1e6, "cu": 1e6, "tỷ": 1e9, "ty": 1e9, "tỏi": 1e9}
@@ -775,6 +776,13 @@ def with_picker(rows, reference, keep="↩️ Thôi"):
 REPORT_BUTTONS = [[("Hôm nay", "bc:ngay"), ("Tuần này", "bc:tuan"), ("Tháng này", "bc:thang"),
                    ("Tháng trước", "bc:thangtruoc")],
                   [("📈 Biểu đồ", "bd:thang"), ("🔮 Dự báo", "db"), ("💬 Nhận xét", "nx:thang")]]
+BACK = ("⬅️ Menu", "m:home")  # nút quay về màn hình tổng quan (menu.py)
+CHI_BUTTONS = REPORT_BUTTONS + [[("🧾 Lịch sử", "m:ls"), ("🗂 Chưa xếp", "m:cx"), ("🎯 Ngân sách", "m:ns")], [BACK]]
+
+
+def from_menu(message):
+    """Tin này mở từ menu (có nút ⬅️ Menu): vẽ lại thì giữ nút menu."""
+    return any(data.startswith("m:") for row in keyboard_rows(message) for _, data in row)
 
 
 def period(kind, day):
@@ -875,18 +883,6 @@ def budget_status(day):
 
 # ---- Lệnh ---------------------------------------------------------------------------
 
-HELP = ("💸 <b>Bot ghi chi tiêu</b>\nNhắn số tiền kèm nội dung, bot tự xếp nhóm:\n"
-        "• cà phê 35k\n• đổ xăng 80000\n• tiền nhà 5tr · 1tr2 là 1.200.000đ\n"
-        "• hôm qua ăn tối 250k · 02/11 cắt tóc 100k\n• + lương 20tr (dấu + là khoản thu)\n"
-        "• đóng họ 1tr #tiết kiệm (tự chọn nhóm bằng dấu #)\n"
-        "• 📷 gửi ảnh hóa đơn, màn hình chuyển khoản: bot đọc rồi ghi\n"
-        "Nhiều khoản thì mỗi khoản một dòng; gõ không dấu cũng được.\n"
-        "Xếp sai nhóm thì bấm ✏️ Đổi nhóm, lần sau bot tự nhớ. Khoản chưa rõ nhóm thì bot hỏi luôn.\n"
-        "Tự tạo nhóm, thêm từ khóa: /nhom\n"
-        "Hỏi bằng câu thường: tháng này cà phê hết bao nhiêu?\n"
-        "Tài sản: /taisan · mua bán cổ phiếu: bán 500 FPT giá 120 · khám sức khỏe tài chính: /suckhoe\n\n")
-
-
 def baocao(args):
     kind = {"homnay": "ngay", "ngay": "ngay", "tuan": "tuan", "thang": "thang", "thangtruoc": "thangtruoc"}.get(
         plain("".join(args)), "thang")
@@ -916,6 +912,11 @@ def delete(reference):
     gone = find(reference)
     if gone:
         kho.command("HDEL", month_key(gone["ngay"][:7]), gone["id"])
+        if gone.get("no"):  # khoản trả nợ: cộng lại dư nợ
+            try:
+                sono().undo(gone)
+            except Exception as e:
+                print(f"[lỗi] hoàn dư nợ khi xóa khoản: {e!r}", file=sys.stderr)
     return gone
 
 
@@ -1154,6 +1155,21 @@ def phantich():
     return module
 
 
+def sono():
+    import sono as module  # sổ nợ
+    return module
+
+
+def kehoach():
+    import kehoach as module  # lộ trình tài chính, chia lương
+    return module
+
+
+def menu():
+    import menu as module  # menu nút bấm, tổng quan, hướng dẫn
+    return module
+
+
 def period_kind(args):
     """Tham số kỳ của /bieudo, /nhanxet: trống là tháng này, '10' là tháng 10, 'thangtruoc'..."""
     word = plain("".join(args))
@@ -1182,9 +1198,16 @@ COMMANDS = {
     "duphong": ("Quỹ dự phòng: mục tiêu, tiến độ, mỗi tháng cần để bao nhiêu", lambda args: duphong().duphong(args)),
     "nhanxet": ("Nhận xét chi tiêu tháng (AI); /nhanxet 10 cho tháng 10", lambda args: phantich().commentary(period_kind(args), today())),
     "xuat": ("Xuất file CSV mở bằng Excel: /xuat 10", xuat),
+    "menu": ("Tổng quan và menu nút bấm", lambda args: menu().menu_cmd(args)),
+    "start": ("Bắt đầu", lambda args: menu().start(args)),
+    "huongdan": ("Cách dùng và mọi lệnh", lambda args: menu().guide(args)),
+    "no": ("Sổ nợ: còn bao nhiêu, mỗi tháng trả, nhắc trả", lambda args: sono().no_cmd(args)),
+    "kehoach": ("Lộ trình xây tài sản, chia lương mỗi tháng", lambda args: kehoach().kehoach(args)),
 }
-HELP += "Lệnh:\n" + "\n".join(f"/{n} – {desc}" for n, (desc, _) in COMMANDS.items())
-MENU = [{"command": n, "description": desc} for n, (desc, _) in COMMANDS.items()]
+COMMANDS["help"] = COMMANDS["huongdan"]
+# Danh sách lệnh hiện ở nút Menu của Telegram: chỉ các lệnh chính, lệnh khác vẫn gõ được (/huongdan)
+VISIBLE = ["menu", "baocao", "no", "kehoach", "taisan", "duphong", "hoi", "huongdan"]
+MENU = [{"command": n, "description": COMMANDS[n][0]} for n in VISIBLE]
 
 
 def answer(text, now):
@@ -1192,10 +1215,18 @@ def answer(text, now):
     if not kho.ready():
         return NEED_STORE
     reset()
+    screen = menu().from_keyboard(text)  # nút cố định dưới ô chat
+    if screen:
+        return screen
+    many = menu().run_lines(text, now)  # nhiều lệnh, mỗi lệnh một dòng
+    if many:
+        return many
     parts = text.split()
     if parts and parts[0].startswith("/"):
         command = parts[0][1:].split("@")[0].lower()
-        return COMMANDS[command][1](parts[1:]) if command in COMMANDS else HELP
+        if command in COMMANDS:
+            return COMMANDS[command][1](parts[1:])
+        return f"Không có lệnh /{html.escape(command[:30])}. Bấm /menu để mở menu, /huongdan để xem mọi lệnh"
     traded = taisan().trade(text, now)  # "mua 1000 FPT giá 95", "bán 500 FPT giá 120"
     if traded:
         return traded
@@ -1203,13 +1234,15 @@ def answer(text, now):
         return phantich().hoi(text, now.date())
     entries = add(text, now)
     if not entries:
-        return "Không thấy số tiền. Nhắn kiểu: <b>cà phê 35k</b> hoặc gõ /start để xem hướng dẫn"
+        return "Không thấy số tiền. Nhắn kiểu: <b>cà phê 35k</b> hoặc bấm /menu"
+    debt_lines, debt_rows = debt_after(entries, now.date())
     try:
         extra = phantich().after_record(entries, now.date())
     except Exception as e:  # phần phân tích lỗi thì vẫn báo đã ghi
         print(f"[lỗi] phân tích sau khi ghi: {e!r}", file=sys.stderr)
         extra = []
-    reply, rows = entries_message(entries, now.date(), extra=extra)
+    reply, rows = entries_message(entries, now.date(), extra=debt_lines + extra)
+    rows = (rows or []) + debt_rows
     hint = salary_fund_hint(entries, now.date())
     if hint:
         reply, rows = reply + "\n" + hint[0], rows + [hint[1]]
@@ -1217,12 +1250,21 @@ def answer(text, now):
 
 
 def salary_fund_hint(entries, day):
-    """Vừa ghi lương: (dòng gợi ý, hàng nút) để tiền vào quỹ dự phòng; None nếu không cần."""
+    """Vừa ghi lương: (dòng gợi ý chia lương, hàng nút) — trả nợ, chi tiêu, quỹ dự phòng; None nếu không cần."""
     try:
-        return duphong().salary_hint(entries, day)
+        return kehoach().salary_hint(entries, day)
     except Exception as e:
-        print(f"[lỗi] gợi ý quỹ dự phòng: {e!r}", file=sys.stderr)
+        print(f"[lỗi] gợi ý chia lương: {e!r}", file=sys.stderr)
         return None
+
+
+def debt_after(entries, day):
+    """Khoản vừa ghi là trả nợ thì trừ dư nợ: (dòng thêm, hàng nút); lỗi thì bỏ qua, khoản vẫn được ghi."""
+    try:
+        return sono().after_record(entries, day)
+    except Exception as e:
+        print(f"[lỗi] trừ dư nợ: {e!r}", file=sys.stderr)
+        return [], []
 
 
 def button_ref(data):
@@ -1255,7 +1297,14 @@ def on_button(data, message, now):
     kind, _, arg = data.partition(":")
     day = now.date()
     if kind == "bc":
-        return None, ("edit", lambda: (report(arg, day)[0], REPORT_BUTTONS))
+        rows = CHI_BUTTONS if from_menu(message) else REPORT_BUTTONS
+        return None, ("edit", lambda: (report(arg, day)[0], rows))
+    if kind == "m":
+        return menu().on_button(arg, message, now)
+    if kind == "no":
+        return sono().on_button(arg, message, now)
+    if kind == "kh":
+        return kehoach().on_button(arg, message, now)
     if kind == "ts":
         return taisan().on_button(arg, message, now)
     if kind == "anh":

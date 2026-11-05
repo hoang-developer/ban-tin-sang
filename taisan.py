@@ -33,7 +33,8 @@ COINS = {"btc": "bitcoin", "eth": "ethereum", "usdt": "tether", "bnb": "binancec
 FMARKET = "https://api.fmarket.vn/res/products/filter"
 VCB_FX = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx"
 BUTTONS = [[("📊 Biểu đồ", "ts:bd"), ("🩺 Khám sức khỏe", "ts:sk")],
-           [("🗂 Sửa, xóa", "ts:ds"), ("🔄 Cập nhật giá", "ts:xem")]]
+           [("🗂 Sửa, xóa", "ts:ds"), ("🔄 Cập nhật giá", "ts:xem")],
+           [("➕ Cách khai báo", "ts:hd"), ct.BACK]]
 NOT_ADVICE = "<i>Chỉ để tham khảo, không phải lời khuyên mua bán chứng khoán hay đầu tư.</i>"
 
 
@@ -206,6 +207,8 @@ def valuation(day, fresh=False):
     rows = []  # (loại, mã dòng, tên, giá trị, giá vốn hoặc None, chi tiết)
     for it in items:
         kind, rid = it["loai"], str(it["id"])
+        if kind == "no" and it["tien"] <= 0:
+            continue  # khoản nợ đã trả xong: chỉ còn trong sổ nợ (/no)
         if kind in ("tien", "khac", "no"):
             rows.append((kind, rid, it["ten"], it["tien"], None, ""))
         elif kind == "tietkiem":
@@ -269,7 +272,8 @@ USAGE = ("💼 <b>Khai báo tài sản</b> (số tiền viết kiểu 25tr, 1t�
          "• Quỹ mở: /taisan quy VCBF-FIF 1200 15000 (số ccq, giá vốn)\n"
          "• Vàng: /taisan vang sjc 1 luong 140 · /taisan vang nhan 2 chi\n"
          "• Tiền số: /taisan coin btc 0,05 · Ngoại tệ: /taisan usd 1000\n"
-         "• Khác: /taisan khac xe máy 30tr · Nợ: /taisan no vay mua nhà 500tr\n"
+         "• Khác: /taisan khac xe máy 30tr\n"
+         "• Nợ, trả dần mỗi tháng: /no chú Tư 100tr, trả 5tr/tháng (sổ nợ tự trừ khi trả)\n"
          "Mua bán cổ phiếu, ETF: nhắn <b>mua 1000 FPT giá 95</b>, <b>mua 500 E1VFVN30 giá 33,6</b>, <b>bán 500 FPT giá 120</b>\n"
          "Xem: /taisan · Sửa, xóa: /taisan xoa · Khám sức khỏe tài chính: /suckhoe")
 FX_CODES = {"usd", "eur", "jpy", "gbp", "aud", "cad", "chf", "cny", "sgd", "krw", "thb", "hkd", "twd"}
@@ -729,14 +733,15 @@ def health_checks(day):
         checks.append((score, "✅" if months >= 3 else "⚠️" if months >= 1 else "🚨",
                        f"Quỹ dự phòng: {vn_num(months, 1)} tháng chi thiết yếu (quỹ {short(fund['balance'])}, chi thiết "
                        f"yếu {short(fund['monthly'])}/tháng) · mục tiêu {fund['months']} tháng: /duphong"))
-    elif spend and v["rows"]:
+    elif spend and v["rows"] and days >= 14:  # ít ngày quá thì một khoản lớn làm sai cả tháng
         months = liquid / spend
         score = 20 if months >= 6 else 15 if months >= 3 else 8 if months >= 1 else 0
         checks.append((score, "✅" if months >= 3 else "⚠️" if months >= 1 else "🚨",
                        f"Quỹ dự phòng: {vn_num(months, 1)} tháng chi tiêu (tiền + tiết kiệm {short(liquid)}, chi TB "
                        f"{short(spend)}/tháng) · nên 3–6 tháng"))
     else:
-        checks.append((None, "❔", "Quỹ dự phòng: chưa tính được (cần khai báo tiền, tiết kiệm bằng /taisan và ghi chi tiêu)"))
+        checks.append((None, "❔", "Quỹ dự phòng: chưa tính được (cần khai báo tiền, tiết kiệm bằng /taisan và ghi chi tiêu "
+                                  "ít nhất 2 tuần)"))
     if income and days >= 20:
         rate = (income - spend) / income * 100
         score = 20 if rate >= 30 else 16 if rate >= 20 else 10 if rate >= 10 else 5 if rate >= 0 else 0
@@ -746,10 +751,8 @@ def health_checks(day):
     else:
         checks.append((None, "❔", "Để dành: chưa tính được (cần ghi thu nhập, ví dụ + lương 20tr, và ít nhất 20 ngày dữ liệu)"))
     if v["assets"]:
-        ratio = v["debts"] / v["assets"] * 100
-        score = 20 if ratio == 0 else 16 if ratio < 30 else 8 if ratio < 50 else 0
-        checks.append((score, "✅" if ratio < 30 else "⚠️" if ratio < 50 else "🚨",
-                       "Nợ: không có" if not ratio else f"Nợ: {short(v['debts'])}, bằng {ratio:.0f}% tài sản · nên dưới 30%"))
+        import sono  # nợ: chấm theo tiền trả mỗi tháng so với thu nhập, tách nợ không lãi
+        checks.append(sono.health_check(day, v, income if income and days >= 20 else None))
         warnings = []
         for kind, _, name, value, _, _ in v["rows"]:
             if kind in ("cp", "quy", "coin") and value / v["assets"] > 0.2:
@@ -822,6 +825,8 @@ def on_button(arg, message, now):
         return "Đang khám, chờ chút…", ("send", lambda: health(day))
     if arg == "ds":
         return None, ("edit", edit_list)
+    if arg == "hd":
+        return None, ("send", lambda: USAGE)
     if arg.startswith("x:"):
         gone = remove(arg[2:])
         return ("Đã xóa" if gone else "Mục này đã xóa rồi"), ("edit", edit_list)
@@ -830,7 +835,9 @@ def on_button(arg, message, now):
         entry = {"id": kho.command("INCR", ct.K_COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
                  "tien": amount, "ghichu": f"lương tháng {day.month}", "nhom": ct.INCOME}
         ct.save(entry)
-        return "Đã ghi lương", ("edit", lambda: f"✅ Đã ghi lương tháng {day.month}: {ct.vnd(amount)} vào 💰 Thu nhập")
+        done = f"✅ Đã ghi lương tháng {day.month}: {ct.vnd(amount)} vào 💰 Thu nhập"
+        hint = ct.salary_fund_hint([entry], day)  # gợi ý chia lương: trả nợ, chi tiêu, quỹ dự phòng
+        return "Đã ghi lương", ("edit", lambda: (done + "\n" + hint[0], [hint[1]]) if hint else done)
     if arg == "chua":
         return "Mai bot hỏi lại", ("edit", lambda: "Chưa nhận lương: mai bot hỏi lại (tối đa 3 ngày)")
     return None, None

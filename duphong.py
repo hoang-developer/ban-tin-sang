@@ -5,7 +5,8 @@
 - Mục tiêu: đủ 3–12 tháng chi thiết yếu (mặc định 6), mốc khởi đầu 1 tháng; đạt trong N tháng (mặc định 12).
 - Số dư quỹ: các tài sản trong /taisan được gắn vào quỹ (mặc định tài khoản "Quỹ dự phòng"; /duphong nap 2tr để
   thêm, /duphong rut 1tr khi phải dùng; /duphong tinh <tên> để tính thêm sổ tiết kiệm có sẵn).
-- Gợi ý mỗi tháng cần để bao nhiêu, so với số dư thu − chi trung bình; ngày ghi lương có nút "Để … vào quỹ".
+- Gợi ý mỗi tháng cần để bao nhiêu, so với số dư thu − chi trung bình; ngày ghi lương, /kehoach chia lương có nút
+  "Để … vào quỹ" (mỗi lần nạp được cộng vào số đã nạp của tháng).
 Thông tin tham khảo, không phải lời khuyên tài chính có giấy phép.
 """
 import html
@@ -18,7 +19,8 @@ import sochitieu as ct
 import taisan as ts
 from bantin import vn_num
 
-KEY = "chitieu:duphong"  # {"thang": số tháng mục tiêu, "han": đạt trong bao nhiêu tháng, "bat_dau": ngày, "chi": tự đặt}
+KEY = "chitieu:duphong"  # {"thang": số tháng mục tiêu, "han": đạt trong bao nhiêu tháng, "bat_dau": ngày, "chi": tự đặt,
+#                          "nap": {"YYYY-MM": tổng đã nạp trong tháng}}
 FUND_NAME = "Quỹ dự phòng"
 ESSENTIAL = ["an", "cho", "xe", "nha", "khoe", "hoc", "giadinh"]  # cộng nhóm tự tạo tên "Trả nợ" nếu có
 MONTHS_CHOICES, DEADLINE_CHOICES = (3, 6, 9, 12), (6, 12, 18, 24)
@@ -153,7 +155,7 @@ def buttons(s):
         rows[0].insert(0, (f"➕ {money(round(s['per_month'], -5))}", f"dp:nap:{int(round(s['per_month'], -5))}"))
     rows.append([(f"{'🎯' if s['months'] == m else ''}{m} tháng", f"dp:thang:{m}") for m in MONTHS_CHOICES])
     rows.append([(f"{'⏳' if s['deadline_months'] == m else ''}đạt trong {m}t", f"dp:han:{m}") for m in DEADLINE_CHOICES])
-    rows.append([("🏦 Để quỹ ở đâu?", "dp:noi")])
+    rows.append([("🏦 Để quỹ ở đâu?", "dp:noi"), ct.BACK])
     return rows
 
 
@@ -175,8 +177,15 @@ def change(amount, day):
     item["tien"] = max(0, item["tien"] + amount)
     item["ngay"] = day.isoformat()
     ts.save(data)
-    if not config().get("bat_dau"):
-        save({**config(), "bat_dau": day.isoformat()})
+    cfg = config()
+    if not cfg.get("bat_dau"):
+        cfg["bat_dau"] = day.isoformat()
+    if amount > 0:  # số đã nạp từng tháng (12 tháng gần nhất), để /kehoach biết tháng này đã để bao nhiêu
+        ym = day.strftime("%Y-%m")
+        added = cfg.get("nap", {})
+        added[ym] = added.get(ym, 0) + amount
+        cfg["nap"] = dict(sorted(added.items())[-12:])
+    save(cfg)
     after = status(day)
     if amount >= 0:
         note = f"✅ Đã thêm {money(amount)} vào quỹ dự phòng: {money(after['balance'])} / {money(after['target'])}"
@@ -221,18 +230,9 @@ def where_text(day):
     return "\n".join(lines + [NOT_ADVICE])
 
 
-def salary_hint(entries, day):
-    """Ghi lương xong: (dòng gợi ý, hàng nút) để tiền vào quỹ dự phòng; None nếu quỹ đã đủ hoặc không có lương."""
-    salary = [e for e in entries if e["nhom"] == ct.INCOME and "luong" in ct.plain(e.get("ghichu") or "")]
-    if not salary or not kho.ready():
-        return None
-    s = status(day)
-    if not s["monthly"] or not s["missing"]:
-        return None
-    amount = min(s["missing"], max(s["per_month"], 100_000))
-    amount = int(round(amount, -5)) or 100_000
-    line = (f"🛟 Quỹ dự phòng {money(s['balance'])}/{money(s['target'])}: tháng này nên để {money(amount)}")
-    return line, [(f"🛟 Để {money(amount)} vào quỹ dự phòng", f"dp:nap:{amount}")]
+def month_added(ym):
+    """Tổng đã nạp vào quỹ trong tháng ym ('2026-11')."""
+    return config().get("nap", {}).get(ym, 0)
 
 
 def duphong(args):
@@ -285,13 +285,19 @@ def on_button(arg, message, now):
     """Nút "dp:...": (thông báo nhỏ, việc tiếp theo)."""
     kind, _, value = arg.partition(":")
     day = now.date()
+    if kind == "xem":
+        return None, ("edit", lambda: text(day))
     if kind == "nap" and value.isdigit():
         lines = change(int(value), day).split("\n")
         toast = lines[0][2:] + "".join(f" · {x[2:]}" for x in lines[1:] if x.startswith("🎉"))
-        if (message.get("text") or "").startswith("🛟 Quỹ dự phòng"):  # nút trên tin quỹ: vẽ lại tin
+        title = message.get("text") or ""
+        if title.startswith("🛟 Quỹ dự phòng"):  # nút trên tin quỹ: vẽ lại tin
             return toast, ("edit", lambda: text(day))
-        rows = [row for row in ct.keyboard_rows(message) if not any(d.startswith("dp:nap") for _, d in row)]
-        return toast, ("buttons", lambda: rows)  # nút dưới tin "Đã ghi lương": bỏ nút đó
+        if title.startswith("📋"):  # nút trên tin chia lương: vẽ lại tin đó
+            import kehoach
+            return toast, ("edit", lambda: kehoach.plan(day))
+        rows = [[b for b in row if not b[1].startswith("dp:nap")] for row in ct.keyboard_rows(message)]
+        return toast, ("buttons", lambda: [row for row in rows if row])  # nút dưới tin "Đã ghi lương": bỏ nút đó
     if kind in ("thang", "han") and value.isdigit():
         cfg = config()
         cfg[kind] = int(value)
