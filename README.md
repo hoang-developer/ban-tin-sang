@@ -194,6 +194,11 @@ ngày, nội dung; bot ghi như tin nhắn thường, vẫn có nút ✏️ đ�
 
 - Lấy **tổng** hóa đơn (dòng Tổng cộng / Tong tien), không lấy tiền khách đưa, tiền thừa, số dư hay từng
   phương thức thanh toán. Nhận tiền vào tài khoản thì ghi vào Thu nhập.
+- **Ảnh lịch sử giao dịch ngân hàng** (nhiều dòng): bot hiện danh sách để chọn trước khi ghi. Tự chọn sẵn chi
+  tiêu, thu nhập, trả nợ vay (vào nhóm "Trả nợ" nếu bạn đã tạo); tự bỏ qua **trả thẻ tín dụng** (các khoản quẹt
+  thẻ đã ghi riêng, ghi nữa là trùng) và **chuyển tiền giữa các tài khoản của chính bạn** (bot nhận ra tên chủ
+  tài khoản ở các dòng trả thẻ tín dụng và nhớ cho các lần sau). Bấm số để chọn/bỏ từng dòng, rồi "✅ Ghi".
+  Giao dịch đã ghi (cùng ngày, số tiền, chiều) thì lần chụp sau tự bỏ qua, ghi "đã ghi trước đó".
 - Hóa đơn có phần trả bằng voucher, Got It, điểm thưởng: bot hiện nút "➕ Ghi … vào Thu nhập" (điểm đổi từ
   chi tiêu thẻ là khoản thu; chi vẫn ghi đủ giá).
 - Chữ kèm ảnh là ghi chú, có `#nhóm` thì vào nhóm đó: gửi ảnh kèm `cà phê với khách #giải trí`.
@@ -258,10 +263,11 @@ bạn tự tạo (kèm từ khóa) và những khoản bạn đã tự xếp đ�
 Khác và bot hỏi bạn. Bot nhớ câu trả lời, cùng nội dung không hỏi lại. AI lỗi, bận hay hết lượt thì bot vẫn
 chạy: khoản lạ bot hỏi bạn, câu hỏi bot tự hiểu cách đơn giản, nhận xét chỉ có số liệu.
 
-**Google Gemini (dùng trước).** Thử ngày 04/11/2026: `gemini-3.5-flash-lite` xếp đúng 13/13 khoản lạ trong
+**Google Gemini (dùng trước).** Thử ngày 04–05/11/2026: `gemini-3.5-flash-lite` xếp đúng 13/13 khoản lạ trong
 khoảng 1 giây, hiểu đúng 5/5 câu hỏi mẫu (dưới 1 giây mỗi câu), đọc đúng số tiền 7/7 ảnh hóa đơn/chuyển
-khoản; `gemini-3.5-flash` cũng 13/13 nhưng chậm hơn. Bot thử Flash-Lite trước, lỗi/bận/hết lượt thì Flash,
-rồi tới OpenRouter. Gói miễn phí không cần thẻ; giới hạn tính theo dự án và theo từng model (Flash: 5 lượt
+khoản và ảnh lịch sử 7 giao dịch; `gemini-3.1-flash-lite` cũng đúng 13/13 và đọc đúng các ảnh (1–2 giây, lúc 3.5
+báo quá tải vẫn chạy); `gemini-3.5-flash` 13/13 nhưng chậm hơn. Bot thử lần lượt 3.5 Flash-Lite, 3.1
+Flash-Lite, 3.5 Flash (lỗi/bận/hết lượt thì sang model sau), rồi tới OpenRouter. Gói miễn phí không cần thẻ; giới hạn tính theo dự án và theo từng model (Flash: 5 lượt
 mỗi phút), số lượt mỗi ngày xem ở [aistudio.google.com/rate-limit](https://aistudio.google.com/rate-limit),
 tính lại lúc 0h giờ Mỹ (khoảng 15h chiều Việt Nam). Ở gói miễn phí Google dùng nội dung gửi lên để cải thiện
 sản phẩm.
