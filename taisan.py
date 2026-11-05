@@ -707,7 +707,20 @@ def health_checks(day):
     for kind, _, _, value, _, _ in v["rows"]:
         kinds[kind] = kinds.get(kind, 0) + value
     liquid = kinds.get("tien", 0) + kinds.get("tietkiem", 0)
-    if spend and v["rows"]:
+    fund = None
+    if any(it.get("duphong") for it in load()["items"]):  # đã lập quỹ dự phòng: dùng đúng số liệu của quỹ
+        try:
+            import duphong
+            fund = duphong.status(day)
+        except Exception as e:
+            print(f"[lỗi] quỹ dự phòng trong khám sức khỏe: {e!r}", file=sys.stderr)
+    if fund and fund["monthly"]:
+        months = fund["covered"]
+        score = 20 if months >= 6 else 15 if months >= 3 else 8 if months >= 1 else 0
+        checks.append((score, "✅" if months >= 3 else "⚠️" if months >= 1 else "🚨",
+                       f"Quỹ dự phòng: {vn_num(months, 1)} tháng chi thiết yếu (quỹ {short(fund['balance'])}, chi thiết "
+                       f"yếu {short(fund['monthly'])}/tháng) · mục tiêu {fund['months']} tháng: /duphong"))
+    elif spend and v["rows"]:
         months = liquid / spend
         score = 20 if months >= 6 else 15 if months >= 3 else 8 if months >= 1 else 0
         checks.append((score, "✅" if months >= 3 else "⚠️" if months >= 1 else "🚨",

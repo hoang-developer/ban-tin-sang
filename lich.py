@@ -292,7 +292,13 @@ def expense_summary(now, job, kind, title):
     chitieu.reset()  # đọc lại nhóm tự chỉnh mới nhất
     text, count = chitieu.report(kind, now.date())
     extras = []
-    if count and kind == "thangtruoc":  # tổng kết tháng: kèm biểu đồ và nhận xét (1 lượt AI mỗi tháng)
+    if count and kind == "thangtruoc":  # tổng kết tháng: kèm biểu đồ, nhận xét (1 lượt AI), tiến độ quỹ dự phòng
+        if any(it.get("duphong") for it in taisan.load()["items"]):
+            try:
+                import duphong
+                extras.append(duphong.text(now.date()))
+            except Exception as e:
+                print(f"[lỗi] quỹ dự phòng trong tổng kết: {e!r}", file=sys.stderr)
         for make in (phantich.chart_reply, phantich.commentary):
             try:
                 extras.append(make(kind, now.date()))
