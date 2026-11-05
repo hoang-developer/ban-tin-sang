@@ -148,7 +148,7 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/xuat` | File CSV mở bằng Excel; `/xuat 10` cho tháng 10 |
 | `/nhom` | Các nhóm, từ khóa; tự tạo nhóm, thêm từ khóa (xem dưới) |
 | `/chuaxep` | Xếp nhóm các khoản đang ở Khác |
-| `/dubao` | Dự báo cả tháng, mỗi ngày còn lại / hôm nay còn được tiêu bao nhiêu (xem dưới) |
+| `/dubao` | Dự báo chi tiêu hằng ngày (ăn uống, đi chợ, đi lại; không tính mua sắm, khoản đột biến), mỗi ngày còn lại / hôm nay còn được tiêu bao nhiêu (xem dưới). `/dubao tatca`: mọi khoản |
 | `/hoi` | Hỏi bằng câu thường, hoặc gõ thẳng câu hỏi: `tháng này cà phê hết bao nhiêu?` |
 | `/bieudo` | Biểu đồ tròn theo nhóm và cột theo ngày; `/bieudo 10` cho tháng 10 |
 | `/nhanxet` | Số liệu đáng chú ý của tháng + nhận xét và gợi ý tiết kiệm của AI; `/nhanxet 10` |
@@ -165,11 +165,15 @@ xét, 21h hằng ngày báo nếu có gì cần để ý, 9h nhắc lương và 
 Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câu hỏi và viết nhận xét. Code ở
 [phantich.py](phantich.py).
 
-- **Dự báo** (`/dubao`, nút 🔮 dưới báo cáo): đã chi + nhịp tiêu hằng ngày (trung bình các khoản dưới 1tr
-  trong 28 ngày qua) × số ngày còn lại + khoản lớn tháng trước có mà tháng này chưa thấy (tiền nhà, học
-  phí...). Có ngân sách tổng (`/ngansach tổng 15tr`) thì bot tính mỗi ngày còn lại được tiêu bao nhiêu,
-  và mỗi lần ghi khoản chi đều báo "💡 Hôm nay còn được tiêu …". Nhóm có ngân sách: dự báo và ngày có thể
-  vượt.
+- **Dự báo chi tiêu hằng ngày** (`/dubao`, nút 🔮 dưới báo cáo): chỉ tính các nhóm sinh hoạt thường nhật, mặc
+  định ăn uống, đi chợ/siêu thị, đi lại (đổi: `/dubao nhom ăn uống, đi chợ`; về mặc định: `/dubao nhom macdinh`).
+  Không tính mua sắm, tiền nhà, giải trí… và các **khoản đột biến**: khoản gấp 3 lần mức thường (trung vị 2 tháng)
+  của nhóm, ít nhất 300k (chưa đủ dữ liệu thì từ 500k), ví dụ một bữa cơm khách 1,5tr; các khoản này được liệt kê
+  riêng. Bot báo: đã chi (TB mỗi ngày), nhịp tiêu mỗi ngày theo từng nhóm (28 ngày qua), cả tháng khoảng bao nhiêu,
+  so với tháng trước. Đặt `/ngansach hằng ngày 9tr` (hoặc đặt ngân sách cho đủ các nhóm hằng ngày) thì bot tính mỗi
+  ngày còn lại được tiêu bao nhiêu, và mỗi lần ghi khoản ăn uống/đi chợ/đi lại đều báo "💡 Chi hằng ngày: hôm nay
+  còn được tiêu …". `/dubao tatca`: dự báo mọi khoản như trước (đã chi + nhịp tiêu khoản dưới 1tr + khoản lớn tháng
+  trước có mà tháng này chưa thấy; theo ngân sách tổng).
 - **Báo bất thường**: ghi một khoản từ 200k mà gấp 3 lần mức thường của nhóm (trung vị 90 ngày, cần từ 5
   khoản) thì bot nói ngay. 21h hằng ngày bot xem: nhóm nào 7 ngày qua tiêu gấp 1,6 lần mức thường (và
   nhiều hơn 300k), nhóm nào đang trên đà vượt ngân sách; có thì nhắn "👀 Để ý chi tiêu", mỗi chuyện chỉ

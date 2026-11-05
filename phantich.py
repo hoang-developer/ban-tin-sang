@@ -20,6 +20,9 @@ from bantin import WEEKDAYS
 LARGE = 1_000_000  # khoản từ 1tr (tiền nhà, học phí...) tính riêng, không tính vào nhịp tiêu hằng ngày
 UNUSUAL_MIN, UNUSUAL_RATIO = 200_000, 3  # khoản lạ thường: từ 200k và gấp 3 lần mức thường của nhóm
 SURGE_RATIO, SURGE_MIN = 1.6, 300_000  # nhóm tăng vọt: 7 ngày qua gấp 1,6 lần mức thường và nhiều hơn 300k
+DAILY_KEY = "chitieu:dubao:nhom"  # các nhóm tính là chi tiêu hằng ngày (người dùng chọn bằng /dubao nhom ...)
+DAILY_DEFAULT = ["an", "cho", "xe"]  # ăn uống, đi chợ/siêu thị, đi lại
+SPIKE_MIN, SPIKE_RATIO = 300_000, 3  # khoản đột biến: từ 300k và gấp 3 lần mức thường (trung vị) của nhóm
 CHART_URL = "https://quickchart.io/chart"  # vẽ biểu đồ Chart.js thành ảnh PNG; chỉ gửi tên nhóm và số tiền
 PALETTE = ["#e8590c", "#2f9e44", "#1971c2", "#9c36b5", "#f08c00", "#0c8599", "#c2255c", "#5c940d",
            "#3b5bdb", "#868e96", "#e64980", "#1098ad", "#74b816", "#ae3ec9", "#fd7e14", "#495057"]
@@ -89,6 +92,8 @@ def forecast(day):
     spent = total(month)
     groups = {}
     for code, limit in kho.get(ct.K_BUDGET, {}).items():
+        if code == "hangngay":  # ngân sách chi tiêu hằng ngày: tính ở daily_forecast
+            continue
         mine = month if code == "tong" else [e for e in month if e["nhom"] == code]
         up = upcoming if code == "tong" else [e for e in upcoming if e["nhom"] == code]
         r = rate(None if code == "tong" else code)
@@ -166,6 +171,133 @@ def forecast_text(day):
     return "\n".join(lines)
 
 
+# ---- Dự báo chi tiêu hằng ngày (ăn uống, sinh hoạt; không tính khoản đột biến) -----------------
+
+def daily_groups():
+    """Các nhóm tính là chi tiêu hằng ngày: người dùng chọn, mặc định ăn uống, đi chợ/siêu thị, đi lại."""
+    saved = kho.get(DAILY_KEY) if kho.ready() else None
+    active = ct.groups()
+    codes = [c for c in (saved or DAILY_DEFAULT) if c in active and c != ct.INCOME]
+    return codes or [c for c in DAILY_DEFAULT if c in active]
+
+
+def spike_limits(items, codes):
+    """{nhóm: mức tiền từ đó coi là đột biến}: gấp 3 lần trung vị các khoản của nhóm (cần từ 5 khoản), ít nhất
+    300k; chưa đủ dữ liệu thì 500k."""
+    limits = {}
+    for code in codes:
+        amounts = [e["tien"] for e in items if e["nhom"] == code]
+        limits[code] = max(SPIKE_MIN, SPIKE_RATIO * statistics.median(amounts)) if len(amounts) >= 5 else 500_000
+    return limits
+
+
+def daily_forecast(day):
+    """Dự báo tháng chỉ cho chi tiêu hằng ngày, bỏ khoản đột biến: dict cho /dubao và dòng sau khi ghi."""
+    codes = daily_groups()
+    first = day.replace(day=1)
+    days = monthrange(day.year, day.month)[1]
+    prev_last = first - timedelta(days=1)
+    prev_first = prev_last.replace(day=1)
+    window = day - timedelta(days=28)
+    items = [e for e in spending(ct.between(min(prev_first, day - timedelta(days=62)), day)) if e["nhom"] in codes]
+    limits = spike_limits(items, codes)
+    regular = [e for e in items if e["tien"] < limits[e["nhom"]]]
+    month = [e for e in regular if e["ngay"] >= first.isoformat()]
+    spikes = [e for e in items if e["tien"] >= limits[e["nhom"]] and e["ngay"] >= first.isoformat()]
+    prev = [e for e in regular if prev_first.isoformat() <= e["ngay"] <= prev_last.isoformat()]
+    past = [e for e in regular if window.isoformat() <= e["ngay"] < day.isoformat()]
+    history = (day - date.fromisoformat(min(e["ngay"] for e in past))).days if past else 0
+    pool, span = (past, history) if history else ([e for e in month if e["ngay"] == day.isoformat()], 1)
+    rates = {c: total(e for e in pool if e["nhom"] == c) / span for c in codes}
+    left = days - day.day
+    spent = total(month)
+    today = total(e for e in month if e["ngay"] == day.isoformat())
+    budgets = kho.get(ct.K_BUDGET, {})
+    # Ngân sách: "hằng ngày" nếu có; không thì cộng ngân sách các nhóm hằng ngày khi nhóm nào cũng đã đặt
+    limit = budgets.get("hangngay") or (sum(budgets[c] for c in codes) if all(c in budgets for c in codes) else None)
+    room = None
+    if limit:
+        per_day = (limit - (spent - today)) / (left + 1)  # chia đều phần còn lại cho hôm nay và các ngày tới
+        room = (per_day, per_day - today)
+    return {"codes": codes, "days": days, "left": left, "spent": spent, "today": today, "rates": rates,
+            "rate": sum(rates.values()), "projected": spent + sum(rates.values()) * left, "history": history,
+            "prev_total": total(prev), "spikes": spikes, "limits": limits, "budget": limit, "room": room,
+            "elapsed": day.day}
+
+
+def daily_label(codes):
+    return ", ".join(ct.bare(ct.name(c)).lower() for c in codes)
+
+
+def daily_text(day):
+    if not kho.ready():
+        return ct.NEED_STORE
+    f = daily_forecast(day)
+    lines = [f"🔮 <b>Dự báo chi tiêu hằng ngày tháng {day.month}</b>",
+             f"<i>{html.escape(daily_label(f['codes']))} · hôm nay {dmy(day)}, còn {f['left']} ngày</i>"]
+    if not f["spent"] and not f["rate"]:
+        return "\n".join(lines + ["Chưa có khoản nào để dự báo. Nhắn kiểu: cà phê 35k"])
+    lines.append(f"Đã chi: <b>{vnd(f['spent'])}</b> ({f['elapsed']} ngày, TB {approx(f['spent'] / f['elapsed'])}/ngày)"
+                 f" · hôm nay {vnd(f['today'])}")
+    parts = " · ".join(f"{ct.name(c).split()[0]} {short(r)}" for c, r in f["rates"].items() if r)
+    lines.append(f"Mỗi ngày đang tiêu khoảng <b>{approx(f['rate'])}</b>" + (f" ({parts})" if parts else ""))
+    compare = ""
+    if f["prev_total"]:
+        change = (f["projected"] - f["prev_total"]) / f["prev_total"] * 100
+        compare = f" · tháng trước {short(f['prev_total'])} ({'↑' if change >= 0 else '↓'}{abs(change):.0f}%)"
+    lines.append(f"➡️ Cả tháng khoảng <b>{approx(f['projected'])}</b>{compare}")
+    if f["room"]:
+        per_day, today_left = f["room"]
+        if per_day <= 0:
+            lines.append(f"🚨 Đã tiêu hết ngân sách hằng ngày {short(f['budget'])} tháng này")
+        else:
+            over = f" · dự báo vượt {short(f['projected'] - f['budget'])}" if f["projected"] > f["budget"] else ""
+            lines.append(f"💡 Ngân sách {short(f['budget'])}: mỗi ngày còn lại tối đa <b>{approx(per_day)}</b>, hôm nay "
+                         + (f"còn được tiêu <b>{approx(today_left)}</b>" if today_left >= 0
+                            else f"đã quá <b>{approx(-today_left)}</b>") + over)
+    else:
+        lines.append("<i>Đặt ngân sách để biết mỗi ngày được tiêu bao nhiêu: /ngansach hằng ngày 9tr</i>")
+    if f["spikes"]:
+        lines.append(f"Không tính {len(f['spikes'])} khoản đột biến ({short(total(f['spikes']))}): " + ", ".join(
+            f"{note_of(e)} {short(e['tien'])}" for e in sorted(f["spikes"], key=lambda e: -e["tien"])[:3]))
+    if f["history"] < 7:
+        lines.append(f"<i>{'Mới có ' + str(f['history']) + ' ngày' if f['history'] else 'Mới bắt đầu có'} dữ liệu, "
+                     "dự báo còn thô, ghi đều vài tuần sẽ sát hơn</i>")
+    lines.append("<i>Không tính mua sắm, tiền nhà, giải trí… và khoản gấp 3 lần mức thường của nhóm. "
+                 "Đổi nhóm: /dubao nhom ăn uống, đi chợ · Mọi khoản: /dubao tatca</i>")
+    return "\n".join(lines)
+
+
+def dubao(args):
+    """/dubao: chi tiêu hằng ngày; /dubao tatca: mọi khoản; /dubao nhom ...: chọn nhóm tính là hằng ngày."""
+    word = ct.plain(args[0]) if args else ""
+    if word in ("tatca", "het", "tong"):
+        return forecast_text(ct.today())
+    if word == "nhom":
+        rest = " ".join(args[1:]).strip()
+        if not rest:
+            return (f"Đang tính là chi tiêu hằng ngày: {html.escape(daily_label(daily_groups()))}\n"
+                    "Đổi: /dubao nhom ăn uống, đi chợ, đi lại · về mặc định: /dubao nhom macdinh")
+        if ct.plain(rest) in ("macdinh", "mac dinh"):
+            kho.delete(DAILY_KEY)
+            return f"✅ Về mặc định: {html.escape(daily_label(daily_groups()))}"
+        codes, unknown = [], []
+        for part in re.split(r"[,;]", rest):
+            if part.strip():
+                code = ct.find_group(part)
+                (codes if code and code != ct.INCOME else unknown).append(code or part.strip())
+        if unknown or not codes:
+            return "Không thấy nhóm: " + html.escape(", ".join(unknown or [rest])) + ". Xem tên nhóm: /nhom"
+        kho.put(DAILY_KEY, list(dict.fromkeys(codes)))
+        return f"✅ Dự báo hằng ngày giờ tính: {html.escape(daily_label(daily_groups()))}\nXem: /dubao"
+    return daily_text(ct.today())
+
+
+def daily_spent(day):
+    """Đã chi hằng ngày (bỏ khoản đột biến) tháng này: cho dòng ngân sách "hằng ngày" ở sochitieu."""
+    return daily_forecast(day)["spent"]
+
+
 # ---- Báo bất thường -----------------------------------------------------------------
 
 def unusual_lines(entries, day):
@@ -188,9 +320,20 @@ def unusual_lines(entries, day):
 
 
 def after_record(entries, day):
-    """Dòng thêm dưới tin "Đã ghi": khoản lạ thường, hôm nay còn được tiêu bao nhiêu (nếu có ngân sách tổng)."""
+    """Dòng thêm dưới tin "Đã ghi": khoản lạ thường, hôm nay còn được tiêu bao nhiêu. Có ngân sách hằng ngày
+    (hoặc ngân sách các nhóm hằng ngày) thì tính theo chi tiêu hằng ngày, không thì theo ngân sách tổng."""
     lines = unusual_lines(entries, day)
-    if any(e["nhom"] != ct.INCOME for e in entries) and "tong" in kho.get(ct.K_BUDGET, {}):
+    codes = daily_groups()
+    budgets = kho.get(ct.K_BUDGET, {})
+    if any(e["nhom"] in codes for e in entries) and ("hangngay" in budgets or all(c in budgets for c in codes)):
+        f = daily_forecast(day)
+        if f["room"]:
+            per_day, today_left = f["room"]
+            lines.append(f"💡 Chi hằng ngày: hôm nay còn được tiêu {approx(today_left)} (mỗi ngày tối đa {short(per_day)})"
+                         if today_left >= 0 else f"💡 Chi hằng ngày: hôm nay đã quá {approx(-today_left)} so với mức "
+                         f"mỗi ngày {short(max(per_day, 0))}")
+            return lines
+    if any(e["nhom"] != ct.INCOME for e in entries) and "tong" in budgets:
         room = allowance(forecast(day))
         if room:
             per_day, today_left = room
