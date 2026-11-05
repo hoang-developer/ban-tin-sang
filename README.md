@@ -20,6 +20,9 @@ Gõ trong chat với bot hoặc bấm nút **Menu** cạnh ô nhập ([lenh.py](
 |---|---|
 | `/stock` | Phiên hiện tại: VN-Index, VN30, HNX, UPCoM, mã VN30 tăng/giảm mạnh, khối ngoại |
 | `/stock FPT` | Chi tiết mã (tối đa 3 mã một lần). Nút ⭐ Theo dõi, 📰 Thêm tin, 🔁 Làm mới |
+| `/nhandinh` | Nhận định trong phiên: AI tổng hợp ngành hot, mã đáng chú ý (kèm khuyến nghị của CTCK nào, giá mục tiêu), tin, rủi ro. Nút 🔥 Ngành, 🎯 Khuyến nghị, 📰 Tin. `/nhandinh tat` / `bat`: tắt/bật tự gửi |
+| `/nganh` | Ngành trên HOSE: % (theo vốn hóa), giá trị giao dịch, khối ngoại ròng, mã dẫn dắt; ngành hút tiền nhất |
+| `/khuyennghi` | Khuyến nghị của các CTCK 30 ngày qua, còn tăng bao nhiêu so với giá mục tiêu. `/khuyennghi FPT` cho một mã (180 ngày) |
 | `/theodoi` | Mã đang theo dõi. `/theodoi FPT` thêm mã, `/theodoi FPT 50 60` báo khi giá ≤ 50.000 hoặc ≥ 60.000 |
 | `/tin` | Tin nổi bật. `/tin giá vàng` tìm tin mới nhất theo từ khóa (7 ngày qua; thêm `24h`, `3ngay` để giới hạn). Nút 🔔 báo khi có tin mới |
 | `/tukhoa` | Từ khóa báo tin mới: `/tukhoa giá xăng` thêm, bấm ❌ để bỏ |
@@ -36,6 +39,23 @@ Gõ trong chat với bot hoặc bấm nút **Menu** cạnh ô nhập ([lenh.py](
 
 Bot chỉ trả lời chat có `TELEGRAM_CHAT_ID`, người khác nhắn vào thì bỏ qua.
 Các lệnh `/theodoi`, `/nho`, `/vivang`, `/doan` và nút ⭐ cần **kho dữ liệu** (bước 4 bên dưới).
+
+### Nhận định trong phiên
+
+Ngày giao dịch, bot tự gửi lúc **10h15** và **13h45** (tắt: `/nhandinh tat`). Code ở [nhandinh.py](nhandinh.py).
+
+- **Dữ liệu** (bot tự tính): ngành theo phân ngành ICB cấp 3 của VNDirect, % thay đổi theo vốn hóa của ~430 mã
+  HOSE (giá Vietcap), giá trị giao dịch, khối ngoại ròng; mã giao dịch nhiều nhất, tăng/giảm mạnh, khối ngoại mua
+  bán nhiều nhất; **khuyến nghị của các công ty chứng khoán** 30 ngày qua (VNDirect tổng hợp: HSC, VNDirect, UBS,
+  Yuanta, Vietcap, MBS, ACBS…, ~100 khuyến nghị/tháng) kèm giá mục tiêu trung bình và còn tăng bao nhiêu so với giá
+  hiện tại; tin 18 giờ qua từ CafeF, Vietstock (cổ phiếu, nhận định thị trường, phân tích cơ bản), VnExpress.
+- **AI** (dùng chung `GEMINI_API_KEY`, OpenRouter dự phòng) viết: 1 dòng diễn biến và dòng tiền, 2–3 ngành hot
+  (ưu tiên vừa tăng vừa hút tiền), 3–5 mã đáng chú ý (diễn biến, CTCK nào khuyến nghị, giá mục tiêu, tin liên
+  quan), 1–2 rủi ro. AI được dặn chỉ dùng dữ liệu đưa vào, ghi nguồn, không tự khuyến nghị mua bán; dòng nào
+  nhắc mã không có trong dữ liệu bị bỏ. AI bận/hết lượt thì bot gửi bản chỉ có số liệu.
+- Lưu ý: khuyến nghị của CTCK hầu hết là MUA và giá mục tiêu thường lạc quan; AI có thể tóm tắt sai. **Thông tin
+  tổng hợp để tham khảo, không phải lời khuyên đầu tư.** Ngày nghỉ lễ (chưa có giao dịch) bot không gửi.
+- Thử ngày 05/11/2026 trong phiên sáng: lấy đủ dữ liệu khoảng 7 giây, AI (Gemini) viết thêm khoảng 9 giây.
 
 ## Việc bot tự làm theo giờ
 
