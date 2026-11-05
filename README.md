@@ -49,13 +49,14 @@ Ngày giao dịch, bot tự gửi lúc **10h15** và **13h45** (tắt: `/nhandin
   bán nhiều nhất; **khuyến nghị của các công ty chứng khoán** 30 ngày qua (VNDirect tổng hợp: HSC, VNDirect, UBS,
   Yuanta, Vietcap, MBS, ACBS…, ~100 khuyến nghị/tháng) kèm giá mục tiêu trung bình và còn tăng bao nhiêu so với giá
   hiện tại; tin 18 giờ qua từ CafeF, Vietstock (cổ phiếu, nhận định thị trường, phân tích cơ bản), VnExpress.
-- **AI** (dùng chung `GEMINI_API_KEY`, OpenRouter dự phòng) viết: 1 dòng diễn biến và dòng tiền, 2–3 ngành hot
-  (ưu tiên vừa tăng vừa hút tiền), 3–5 mã đáng chú ý (diễn biến, CTCK nào khuyến nghị, giá mục tiêu, tin liên
-  quan), 1–2 rủi ro. AI được dặn chỉ dùng dữ liệu đưa vào, ghi nguồn, không tự khuyến nghị mua bán; dòng nào
-  nhắc mã không có trong dữ liệu bị bỏ. AI bận/hết lượt thì bot gửi bản chỉ có số liệu.
+- **Tin gửi đi ngắn gọn** (khoảng 7 dòng): dòng đầu VN-Index, thanh khoản, khối ngoại ròng (bot tính); rồi AI
+  (dùng chung `GEMINI_API_KEY`, OpenRouter dự phòng) viết tối đa 5 dòng: 🔥 2–3 ngành hot (ưu tiên vừa tăng vừa
+  hút tiền), 🎯 2–3 mã đáng chú ý (% hôm nay, CTCK nào khuyến nghị, mục tiêu, còn tăng), ⚠️ 1 rủi ro. Chi tiết
+  xem bằng nút 🔥 Ngành, 🎯 Khuyến nghị, 📰 Tin. AI được dặn chỉ dùng dữ liệu đưa vào, không tự khuyến nghị mua
+  bán; dòng nào nhắc mã không có trong dữ liệu bị bỏ. AI bận/hết lượt thì bot gửi bản ngắn chỉ có số liệu.
 - Lưu ý: khuyến nghị của CTCK hầu hết là MUA và giá mục tiêu thường lạc quan; AI có thể tóm tắt sai. **Thông tin
   tổng hợp để tham khảo, không phải lời khuyên đầu tư.** Ngày nghỉ lễ (chưa có giao dịch) bot không gửi.
-- Thử ngày 05/11/2026 trong phiên sáng: lấy đủ dữ liệu khoảng 7 giây, AI (Gemini) viết thêm khoảng 9 giây.
+- Thử ngày 05/11/2026 trong phiên sáng: cả lấy dữ liệu và AI viết mất khoảng 7–16 giây.
 
 ## Việc bot tự làm theo giờ
 

@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 import chungkhoan
 import kho
-from bantin import VN_TZ, WEEKDAYS, vn_num
+from bantin import VN_TZ, vn_num
 
 FINFO = "https://api-finfo.vndirect.com.vn/v4"
 FEEDS = [("CafeF", "https://cafef.vn/thi-truong-chung-khoan.rss"),
@@ -41,6 +41,7 @@ BUTTONS = [[("🔥 Ngành", "nd:nganh"), ("🎯 Khuyến nghị", "nd:kn"), ("�
            [("🔄 Cập nhật nhận định", "nd:moi")]]
 NOT_ADVICE = ("<i>Tổng hợp tự động từ khuyến nghị của các CTCK (qua VNDirect), giá Vietcap, tin CafeF/Vietstock/"
               "VnExpress; AI có thể sai. Chỉ để tham khảo, không phải lời khuyên đầu tư.</i>")
+SHORT_NOTE = "<i>🤖 AI tổng hợp từ khuyến nghị CTCK, giá, tin · tham khảo, không phải lời khuyên đầu tư</i>"
 OFF = "nhandinh:tat"  # có khóa này thì không tự gửi nhận định trong phiên
 TICKER = re.compile(r"(?<![A-Za-z0-9])[A-Z][A-Z0-9]{2}(?![A-Za-z0-9])")
 
@@ -350,16 +351,14 @@ def ai_input(data):
 SYSTEM = ("Bạn là chuyên viên tổng hợp thông tin chứng khoán Việt Nam cho một nhà đầu tư cá nhân. Chỉ dùng DỮ LIỆU "
           "được cung cấp (số liệu phiên, ngành, khuyến nghị của các công ty chứng khoán, tin tức). Không bịa số, không "
           "bịa mã, không dự đoán giá, không tự đưa khuyến nghị mua bán của riêng bạn. Mỗi mã nhắc tới phải có trong "
-          "dữ liệu và ghi rõ nguồn (tên CTCK hoặc tên báo). Viết tiếng Việt có dấu, ngắn gọn, không markdown, đúng các "
-          "dòng sau, mỗi dòng dưới 40 chữ:\n"
-          "📊 1 dòng: diễn biến và dòng tiền phiên (chỉ số, thanh khoản, độ rộng, khối ngoại).\n"
-          "🔥 2–3 dòng: mỗi dòng một ngành đang hot: ưu tiên ngành vừa tăng vừa hút nhiều tiền hoặc được khối "
-          "ngoại mua; ngành tăng mạnh mà giao dịch ít thì nói rõ là thanh khoản thấp. Có số liệu, lý do lấy từ tin "
-          "nếu có.\n"
-          "🎯 3–5 dòng: mỗi dòng một mã đáng chú ý: diễn biến hôm nay, CTCK nào khuyến nghị, giá mục tiêu, còn tăng "
-          "bao nhiêu %, tin liên quan.\n"
-          "⚠️ 1–2 dòng: rủi ro hoặc điều cần để ý (ngành/mã giảm mạnh, khối ngoại bán, tin xấu).")
-PREFIXES = ("📊", "🔥", "🎯", "⚠️", "⚠")
+          "dữ liệu. Viết RẤT NGẮN, tiếng Việt có dấu, không markdown, tối đa 5 dòng, mỗi dòng dưới 20 chữ, số viết gọn "
+          "(109k, 1.643 tỷ, +45%), không nhắc lại VN-Index:\n"
+          "🔥 1 dòng: 2–3 ngành hot nhất (ưu tiên vừa tăng vừa hút tiền hoặc khối ngoại mua), mỗi ngành: % và tiền "
+          "vào. Ví dụ: 🔥 Chứng khoán +0,7% (1.643 tỷ, ngoại mua 372 tỷ) · BĐS +1,8% (544 tỷ)\n"
+          "🎯 2–3 dòng: mỗi dòng một mã đáng chú ý: % hôm nay và một lý do ngắn (CTCK nào khuyến nghị, mục tiêu, "
+          "còn tăng %; hoặc tin). Ví dụ: 🎯 MWG +1,3%: HSC, UBS khuyến nghị MUA, mục tiêu 109k (+45%)\n"
+          "⚠️ 1 dòng: rủi ro chính (ngành/mã giảm mạnh, khối ngoại bán, tin xấu).")
+PREFIXES = ("🔥", "🎯", "⚠️", "⚠")
 
 
 def ai_lines(data):
@@ -384,7 +383,7 @@ def ai_lines(data):
             print(f"[nhận định] bỏ dòng có mã ngoài dữ liệu: {line}", file=sys.stderr)
             continue
         out.append(html.escape(line))
-    return out[:12]
+    return out[:5]
 
 
 def session_name(now):
@@ -400,27 +399,53 @@ def session_name(now):
     return "sau phiên"
 
 
+def headline(now, data):
+    """Một dòng đầu: giờ, VN-Index, thanh khoản, khối ngoại ròng HOSE."""
+    vni = data["index"].get("VN-Index")
+    parts = [f"🧠 <b>Nhận định {now:%H:%M}</b>"]
+    if vni:
+        parts.append(f"VN-Index {vn_num(vni[0], 0)} ({pct((vni[0] / vni[1] - 1) * 100)})")
+        parts.append(billions(vni[2]))
+    if data["stocks"]:
+        parts.append("ngoại " + signed_billions(sum(s["nn"] for s in data["stocks"])))
+    return " · ".join(parts)
+
+
+def short_fallback(data):
+    """Không có AI: 3–4 dòng số liệu gọn."""
+    today_pct = {s["ma"]: s["pct"] for s in data["stocks"]}
+    hot = sorted((g for g in data["sectors"] if g["pct"] > 0), key=lambda g: -g["gtgd"])[:3]
+    lines = []
+    if hot:
+        lines.append("🔥 " + " · ".join(f"{html.escape(g['ten'])} {pct(g['pct'])} ({billions(g['gtgd'])})" for g in hot))
+    for r in data["recs"][:2]:
+        move = f" {pct(today_pct[r['ma']])}" if r["ma"] in today_pct else ""
+        target = f", mục tiêu {pt_short(r['muc_tieu'])}" if r["muc_tieu"] else ""
+        upside = f" ({pct(r['con_tang'])})" if r["con_tang"] is not None else ""
+        lines.append(f"🎯 {r['ma']}{move}: {html.escape(', '.join(r['ctck'][:2]))} khuyến nghị {r['loai']}{target}{upside}")
+    if data["news"]:
+        lines.append(news_line(data["news"][0]))
+    return lines
+
+
+def pt_short(x):
+    """109461 -> '109k'."""
+    return f"{round(x / 1000)}k"
+
+
 def brief(now=None, data=None):
-    """Tin nhận định (chữ, nút)."""
+    """Tin nhận định ngắn (chữ, nút); chi tiết xem bằng các nút."""
     now = now or now_vn()
     data = data or gather()
-    lines = [f"🧠 <b>Nhận định {session_name(now)} {WEEKDAYS[now.weekday()].lower()} {now:%d/%m}</b> · {now:%H:%M}",
-             market_line(data)]
+    lines = [headline(now, data)]
     smart = ai_lines(data)
     if smart:
-        lines += ["", "🤖 <b>AI tổng hợp</b>"] + smart
-    else:  # không có AI: tóm tắt bằng số liệu
-        lines.append("")
-        lines += sector_lines(data, top=3, bottom=0)[:-1]
-        lines += ["🎯 " + rec_line(r) for r in data["recs"][:3]]
-        lines += [news_line(i) for i in data["news"][:3]]
+        lines += smart + [SHORT_NOTE]
+    else:
         import sochitieu as ct
-        lines.append("<i>" + ("AI đang bận, chỉ có số liệu" if ct.ai_key()
-                              else "Bật AI (biến GEMINI_API_KEY) để có nhận định tổng hợp") + "</i>")
-    strong = [g for g in data["sectors"] if g["pct"] > 0][:3]
-    if strong:
-        lines += ["", "🔥 Ngành mạnh: " + " · ".join(f"{html.escape(g['ten'])} {pct(g['pct'])}" for g in strong)]
-    lines.append(NOT_ADVICE)
+        lines += short_fallback(data)
+        lines.append("<i>" + ("AI đang bận, chỉ có số liệu" if ct.ai_key() else "Bật AI (GEMINI_API_KEY) để có nhận định")
+                     + " · tham khảo, không phải lời khuyên đầu tư</i>")
     return "\n".join(lines), BUTTONS
 
 
