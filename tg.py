@@ -81,7 +81,8 @@ def keyboard(buttons):
 
 
 def send(chat_id, text, buttons=None, tok=None):
-    extra = {"reply_markup": keyboard(buttons)} if buttons else {}
+    """buttons: [[(nhãn, dữ liệu)]] là nút dưới tin; dict là reply_markup dựng sẵn (hàng nút dưới ô chat...)."""
+    extra = {"reply_markup": buttons if isinstance(buttons, dict) else keyboard(buttons)} if buttons else {}
     return call("sendMessage", tok, chat_id=chat_id, text=text, parse_mode="HTML",
                 link_preview_options={"is_disabled": True}, **extra)
 
@@ -103,8 +104,14 @@ def edit_buttons(chat_id, message_id, buttons, tok=None):
 
 
 def send_reply(chat_id, reply, tok=None):
-    """Gửi câu trả lời của một lệnh: tin HTML, (tin, nút bấm), {"file", "name", "caption"} (gửi file)
-    hoặc {"photos": [PNG...], "caption", "text"} (gửi ảnh, kèm một tin chữ sau ảnh nếu có)."""
+    """Gửi câu trả lời của một lệnh: tin HTML, (tin, nút bấm), {"file", "name", "caption"} (gửi file),
+    {"photos": [PNG...], "caption", "text"} (gửi ảnh, kèm một tin chữ sau ảnh nếu có)
+    hoặc {"messages": [câu trả lời...]} (gửi lần lượt nhiều tin)."""
+    if isinstance(reply, dict) and "messages" in reply:
+        sent = None
+        for one in reply["messages"]:
+            sent = send_reply(chat_id, one, tok)
+        return sent
     if isinstance(reply, dict) and "photos" in reply:
         sent = send_photos(chat_id, reply["photos"], reply.get("caption", ""), tok)
         if reply.get("text"):

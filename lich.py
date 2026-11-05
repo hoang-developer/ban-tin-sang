@@ -15,6 +15,7 @@ import lenh
 import nhandinh
 import phantich
 import sochitieu as chitieu
+import sono
 import taisan
 import tg
 from bantin import BUTTONS as BANTIN_BUTTONS
@@ -292,7 +293,12 @@ def expense_summary(now, job, kind, title):
     chitieu.reset()  # đọc lại nhóm tự chỉnh mới nhất
     text, count = chitieu.report(kind, now.date())
     extras = []
-    if count and kind == "thangtruoc":  # tổng kết tháng: kèm biểu đồ, nhận xét (1 lượt AI), tiến độ quỹ dự phòng
+    if count and kind == "thangtruoc":  # tổng kết tháng: kèm biểu đồ, nhận xét (1 lượt AI), quỹ dự phòng, sổ nợ
+        if sono.active():
+            try:
+                extras.append(sono.view(now.date()))
+            except Exception as e:
+                print(f"[lỗi] sổ nợ trong tổng kết: {e!r}", file=sys.stderr)
         if any(it.get("duphong") for it in taisan.load()["items"]):
             try:
                 import duphong
@@ -345,20 +351,28 @@ def chi_tieu_thang(now, chat):
 
 
 def tai_chinh_sang(now, chat):
-    """Từ 9h: nhắc đã nhận lương chưa (3 ngày từ ngày lương), sổ tiết kiệm sắp đáo hạn (qua bot chi tiêu)."""
+    """Từ 9h: nhắc đã nhận lương chưa (3 ngày từ ngày lương), sổ tiết kiệm sắp đáo hạn, khoản nợ tới hạn mà tháng
+    này chưa trả (qua bot chi tiêu)."""
     tok = chitieu.token()
     if not between(now, (9, 0), (21, 0)) or not tok or done_today("tai_chinh_sang", now):
         return None
     chitieu.reset()
     due = taisan.salary_due(now.date())
     notes = taisan.maturity_notes(now.date())
+    try:
+        debts = sono.reminders(now.date())
+    except Exception as e:
+        print(f"[lỗi] nhắc trả nợ: {e!r}", file=sys.stderr)
+        debts = None
     for owner in chitieu.owner_chats():
         if due:
             tg.send(owner, due[0], due[1], tok=tok)
         if notes:
             tg.send(owner, "\n".join(notes), tok=tok)
+        if debts:
+            tg.send(owner, debts[0], debts[1], tok=tok)
     mark_done("tai_chinh_sang", now)
-    return f"nhắc lương: {'có' if due else 'không'}, đáo hạn: {len(notes)}"
+    return f"nhắc lương: {'có' if due else 'không'}, đáo hạn: {len(notes)}, nhắc nợ: {'có' if debts else 'không'}"
 
 
 def tai_san_cuoi_ngay(now, chat):

@@ -269,11 +269,14 @@ def single(tx, message, now, check_dup=True):
     extra = [f"📷 Đọc từ ảnh{seen_from}, kiểm tra lại số tiền và ngày nhé"]
     if missing:
         extra.append(f"⚠️ Chưa có nhóm «{html.escape(missing)}», tạo bằng: /nhom them {html.escape(missing)}")
+    debt_lines, debt_rows = ct.debt_after([e], day)  # chuyển khoản trả nợ: trừ dư nợ
+    extra += debt_lines
     try:
         extra += ct.phantich().after_record([e], day)
     except Exception as err:
         print(f"[lỗi] phân tích sau khi ghi ảnh: {err!r}", file=sys.stderr)
     text, rows = ct.entries_message([e], day, extra=extra)
+    rows = (rows or []) + debt_rows
     if tx["diem"] and tx["chieu"] == "chi" and tx["diem"] < tx["tien"] * 1.01:
         text += (f"\n🎁 Có {ct.vnd(tx['diem'])} trả bằng voucher/điểm thưởng. Điểm đổi từ chi tiêu (thẻ tín dụng…) "
                  "nên ghi là khoản thu:")
@@ -314,14 +317,15 @@ def on_button(arg, message, now):
     kho.delete(PENDING + unique)
     entries = record(chosen, now)
     extra = [f"📷 Ghi từ ảnh, bỏ qua {len(txs) - len(chosen)} giao dịch không chọn"]
-    if any(tx["kieu"] == "tra_no" for tx in chosen):
-        extra.append("<i>💳 Có trả nợ vay: nếu đang theo dõi khoản vay trong /taisan, nhớ cập nhật dư nợ</i>")
+    debt_lines, debt_rows = ct.debt_after(entries, day)  # có khoản trả nợ: trừ dư nợ trong /no
+    extra += debt_lines
     try:
         extra += ct.phantich().after_record(entries, day)
     except Exception as err:
         print(f"[lỗi] phân tích sau khi ghi ảnh: {err!r}", file=sys.stderr)
     def done():
         text, rows = ct.entries_message(entries, day, extra=extra)
-        hint = ct.salary_fund_hint(entries, day)  # ảnh có lương: gợi ý để tiền vào quỹ dự phòng
+        rows = (rows or []) + debt_rows
+        hint = ct.salary_fund_hint(entries, day)  # ảnh có lương: gợi ý chia lương (trả nợ, quỹ dự phòng...)
         return (text + "\n" + hint[0], rows + [hint[1]]) if hint else (text, rows)
     return f"Đã ghi {len(entries)} khoản", ("edit", done)
