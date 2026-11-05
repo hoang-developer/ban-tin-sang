@@ -349,7 +349,9 @@ def parse_line(line, day, learned=None):
 # AI lỗi hết thì khoản vào Khác và bot hỏi người dùng.
 
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-GEMINI_MODELS = "gemini-3.5-flash-lite,gemini-3.5-flash"
+# 05/11/2026: 3.1 Flash-Lite cũng đúng 13/13, đọc đúng ảnh hóa đơn và lịch sử giao dịch (1–2 giây); nằm ở nhóm máy
+# chủ khác nên lúc 3.5 báo quá tải (503) vẫn trả lời được
+GEMINI_MODELS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.5-flash"
 AI_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Chọn ngày 04/11/2026: thử 13 khoản lạ, Nemotron 3 Ultra đúng 12, Dots 3 đúng 12 (dự phòng).
 # Không thêm openrouter/free: nó chọn ngẫu nhiên model miễn phí, có lần chỉ đúng 7/13.
