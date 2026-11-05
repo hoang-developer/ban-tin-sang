@@ -154,6 +154,7 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/nhanxet` | Số liệu đáng chú ý của tháng + nhận xét và gợi ý tiết kiệm của AI; `/nhanxet 10` |
 | `/taisan` | Tài sản ròng: tiền, tiết kiệm, cổ phiếu, quỹ, vàng, tiền số, ngoại tệ, nợ (xem dưới) |
 | `/suckhoe` | Khám sức khỏe tài chính cá nhân |
+| `/duphong` | Quỹ dự phòng: mục tiêu 3–12 tháng chi thiết yếu, tiến độ, mỗi tháng cần để bao nhiêu, để quỹ ở đâu (xem dưới) |
 | `/luong` | Nhắc ngày nhận lương: `/luong 10 25tr` |
 
 Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước kèm biểu đồ và nhận
@@ -248,6 +249,26 @@ Code ở [taisan.py](taisan.py).
   phân bổ (một mã quá 20% tài sản, tiền số quá 10%, một loại quá 70%), khoản đầu tư lỗ từ 20%, xu hướng
   tài sản ròng. Chi và thu lấy từ sổ 90 ngày qua. AI (nếu bật) viết 2 nhận xét và 2–3 việc nên làm có
   con số; được dặn không khuyên mua bán mã nào, không dự đoán giá. Chỉ để tham khảo.
+
+### Quỹ dự phòng (bước đầu xây dựng tài chính)
+
+Code ở [duphong.py](duphong.py). `/duphong` cho xem:
+
+- **Chi thiết yếu mỗi tháng**, tính từ sổ 90 ngày qua (cần ít nhất 14 ngày ghi chép): ăn uống, đi chợ, đi lại
+  (bỏ khoản đột biến), nhà cửa và hóa đơn, sức khỏe, học tập, gia đình, nhóm "Trả nợ" nếu đã tạo. Không tính mua
+  sắm, giải trí, quà. Tự đặt: `/duphong chi 12tr` (về tự tính: `/duphong chi tu dong`).
+- **Mục tiêu**: đủ 3/6/9/12 tháng chi thiết yếu (mặc định 6, chọn bằng nút hoặc `/duphong muctieu 6`), mốc khởi đầu
+  1 tháng, rồi 3 tháng. Thanh tiến độ, đủ mấy tháng chi.
+- **Mỗi tháng cần để bao nhiêu** để đạt trong 6/12/18/24 tháng (mặc định 12, `/duphong han 12`), so với số dư
+  thu − chi trung bình 3 tháng (vừa sức hay căng; căng thì bot tính để 70% phần dư thì mất bao lâu).
+- **Số dư quỹ**: tài khoản "Quỹ dự phòng" trong `/taisan` (`/duphong nap 2tr`, nút ➕, `/duphong rut 1tr` khi phải
+  dùng) cộng các sổ tiết kiệm, quỹ có sẵn bạn gắn vào (`/duphong tinh ACB`). Để tiền vào quỹ là chuyển tiền,
+  không tính là khoản chi. Chạm mốc thì bot chúc mừng.
+- **Ngày nhận lương**: ghi `+ lương …` (hoặc ảnh lịch sử có lương) thì bot gợi ý "🛟 tháng này nên để …" kèm nút để
+  luôn vào quỹ.
+- **🏦 Để quỹ ở đâu**: tiết kiệm không kỳ hạn hoặc kỳ hạn 1–3 tháng, quỹ thị trường tiền tệ trên Fmarket (lãi, phí),
+  lãi suất các sổ bạn đã khai báo; không nên để ở cổ phiếu, vàng, tiền số, bất động sản.
+- `/suckhoe` dùng đúng số liệu quỹ; tổng kết đầu tháng kèm tiến độ quỹ.
 
 ### Cài bot chi tiêu (làm một lần)
 

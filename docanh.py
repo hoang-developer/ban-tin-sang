@@ -320,4 +320,8 @@ def on_button(arg, message, now):
         extra += ct.phantich().after_record(entries, day)
     except Exception as err:
         print(f"[lỗi] phân tích sau khi ghi ảnh: {err!r}", file=sys.stderr)
-    return f"Đã ghi {len(entries)} khoản", ("edit", lambda: ct.entries_message(entries, day, extra=extra))
+    def done():
+        text, rows = ct.entries_message(entries, day, extra=extra)
+        hint = ct.salary_fund_hint(entries, day)  # ảnh có lương: gợi ý để tiền vào quỹ dự phòng
+        return (text + "\n" + hint[0], rows + [hint[1]]) if hint else (text, rows)
+    return f"Đã ghi {len(entries)} khoản", ("edit", done)

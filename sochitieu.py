@@ -1144,6 +1144,11 @@ def taisan():
     return module
 
 
+def duphong():
+    import duphong as module  # quỹ dự phòng
+    return module
+
+
 def phantich():
     import phantich as module  # nạp khi cần: phantich.py cũng dùng các hàm trong file này
     return module
@@ -1174,6 +1179,7 @@ COMMANDS = {
     "taisan": ("Tài sản ròng: tiền, tiết kiệm, cổ phiếu, vàng, quỹ, nợ…; /taisan huongdan", lambda args: taisan().taisan(args)),
     "suckhoe": ("Khám sức khỏe tài chính cá nhân", lambda args: taisan().health(today())),
     "luong": ("Nhắc ngày nhận lương: /luong 10 25tr", lambda args: taisan().luong(args)),
+    "duphong": ("Quỹ dự phòng: mục tiêu, tiến độ, mỗi tháng cần để bao nhiêu", lambda args: duphong().duphong(args)),
     "nhanxet": ("Nhận xét chi tiêu tháng (AI); /nhanxet 10 cho tháng 10", lambda args: phantich().commentary(period_kind(args), today())),
     "xuat": ("Xuất file CSV mở bằng Excel: /xuat 10", xuat),
 }
@@ -1203,7 +1209,20 @@ def answer(text, now):
     except Exception as e:  # phần phân tích lỗi thì vẫn báo đã ghi
         print(f"[lỗi] phân tích sau khi ghi: {e!r}", file=sys.stderr)
         extra = []
-    return entries_message(entries, now.date(), extra=extra)
+    reply, rows = entries_message(entries, now.date(), extra=extra)
+    hint = salary_fund_hint(entries, now.date())
+    if hint:
+        reply, rows = reply + "\n" + hint[0], rows + [hint[1]]
+    return reply, rows
+
+
+def salary_fund_hint(entries, day):
+    """Vừa ghi lương: (dòng gợi ý, hàng nút) để tiền vào quỹ dự phòng; None nếu không cần."""
+    try:
+        return duphong().salary_hint(entries, day)
+    except Exception as e:
+        print(f"[lỗi] gợi ý quỹ dự phòng: {e!r}", file=sys.stderr)
+        return None
 
 
 def button_ref(data):
@@ -1242,6 +1261,8 @@ def on_button(data, message, now):
     if kind == "anh":
         import docanh
         return docanh.on_button(arg, message, now)
+    if kind == "dp":
+        return duphong().on_button(arg, message, now)
     if kind == "bd":
         return "Đang vẽ biểu đồ…", ("send", lambda: phantich().chart_reply(arg, day))
     if kind == "db":
