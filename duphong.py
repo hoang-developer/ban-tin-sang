@@ -4,16 +4,14 @@
   hóa đơn, sức khỏe, học tập, gia đình, trả nợ. Không tính mua sắm, giải trí, quà... Tự đặt được: /duphong chi 12tr.
 - Mục tiêu: đủ 3–12 tháng chi thiết yếu (mặc định 6), mốc khởi đầu 1 tháng; đạt trong N tháng (mặc định 12).
 - Số dư quỹ: các tài sản trong /taisan được gắn vào quỹ (mặc định tài khoản "Quỹ dự phòng"; /duphong nap 2tr để
-  thêm, /duphong rut 1tr khi phải dùng; /duphong tinh <tên> để tính thêm sổ tiết kiệm, quỹ tiền tệ có sẵn).
+  thêm, /duphong rut 1tr khi phải dùng; /duphong tinh <tên> để tính thêm sổ tiết kiệm có sẵn).
 - Gợi ý mỗi tháng cần để bao nhiêu, so với số dư thu − chi trung bình; ngày ghi lương có nút "Để … vào quỹ".
 Thông tin tham khảo, không phải lời khuyên tài chính có giấy phép.
 """
 import html
 import math
-import sys
 from datetime import date, timedelta
 
-import chungkhoan
 import kho
 import phantich as pt
 import sochitieu as ct
@@ -199,7 +197,7 @@ def toggle(name):
     if not target:
         own = [it.get("ten") or it.get("ma") for it in data["items"] if it["loai"] in ("tien", "tietkiem", "quy")]
         return ("Không thấy tài sản tên «" + html.escape(name) + "» trong /taisan. Có: "
-                + html.escape(", ".join(own) or "chưa có tiền, tiết kiệm, quỹ nào"))
+                + html.escape(", ".join(own) or "chưa có tài khoản, sổ tiết kiệm nào"))
     target["duphong"] = not target.get("duphong")
     ts.save(data)
     label = target.get("ten") or target.get("ma")
@@ -207,54 +205,19 @@ def toggle(name):
             else f"Đã bỏ «{html.escape(label)}» khỏi quỹ dự phòng") + "\nXem: /duphong"
 
 
-def mmf_funds():
-    """Quỹ thị trường tiền tệ trên Fmarket (giữ 1 ngày): [(tên, lãi %, khoảng thời gian, phí quản lý %)]; quỹ mới
-    chưa đủ 12 tháng thì lấy lãi 6, 3 hay 1 tháng gần nhất."""
-    def fetch():
-        body = {"types": ["NEW_FUND", "TRADING_FUND"], "issuerIds": [], "sortOrder": "DESC", "sortField": "navTo12Months",
-                "page": 1, "pageSize": 100, "isIpo": False, "fundAssetTypes": [], "bondRemainPeriods": [],
-                "searchField": "", "isBuyByReward": False, "thirdAppIds": []}
-        rows = chungkhoan.get_json(ts.FMARKET, body)["data"]["rows"]
-        out = []
-        for r in rows:
-            if (r.get("dataFundAssetType") or {}).get("name") != "Quỹ MMF":
-                continue
-            change = r.get("productNavChange") or {}
-            got = next(((change.get(k), label) for k, label in (("navTo12Months", "12 tháng"), ("navTo6Months", "6 tháng"),
-                        ("navTo3Months", "3 tháng"), ("navTo1Months", "1 tháng")) if change.get(k) is not None), (None, ""))
-            out.append((r["shortName"], got[0], got[1], r.get("managementFee")))
-        return out
-    return pt_remembered("duphong:mmf2", 86400, fetch)
-
-
-def pt_remembered(key, seconds, fetch):
-    saved = kho.get(key)
-    if saved is not None:
-        return saved
-    value = fetch()
-    kho.put(key, value, seconds)
-    return value
-
-
 def where_text(day):
     lines = ["🏦 <b>Để quỹ dự phòng ở đâu</b>",
              "Cần: rút được ngay hoặc trong vài ngày, không mất vốn, lãi là phụ.",
-             "• Tiết kiệm không kỳ hạn hoặc kỳ hạn 1–3 tháng (rút trước hạn mất lãi, không mất gốc)",
-             "• Quỹ thị trường tiền tệ (MMF): rút trong 1–2 ngày làm việc, lãi thường cao hơn không kỳ hạn"]
-    try:
-        funds = mmf_funds()[:4]
-        if funds:
-            lines.append("   Trên Fmarket: " + " · ".join(
-                html.escape(n) + (f" {vn_num(r, 1)}%/{label}" if r is not None else " (quỹ mới, chưa có số liệu lãi)")
-                + (f" (phí {vn_num(fee, 2).rstrip('0').rstrip(',')}%)" if fee else "") for n, r, label, fee in funds))
-    except Exception as e:
-        print(f"[lỗi] quỹ MMF: {e!r}", file=sys.stderr)
+             "• Tiết kiệm không kỳ hạn, hoặc tiết kiệm online kỳ hạn 1–3 tháng: rút trước hạn chỉ mất lãi, không mất "
+             "gốc; nên chia vài sổ nhỏ để cần bao nhiêu rút bấy nhiêu",
+             "• Có thể để 1 tháng chi ở tài khoản thanh toán, phần còn lại gửi tiết kiệm"]
     savings = [it for it in ts.load()["items"] if it["loai"] == "tietkiem"]
     if savings:
         lines.append("   Sổ của bạn: " + " · ".join(
             f"{html.escape(it['ten'])} {ts.qty_text(it['lai'])}%" + (" ✅" if it.get("duphong") else "") for it in savings))
-    lines.append("• Không nên: cổ phiếu, vàng, tiền số (giá lên xuống, lúc cần có thể đang lỗ), bất động sản (khó bán nhanh)")
-    lines.append("Tính sổ tiết kiệm hay quỹ có sẵn vào quỹ dự phòng: /duphong tinh <tên>")
+    lines.append("• Không để quỹ dự phòng ở cổ phiếu, ETF, vàng (giá lên xuống, lúc cần có thể đang lỗ); các khoản này "
+                 "dành cho bước đầu tư sau khi quỹ đủ")
+    lines.append("Tính sổ tiết kiệm có sẵn vào quỹ dự phòng: /duphong tinh <tên sổ>")
     return "\n".join(lines + [NOT_ADVICE])
 
 
