@@ -72,6 +72,8 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
 - **📌 Bảng điện** (ngày giao dịch, 9h–15h): một tin ghim đầu chat với VN-Index, VN30, HNX, UPCoM,
   các mã đang theo dõi và giá vàng, tự sửa lại mỗi 15 phút.
 - **🎯 Đoán xanh/đỏ**: 8:15 bot hỏi VN-Index hôm nay xanh hay đỏ (nhận đoán tới 9:15), 15h chấm điểm.
+- **📈 Đầu tư quỹ mở** (bot chi tiêu, nếu bật `/dautu`): ngày hạn đặt lệnh cuối tháng nhắc 8:30 và 13:00, sau 17h
+  báo lệnh đã khớp; bản tin tối có dòng NAV quỹ.
 - **🔔 Nhắc ngày** (7h): ngày trong `/nho` còn 3 ngày hoặc là hôm nay.
 - **💰 Tin cổ tức** (7:30): tin cổ tức, chốt quyền của các mã đang theo dõi (Google News).
 - **🌙 Bản tin tối** (21h): thời tiết và gợi ý ngày mai, chứng khoán hôm nay, giá vàng so với hôm
@@ -163,6 +165,7 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/suckhoe` | Khám sức khỏe tài chính cá nhân |
 | `/duphong` | Quỹ dự phòng: mục tiêu 3–12 tháng chi thiết yếu, tiến độ, mỗi tháng cần để bao nhiêu, để quỹ ở đâu (xem dưới) |
 | `/luong` | Nhắc ngày nhận lương: `/luong 10 25tr` |
+| `/dautu` | Đầu tư quỹ mở hằng tháng (Value Averaging): tháng này nên mua bao nhiêu, nhắc hạn đặt lệnh (xem dưới) |
 
 Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước kèm biểu đồ và nhận
 xét, 21h hằng ngày báo nếu có gì cần để ý, 9h nhắc lương và sổ tiết kiệm sắp đáo hạn, 18h lưu tài sản ròng
@@ -316,7 +319,35 @@ khoản nợ tới kỳ, nạp quỹ tháng này, xếp nhóm khoản chưa rõ)
 **Chia lương** (`/kehoach chia`, nút 📋, tự gợi ý khi ghi lương): thu tháng này → trả nợ tới kỳ (đã trả ✅ hay chưa)
 → chi tiêu dự kiến (trung bình 90 ngày qua, không tính trả nợ; có ngân sách tổng thì theo ngân sách) → quỹ dự phòng
 (mức để kịp hạn, cộng tiền trước đây trả các khoản nợ đã xong; không quá phần thu còn lại) → còn lại. Nút trả nợ, nạp
-quỹ ngay trên tin. Chưa ghi lương thì dùng số ở `/luong`, không có thì thu trung bình 3 tháng.
+quỹ ngay trên tin. Chưa ghi lương thì dùng số ở `/luong`, không có thì thu trung bình 3 tháng. Đã bật `/dautu` thì
+thêm bước 📈 góp vào quỹ chờ (sau quỹ dự phòng).
+
+### Đầu tư quỹ mở hằng tháng (Value Averaging)
+
+Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu mỗi tháng, mã quỹ trên Fmarket). Bot không
+đặt lệnh, không chuyển tiền: bot tính nên mua bao nhiêu và nhắc, bạn đặt trên Fmarket rồi bấm ✅.
+
+- **Đường kế hoạch**: tháng đầu = số góp (cộng giá trị quỹ đang có lúc bật), mỗi tháng sau = tháng trước × 1,01 + số
+  góp (đổi mức tăng: `/dautu tang 1%`; tháng tạm dừng thì không cộng số góp).
+- **Mỗi tháng mua** = kế hoạch − giá trị quỹ đang có, không quá tiền đang có (quỹ chờ + phần góp tháng này chưa để),
+  làm tròn xuống 10.000đ, dưới 100.000đ thì không mua. Quỹ giảm thì mua nhiều hơn, tăng nhanh thì mua ít hoặc không
+  mua, tiền để ở **quỹ chờ** (tài khoản "Quỹ chờ VMEEF" trong `/taisan`, tiền thật nên gửi tiết kiệm online kỳ hạn
+  ngắn). Không bao giờ bán (phí bán VMEEF 2% năm đầu, 1% năm thứ hai).
+- **Hạn đặt lệnh**: trước 14:40 phiên đóng sổ cuối cùng của tháng, khớp NAV phiên đầu tháng sau (lịch phiên lấy từ
+  Fmarket nên tính đúng cả dịp nghỉ lễ). Sáng hôm đó 8:30 bot nhắc kèm số tiền và nút ✅ Đã đặt lệnh, 13:00 nhắc lại
+  nếu chưa bấm. Ngày thường `/dautu` chỉ cho con số dự kiến.
+- **Khớp lệnh**: sau 17h ngày khớp, bot lấy NAV, tính số ccq (phí mua 0%), cộng vào `/taisan`. Fmarket báo số khác
+  thì `/dautu ccq 66,43`. Mua ngoài lịch: `/dautu dadat 3tr` hoặc nhắn `mua VMEEF 3tr` (lệnh cũ thêm ngày khớp:
+  `/dautu dadat 1tr 10/11`).
+- **Góp tiền**: ghi `+ lương …` thì gợi ý chia lương có nút 📈 để tiền vào quỹ chờ; qua hạn cuối tháng mà chưa để thì
+  bot tự tính phần góp tháng đó vào quỹ chờ (sửa số dư thật: `/dautu quycho 12tr`). Quỹ dự phòng chưa tới mốc 1 tháng
+  chi thiết yếu thì bot khuyên tạm dừng góp (không chặn): nút ⏸ hoặc `/dautu bo`.
+- Bản tin tối của bot bản tin có thêm dòng NAV quỹ, % hôm nay, cách đỉnh 52 tuần. Fmarket cập nhật danh mục mà top 10
+  có VIC, VHM, VRE, VPL thì bot báo.
+- Chạy thử trên NAV thật (Fmarket) từ năm bắt đầu khác nhau, so với mua đều 4tr đầu mỗi tháng (DCA), tiền chờ lãi
+  4,5%/năm: VA thắng VMEEF 3/3 lần, VESAF 6/7, SSISCA 10/10, DCDS 20/20; hơn trung vị 0,6–1,4% tổng tài sản cuối kỳ,
+  sụt giảm lớn nhất thấp hơn (DCDS −42% so với −54%). Đổi lại có lúc quỹ chờ lên vài chục triệu, nhiều tháng liền không
+  mua rồi một tháng mua lớn. Kết quả quá khứ không bảo đảm tương lai; tham khảo, không phải lời khuyên đầu tư.
 
 ### Cài bot chi tiêu (làm một lần)
 
