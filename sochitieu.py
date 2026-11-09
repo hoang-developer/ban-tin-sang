@@ -1170,6 +1170,11 @@ def menu():
     return module
 
 
+def dautu():
+    import dautu as module  # đầu tư quỹ mở hằng tháng (Value Averaging)
+    return module
+
+
 def period_kind(args):
     """Tham số kỳ của /bieudo, /nhanxet: trống là tháng này, '10' là tháng 10, 'thangtruoc'..."""
     word = plain("".join(args))
@@ -1203,10 +1208,11 @@ COMMANDS = {
     "huongdan": ("Cách dùng và mọi lệnh", lambda args: menu().guide(args)),
     "no": ("Sổ nợ: còn bao nhiêu, mỗi tháng trả, nhắc trả", lambda args: sono().no_cmd(args)),
     "kehoach": ("Lộ trình xây tài sản, chia lương mỗi tháng", lambda args: kehoach().kehoach(args)),
+    "dautu": ("Đầu tư quỹ mở hằng tháng: tháng này nên mua bao nhiêu", lambda args: dautu().dautu(args)),
 }
 COMMANDS["help"] = COMMANDS["huongdan"]
 # Danh sách lệnh hiện ở nút Menu của Telegram: chỉ các lệnh chính, lệnh khác vẫn gõ được (/huongdan)
-VISIBLE = ["menu", "baocao", "no", "kehoach", "taisan", "duphong", "hoi", "huongdan"]
+VISIBLE = ["menu", "baocao", "no", "kehoach", "dautu", "taisan", "duphong", "hoi", "huongdan"]
 MENU = [{"command": n, "description": COMMANDS[n][0]} for n in VISIBLE]
 
 
@@ -1230,6 +1236,9 @@ def answer(text, now):
     traded = taisan().trade(text, now)  # "mua 1000 FPT giá 95", "bán 500 FPT giá 120"
     if traded:
         return traded
+    fund_order = dautu().from_text(text, now)  # "mua VMEEF 3tr": ghi lệnh mua quỹ đang đầu tư
+    if fund_order:
+        return fund_order
     if phantich().is_question(text):
         return phantich().hoi(text, now.date())
     entries = add(text, now)
@@ -1312,6 +1321,8 @@ def on_button(data, message, now):
         return docanh.on_button(arg, message, now)
     if kind == "dp":
         return duphong().on_button(arg, message, now)
+    if kind == "dt":
+        return dautu().on_button(arg, message, now)
     if kind == "bd":
         return "Đang vẽ biểu đồ…", ("send", lambda: phantich().chart_reply(arg, day))
     if kind == "db":

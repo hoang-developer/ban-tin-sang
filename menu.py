@@ -44,6 +44,7 @@ GUIDE = ("📖 <b>Mọi lệnh</b> (dễ nhất là bấm /menu)\n"
          "\n🎯 <b>Kế hoạch</b>\n"
          "/kehoach lộ trình xây tài sản · /kehoach chia: chia lương tháng này\n"
          "/duphong quỹ dự phòng · /luong ngày nhận lương (/luong 5 19tr)\n"
+         "/dautu đầu tư quỹ mở hằng tháng: tháng này nên mua bao nhiêu, nhắc hạn đặt lệnh (/dautu huongdan)\n"
          "\n⚙️ <b>Cài đặt</b>\n"
          "/nhom tự tạo nhóm, thêm từ khóa · /ngansach ngân sách tháng\n"
          "\n" + HOW_TO)
@@ -52,6 +53,7 @@ SETTINGS = ("⚙️ <b>Cài đặt</b>\n"
             "• 🎯 Ngân sách: /ngansach ăn uống 3tr · /ngansach tổng 15tr · /ngansach hằng ngày 9tr\n"
             "• 📅 Ngày lương: /luong 5 19tr (tới ngày bot hỏi đã nhận chưa)\n"
             "• 🛟 Quỹ dự phòng: /duphong muctieu 6 (tháng chi) · /duphong han 12 (đạt trong bao nhiêu tháng)\n"
+            "• 📈 Đầu tư quỹ mở: /dautu gop 4tr (góp mỗi tháng) · /dautu tang 1% (mức tăng của kế hoạch)\n"
             "• 🔮 Nhóm tính chi hằng ngày: /dubao nhom ăn uống, đi chợ, đi lại")
 SETTINGS_ROWS = [[("🏷 Các nhóm", "m:nhom"), ("🎯 Ngân sách", "m:ns")],
                  [("📤 Xuất Excel tháng này", "m:xuat")], [ct.BACK]]

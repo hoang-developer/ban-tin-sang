@@ -248,6 +248,15 @@ def evening_message(now):
             return lines
         parts.append(section("📈 Chứng khoán hôm nay", market))
 
+    try:
+        import dautu
+        fund = dautu.evening_line(now.date())  # NAV quỹ đang đầu tư (/dautu của bot chi tiêu)
+    except Exception as e:
+        print(f"[lỗi] NAV quỹ trong bản tin tối: {e!r}", file=sys.stderr)
+        fund = None
+    if fund:
+        parts.append(fund)
+
     def gold_today():
         prices = gold_prices()
         sell = prices["sjc"][1]
@@ -389,6 +398,49 @@ def tai_san_cuoi_ngay(now, chat):
     return f"tài sản ròng {round(v['net'])}"
 
 
+def dau_tu(now, chat):
+    """Đầu tư quỹ mở (/dautu, qua bot chi tiêu): ngày hạn đặt lệnh cuối tháng nhắc lúc 8:30 và 13:00 (nếu chưa
+    đặt), qua 14:40 thì chốt kỳ, sau 17h báo lệnh đã khớp, mỗi ngày xem danh mục quỹ có cổ phiếu cần để ý không."""
+    tok = chitieu.token()
+    if not tok or not between(now, (8, 30), (23, 45)):
+        return None
+    import dautu
+    cfg = dautu.config()
+    if not dautu.active(cfg):
+        return None
+    chitieu.reset()
+    notes, replies = [], []
+    if between(now, (8, 30), (14, 40)):
+        deadline, _ = dautu.is_deadline(cfg, now)
+        if deadline and not done_today("dau_tu_nhac", now):
+            mark_done("dau_tu_nhac", now)
+            if (now.hour, now.minute) >= (13, 0):
+                mark_done("dau_tu_nhac2", now)
+            replies.append(dautu.reminder(now))
+            notes.append("nhắc hạn đặt lệnh")
+        elif deadline and (now.hour, now.minute) >= (13, 0) and not done_today("dau_tu_nhac2", now):
+            mark_done("dau_tu_nhac2", now)
+            again = dautu.reminder(now, second=True)
+            if again:
+                replies.append(again)
+                notes.append("nhắc lại")
+    elif dautu.close_periods(dautu.config(), now):
+        notes.append("chốt kỳ")
+    for note in dautu.match_job(now):
+        replies.append((note, [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]))
+        notes.append("lệnh đã khớp")
+    if not done_today("dau_tu_danhmuc", now):
+        mark_done("dau_tu_danhmuc", now)
+        alert = dautu.holdings_alert(dautu.config())
+        if alert:
+            replies.append(alert)
+            notes.append("danh mục quỹ")
+    for owner in chitieu.owner_chats():
+        for reply in replies:
+            tg.send_reply(owner, reply, tok)
+    return ", ".join(notes) or None
+
+
 def nhan_dinh_phien(now, chat):
     """Ngày giao dịch: nhận định trong phiên lúc 10h15 và 13h45 (tắt bằng /nhandinh tat)."""
     if not trading_day(now):
@@ -405,7 +457,7 @@ def nhan_dinh_phien(now, chat):
 
 
 JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi,
-        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien]
+        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien, dau_tu]
 
 
 def run(now):
