@@ -41,7 +41,10 @@ USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
          "/dautu ccq 66,4: sửa số ccq của lệnh khớp gần nhất theo Fmarket\n"
          "/dautu nap 2tr · /dautu rut 1tr · /dautu quycho 12tr: thêm, rút, đặt lại số dư quỹ chờ\n"
          "/dautu gop 5tr: đổi số góp mỗi tháng · /dautu tang 1%: đổi mức tăng của kế hoạch\n"
-         "/dautu bo: tạm dừng tháng này · /dautu lichsu: các lệnh · /dautu tat, /dautu bat")
+         "/dautu bo: tạm dừng tháng này · /dautu lichsu: các lệnh · /dautu tat, /dautu bat\n"
+         "<b>Quỹ chờ là quỹ trái phiếu</b> (vừa là phần trái phiếu của danh mục, vừa là tiền chờ): /dautu quycho VFF "
+         "(về tiền gửi: /dautu quycho tien) · góp thêm mỗi tháng: /dautu vff 1tr · đã mua VFF: nhắn mua VFF 1tr · "
+         "đã hoán đổi: /dautu doi 125,5 (số ccq VFF)")
 
 
 # ---- Lưu trữ ---------------------------------------------------------------------------
@@ -109,7 +112,8 @@ def find_fund(code):
 
 def nav_history(cfg, fresh=False):
     """[(ngày, NAV)] khoảng 400 phiên gần nhất. Lưu trong kho 2 tiếng; nguồn lỗi thì dùng bản đã lưu."""
-    store = kho.get(K_NAV, {}) or {}
+    key = f"{K_NAV}:{cfg['ma']}"
+    store = kho.get(key, {}) or {}
     if store.get("ma") == cfg["ma"] and store.get("nav") and not fresh and \
             (now_vn() - datetime.fromisoformat(store["luc"])).total_seconds() < 2 * 3600:
         return [(date.fromisoformat(d), v) for d, v in store["nav"]]
@@ -119,7 +123,7 @@ def nav_history(cfg, fresh=False):
                              "toDate": now_vn().strftime("%Y%m%d")})["data"]
         navs = sorted((p["navDate"], float(p["nav"])) for p in rows if p.get("nav"))[-400:]
         if navs:
-            kho.put(K_NAV, {"ma": cfg["ma"], "luc": now_vn().isoformat(timespec="minutes"), "nav": navs})
+            kho.put(key, {"ma": cfg["ma"], "luc": now_vn().isoformat(timespec="minutes"), "nav": navs})
             return [(date.fromisoformat(d), v) for d, v in navs]
     except Exception as e:
         print(f"[lỗi] NAV {cfg['ma']}: {e!r}", file=sys.stderr)
@@ -130,7 +134,8 @@ def nav_history(cfg, fresh=False):
 
 def fund_info(cfg, fresh=False):
     """Chi tiết quỹ của Fmarket (phiên giao dịch kế tiếp, top 10 mã, phí); lưu 1 tiếng, lỗi thì dùng bản cũ."""
-    store = kho.get(K_INFO, {}) or {}
+    key = f"{K_INFO}:{cfg['ma']}"
+    store = kho.get(key, {}) or {}
     if store.get("ma") == cfg["ma"] and not fresh and \
             (now_vn() - datetime.fromisoformat(store["luc"])).total_seconds() < 3600:
         return store["data"]
@@ -140,7 +145,7 @@ def fund_info(cfg, fresh=False):
             {"ma": h.get("stockCode"), "nganh": h.get("industry"), "tyle": h.get("netAssetPercent")}
             for h in d.get("productTopHoldingList") or []],
             "top_luc": (d.get("productFund") or {}).get("updateAssetHoldingTime")}
-        kho.put(K_INFO, {"ma": cfg["ma"], "luc": now_vn().isoformat(timespec="minutes"), "data": keep})
+        kho.put(key, {"ma": cfg["ma"], "luc": now_vn().isoformat(timespec="minutes"), "data": keep})
         return keep
     except Exception as e:
         print(f"[lỗi] thông tin quỹ {cfg['ma']}: {e!r}", file=sys.stderr)
@@ -209,8 +214,33 @@ def wait_item(data, cfg):
     return item
 
 
-def holding(data, cfg):
-    return next((it for it in data["items"] if it["loai"] == "quy" and it["ma"] == cfg["ma"]), None)
+def holding(data, cfg, code=None):
+    code = code or cfg["ma"]
+    return next((it for it in data["items"] if it["loai"] == "quy" and it["ma"] == code), None)
+
+
+def side(cfg):
+    """Quỹ chờ là quỹ (ví dụ VFF: vừa là phần trái phiếu của danh mục, vừa là tiền chờ cho VA): {"ma", "id"} hoặc None
+    nếu quỹ chờ là tiền gửi."""
+    return cfg.get("cho") or None
+
+
+def goes_main(cfg, o):
+    """Lệnh làm tăng quỹ chính: mua quỹ chính, hoặc hoán đổi từ quỹ chờ sang."""
+    return o.get("loai") == "doi" or o.get("quy", cfg["ma"]) == cfg["ma"]
+
+
+def them_of(cfg, ym):
+    """Số góp thêm mỗi tháng vào quỹ chờ (ngoài phần VA), 0 nếu tháng tạm dừng."""
+    if not side(cfg) or (cfg.get("ky", {}).get(ym) or {}).get("bo"):
+        return 0
+    steps = [(k, v) for k, v in cfg.get("them", {}).items() if k <= ym]
+    return max(steps)[1] if steps else 0
+
+
+def total_of(cfg, ym):
+    """Tổng tiền góp của tháng: phần VA + phần góp thêm vào quỹ chờ."""
+    return gop_of(cfg, ym) + them_of(cfg, ym)
 
 
 def gop_of(cfg, ym):
@@ -243,8 +273,8 @@ def close_periods(cfg, now=None):
             navs = nav_history(cfg)
             hold = holding(data, cfg)
             value = (hold["sl"] * navs[-1][1] if hold and navs else 0) + sum(
-                o["tien"] for o in cfg.get("lenh", []) if o["trang_thai"] == "cho")
-        unpaid = max(0, gop_of(cfg, ym) - cfg.get("nap", {}).get(ym, 0))
+                o["tien"] for o in cfg.get("lenh", []) if o["trang_thai"] == "cho" and goes_main(cfg, o))
+        unpaid = max(0, total_of(cfg, ym) - cfg.get("nap", {}).get(ym, 0))
         if unpaid:
             wait_item(data, cfg)["tien"] += unpaid
             cfg.setdefault("nap", {})[ym] = cfg.get("nap", {}).get(ym, 0) + unpaid
@@ -267,18 +297,39 @@ def status(cfg, now=None, fresh=False):
     hold = holding(data, cfg)
     units = hold["sl"] if hold else 0
     nav_day, nav = navs[-1] if navs else (None, None)
-    pending = sum(o["tien"] for o in cfg.get("lenh", []) if o["trang_thai"] == "cho")
+    orders = cfg.get("lenh", [])
+    pending = sum(o["tien"] for o in orders if o["trang_thai"] == "cho" and goes_main(cfg, o))
     value = units * nav + pending if nav else pending + (units * hold["gia_von"] if hold and hold.get("gia_von") else 0)
     plan = target(cfg, ym)
     k = cfg.get("ky", {}).get(ym) or {}
     cash = next((it["tien"] for it in data["items"] if it["loai"] == "tien" and it.get("dautu")), 0)
-    unpaid = 0 if k.get("bo") else max(0, gop_of(cfg, ym) - cfg.get("nap", {}).get(ym, 0))
-    available = cash + unpaid
+    unpaid = 0 if k.get("bo") else max(0, total_of(cfg, ym) - cfg.get("nap", {}).get(ym, 0))
+    money_now = cash + unpaid  # tiền mặt dùng được ngay (chưa đặt lệnh)
+    sd = side(cfg)
+    side_value = side_nav = side_day = None
+    if sd:
+        snavs = nav_history(sd, fresh)
+        side_day, side_nav = snavs[-1] if snavs else (None, None)
+        sh = holding(data, cfg, sd["ma"])
+        side_units = (sh["sl"] if sh else 0) - sum(o["ccq_ra"] for o in orders if o["trang_thai"] == "cho"
+                                                    and o.get("loai") == "doi")
+        side_value = max(0.0, side_units) * (side_nav or 0) + sum(
+            o["tien"] for o in orders if o["trang_thai"] == "cho" and o.get("quy") == sd["ma"] and o.get("loai") != "doi")
+    available = money_now + (side_value or 0)
     need = plan - value
     buy = max(0, min(need, available)) // STEP * STEP
     buy = 0 if buy < MIN_ORDER else buy
-    ordered = sum(o["tien"] for o in cfg.get("lenh", []) if o["ky"] == ym)
-    invested = sum(o["tien"] for o in cfg.get("lenh", []))
+    direct = min(buy, money_now) // STEP * STEP  # mua thẳng bằng tiền góp trước
+    switch = buy - direct
+    if sd and switch and switch < MIN_ORDER:  # phần thiếu quá nhỏ: khỏi hoán đổi
+        buy, switch = direct, 0
+    if not sd:
+        direct, switch = buy, 0
+    side_buy = (money_now - direct) // STEP * STEP if sd and not k.get("bo") else 0
+    side_buy = side_buy if side_buy >= MIN_ORDER else 0
+    switch_units = (int(switch / side_nav * 100) + 1) / 100 if switch and side_nav else 0
+    ordered = sum(o["tien"] for o in orders if o["ky"] == ym)
+    invested = sum(o["tien"] for o in orders if goes_main(cfg, o))
     cost = units * hold["gia_von"] if hold and hold.get("gia_von") else 0
     year_ago = [v for d, v in navs if nav_day and (nav_day - d).days <= 365]
     peak = max(year_ago) if year_ago else None
@@ -291,6 +342,8 @@ def status(cfg, now=None, fresh=False):
         print(f"[lỗi] quỹ dự phòng trong /dautu: {e!r}", file=sys.stderr)
     return {"ym": ym, "plan": plan, "value": value, "units": units, "nav": nav, "nav_day": nav_day, "pending": pending,
             "cash": cash, "unpaid": unpaid, "available": available, "need": need, "buy": buy, "skip": k.get("bo"),
+            "direct": direct, "switch": switch, "switch_units": switch_units, "side_buy": side_buy, "side": sd,
+            "side_value": side_value, "side_nav": side_nav, "side_day": side_day, "money_now": money_now,
             "short": need > available + STEP, "ordered": ordered, "invested": invested, "cost": cost,
             "contributed": sum(cfg.get("nap", {}).values()) + cfg.get("goc", 0),
             "drawdown": nav / peak - 1 if peak and nav else None,
@@ -327,6 +380,8 @@ def decision_lines(cfg, s, final=True):
         lines.append(f"📅 Nếu NAV giữ như hiện tại, cuối tháng mua khoảng <b>{money(s['buy'])}</b>" if s["buy"] else
                      "📅 Nếu NAV giữ như hiện tại, cuối tháng không mua (quỹ đang cao hơn kế hoạch)")
         lines.append("   Số chính xác bot tính và nhắc vào sáng ngày hạn đặt lệnh")
+    elif s["side"]:
+        lines += order_lines(cfg, s)
     elif s["buy"]:
         lines.append(f"👉 <b>Mua {ct.vnd(s['buy'])}</b>" + (
             f" (hết tiền đang có; còn thiếu {money(s['need'] - s['buy'])} so với kế hoạch, tháng sau tự bù)"
@@ -336,8 +391,12 @@ def decision_lines(cfg, s, final=True):
     else:
         lines.append(f"👉 <b>Tháng này không mua</b>: quỹ đang cao hơn kế hoạch {money(-s['need'])}; "
                      f"để {money(gop_of(cfg, s['ym']))} vào quỹ chờ (gửi tiết kiệm), chờ lúc quỹ giảm thì mua nhiều hơn")
-    lines.append(f"💰 Tiền đang có: quỹ chờ {money(s['cash'])}"
-                 + (f" + góp tháng này chưa để {money(s['unpaid'])}" if s["unpaid"] else ""))
+    if s["side"]:
+        lines.append(f"💰 Tiền góp chưa đặt lệnh {money(s['money_now'])} · {s['side']['ma']} đang có "
+                     f"{money(s['side_value'] or 0)}")
+    else:
+        lines.append(f"💰 Tiền đang có: quỹ chờ {money(s['cash'])}"
+                     + (f" + góp tháng này chưa để {money(s['unpaid'])}" if s["unpaid"] else ""))
     if s["below_milestone"]:
         f = s["fund"]
         lines.append(f"⚠️ Quỹ dự phòng mới đủ {vn_num(f['covered'], 1)} tháng chi (mốc đầu: 1 tháng, còn thiếu "
@@ -345,7 +404,34 @@ def decision_lines(cfg, s, final=True):
     return lines
 
 
+def order_lines(cfg, s):
+    """Các lệnh cần đặt trên Fmarket khi quỹ chờ là quỹ trái phiếu."""
+    sd = s["side"]["ma"]
+    steps = []
+    if s["direct"]:
+        steps.append(f"Mua {cfg['ma']} <b>{ct.vnd(s['direct'])}</b> (tiền góp)")
+    if s["side_buy"]:
+        steps.append(f"Mua {sd} <b>{ct.vnd(s['side_buy'])}</b>")
+    if s["switch"]:
+        steps.append(f"Hoán đổi <b>{units_text(s['switch_units'])} ccq {sd} → {cfg['ma']}</b> (≈ {money(s['switch'])}, "
+                     "miễn phí hoán đổi)")
+    if not steps:
+        return ["👉 Tháng này không cần đặt lệnh"]
+    head = (f"👉 {cfg['ma']} đang cao hơn kế hoạch {money(-s['need'])}: chưa mua thêm, tiền góp vào {sd}"
+            if s["need"] <= 0 else f"👉 Mua thêm {cfg['ma']} {money(s['buy'])}" + (
+                f" (hết tiền; còn thiếu {money(s['need'] - s['buy'])} so với kế hoạch, tháng sau tự bù)" if s["short"] else ""))
+    return [head] + [f"   {i}. {t}" for i, t in enumerate(steps, 1)]
+
+
 def summary_line(s):
+    if s["side"]:  # cả danh mục: quỹ chính + quỹ chờ + tiền chưa đặt lệnh
+        total = s["value"] + (s["side_value"] or 0) + s["cash"]
+        gain = total - s["contributed"]
+        share = s["value"] / total * 100 if total else 0
+        return (f"Danh mục {money(total)}: cổ phiếu {money(s['value'])} ({share:.0f}%) · "
+                f"{s['side']['ma']} {money(s['side_value'] or 0)} ({100 - share:.0f}%)"
+                + (f" · đã góp {money(s['contributed'])}, lãi/lỗ {money(gain)} ({pct(gain / s['contributed'])})"
+                   if s["contributed"] else ""))
     gain = s["value"] - s["invested"] if s["invested"] else 0
     line = f"Đã mua {money(s['invested'])}"
     if s["invested"] and s["nav"]:
@@ -363,7 +449,9 @@ def view(day=None, fresh=False):
                 "mua nhiều hơn, quỹ tăng nhanh thì mua ít hoặc để tiền chờ.\n\n" + USAGE)
     s = status(cfg, fresh=fresh)
     final, sess = is_deadline(cfg)
+    extra = them_of(cfg, s["ym"])
     lines = [f"📈 <b>{cfg['ma']}: góp {money(gop_of(cfg, s['ym']) or cfg['gop'][max(cfg['gop'])])}/tháng</b>"
+             + (f" + {money(extra)} {s['side']['ma']}" if extra else "")
              + (" (đang tắt: /dautu bat)" if cfg.get("tat") else ""),
              nav_line(cfg, s), *decision_lines(cfg, s, final),
              f"⏰ Hạn đặt lệnh tháng này: trước {deadline_text(cfg, s['ym'], sess)}",
@@ -396,7 +484,11 @@ def last_weekday(ym):
 def buttons(cfg, s, sess, final=True):
     rows = []
     phien = sess["phien"].strftime("%Y%m%d")
-    if s["buy"] and not s["skip"] and final:
+    if s["side"] and final and not s["skip"] and (s["direct"] or s["side_buy"] or s["switch"]):
+        sp = session(s["side"])["phien"].strftime("%Y%m%d")
+        rows.append([("✅ Đã đặt các lệnh trên", f"dt:dat2:{int(s['direct'])}:{int(s['side_buy'])}:"
+                      f"{round(s['switch_units'] * 100)}:{s['ym']}:{phien}:{sp}")])
+    elif s["buy"] and not s["skip"] and final:
         rows.append([(f"✅ Đã đặt lệnh {money(s['buy'])}", f"dt:dat:{int(s['buy'])}:{phien}:{s['ym']}")])
     if not s["skip"] and not s["ordered"]:
         rows.append([("⏸ Tạm dừng tháng này", f"dt:bo:{s['ym']}")])
@@ -409,13 +501,15 @@ def reminder(now, second=False):
     """Tin nhắc ngày hạn đặt lệnh (8:30, nhắc lại 13:00 nếu chưa bấm)."""
     cfg = config()
     s = status(cfg, now, fresh=True)
-    if second and (not s["buy"] or s["skip"] or s["ordered"]):
+    if second and (not (s["buy"] or s["side_buy"]) or s["skip"] or s["ordered"]):
         return None
     sess = session(cfg, now)
     title = (f"📈 <b>{cfg['ma']}: hôm nay là hạn đặt lệnh tháng {int(s['ym'][5:])}</b>" if not second else
              f"⏰ <b>{cfg['ma']}: còn tới 14:40 để đặt lệnh tháng {int(s['ym'][5:])}</b>")
-    lines = [title, f"Đặt trên Fmarket trước <b>14:40 {sess['dong']:%d/%m}</b> → khớp NAV phiên {sess['phien']:%d/%m}",
-             nav_line(cfg, s), *decision_lines(cfg, s), summary_line(s), NOT_ADVICE]
+    when = f"Đặt trên Fmarket trước <b>14:40 {sess['dong']:%d/%m}</b> → {cfg['ma']} khớp NAV phiên {sess['phien']:%d/%m}"
+    if s["side"]:
+        when += f", {s['side']['ma']} phiên {session(s['side'], now)['phien']:%d/%m}"
+    lines = [title, when, nav_line(cfg, s), *decision_lines(cfg, s), summary_line(s), NOT_ADVICE]
     return "\n".join(lines), buttons(cfg, s, sess)
 
 
@@ -424,9 +518,16 @@ def history_text():
     orders = cfg.get("lenh", [])
     if not orders:
         return "Chưa có lệnh nào. Đặt xong trên Fmarket thì bấm ✅ hoặc gõ /dautu dadat 3tr", [[("📈 Đầu tư", "dt:xem")]]
-    lines = [f"🧾 <b>Các lệnh {cfg['ma']}</b>"]
+    lines = [f"🧾 <b>Các lệnh {cfg['ma']}</b>" + (f" và {side(cfg)['ma']}" if side(cfg) else "")]
     for o in orders[-15:]:
         when = f"đặt {o['dat'][8:]}/{o['dat'][5:7]} → phiên {o['phien'][8:]}/{o['phien'][5:7]}"
+        code = o.get("quy", cfg["ma"])
+        if o.get("loai") == "doi":
+            lines.append(f"• {when}: hoán đổi {units_text(o['ccq_ra'])} ccq {code} → " + (
+                f"{units_text(o['ccq'])} ccq {cfg['ma']} ({money(o['tien'])})" if o["trang_thai"] == "khop"
+                else f"{cfg['ma']} · chờ khớp"))
+            continue
+        when = (f"{code} " if code != cfg["ma"] else "") + when
         if o["trang_thai"] == "khop":
             lines.append(f"• {when}: {money(o['tien'])} → {units_text(o['ccq'])} ccq, NAV {vn_num(o['nav'], 2)}")
         else:
@@ -480,16 +581,18 @@ def cutoff_day(trading):
 def next_trading(cfg, d, include=False):
     """Ngày giao dịch đầu tiên sau d (include: tính cả d). Theo lịch NAV thật nếu có (bỏ ngày lễ), không thì
     thứ Hai–thứ Sáu."""
-    known = [x for x, _ in nav_history(cfg) if (x >= d if include else x > d)]
+    navs = nav_history(cfg)
+    known = [x for x, _ in navs if (x >= d if include else x > d)]
     if known:
         return known[0]
+    days = {x.weekday() for x, _ in navs[-20:]} if len(navs) >= 5 else {0, 1, 2, 3, 4}
     x = d if include else d + timedelta(days=1)
-    while x.weekday() >= 5:
+    while x.weekday() not in days:
         x += timedelta(days=1)
     return x
 
 
-def order_spec(cfg, text, now):
+def order_spec(cfg, text, now, fund=None):
     """Phần chữ ngoài số tiền của "/dautu dadat", "mua VMEEF": (ngày đặt, phiên khớp, kỳ) hoặc câu báo lỗi.
     Có ngày (9/11): lệnh đặt hôm đó, mặc định trước 14:40 ("sau 14h40" thì sang phiên sau). Không có ngày: vừa đặt
     xong, tính theo giờ hiện tại."""
@@ -501,17 +604,18 @@ def order_spec(cfg, text, now):
     cutoff = next_trading(cfg, day, include=True)  # đặt cuối tuần, ngày lễ: sổ lệnh đóng ở ngày giao dịch kế tiếp
     if late and cutoff == day:
         cutoff = next_trading(cfg, cutoff)
-    return day, next_trading(cfg, cutoff), ym_of(cutoff)
+    return day, next_trading(fund or cfg, cutoff), ym_of(cutoff)  # fund: quỹ chờ có lịch giao dịch riêng
 
 
-def record_order(amount, trading_day=None, now=None, period=None, order_day=None):
+def record_order(amount, trading_day=None, now=None, period=None, order_day=None, fund=None, quiet=False):
     """Đã đặt lệnh mua `amount`: trừ quỹ chờ (thiếu thì phần thiếu tính là góp thêm của tháng), ghi lệnh chờ khớp.
-    period: kỳ của lệnh (nút bấm mang theo); không có thì suy từ ngày đóng sổ của phiên khớp."""
+    period: kỳ của lệnh (nút bấm mang theo); không có thì suy từ ngày đóng sổ của phiên khớp. fund: mua quỹ chờ (VFF)."""
     now = now or now_vn()
     order_day = order_day or now.date()
     cfg = config()
     close_periods(cfg, now)
-    sess = session(cfg, now)
+    code = (fund or cfg)["ma"]
+    sess = session(fund or cfg, now)
     trading = trading_day or sess["phien"]
     ym = period or (ym_of(cutoff_day(trading_day)) if trading_day else current_period(cfg, now))
     if ym < cfg["bat_dau"]:
@@ -524,50 +628,126 @@ def record_order(amount, trading_day=None, now=None, period=None, order_day=None
         item["tien"] = 0
     else:
         item["tien"] -= amount
-    order = {"id": max([o["id"] for o in cfg.get("lenh", [])] + [0]) + 1, "ky": ym, "tien": amount,
-             "dat": order_day.isoformat(), "phien": trading.isoformat(), "trang_thai": "cho"}
+    order = {"id": max([o["id"] for o in cfg.get("lenh", [])] + [0]) + 1, "ky": ym, "tien": amount, "quy": code,
+             "loai": "mua", "dat": order_day.isoformat(), "phien": trading.isoformat(), "trang_thai": "cho"}
     cfg.setdefault("lenh", []).append(order)
     ts.save(data)
     save(cfg)
+    note = (f"✅ Đã ghi lệnh mua {code} {ct.vnd(amount)}: đặt {order_day:%d/%m} → khớp NAV phiên "
+            f"<b>{trading:%d/%m}</b>." + ("" if side(cfg) else f" Quỹ chờ còn {money(item['tien'])}."))
+    if quiet:
+        return note
     matched = match_orders(now)
-    note = (f"✅ Đã ghi lệnh mua {cfg['ma']} {ct.vnd(amount)}: đặt {order_day:%d/%m} → khớp NAV phiên "
-            f"<b>{trading:%d/%m}</b>. Quỹ chờ còn {money(item['tien'])}.")
     if matched:
         return note + "\n" + matched[0]
     return note + " Tối ngày khớp (khoảng 17h có NAV) bot tính số ccq và cộng vào /taisan."
 
 
+def record_switch(units, trading_day=None, now=None, period=None, order_day=None, quiet=False):
+    """Đã đặt lệnh hoán đổi `units` ccq quỹ chờ (VFF) sang quỹ chính: ghi lệnh chờ khớp (không trừ tiền góp)."""
+    now = now or now_vn()
+    order_day = order_day or now.date()
+    cfg = config()
+    sd = side(cfg)
+    if not sd:
+        return "Quỹ chờ đang là tiền gửi, không có gì để hoán đổi. Đổi sang quỹ trái phiếu: /dautu quycho VFF"
+    close_periods(cfg, now)
+    trading = trading_day or session(sd, now)["phien"]
+    ym = period or current_period(cfg, now)
+    navs = nav_history(sd)
+    estimate = round(units * navs[-1][1]) if navs else 0
+    order = {"id": max([o["id"] for o in cfg.get("lenh", [])] + [0]) + 1, "ky": max(ym, cfg["bat_dau"]),
+             "tien": estimate, "ccq_ra": units, "quy": sd["ma"], "loai": "doi", "dat": order_day.isoformat(),
+             "phien": trading.isoformat(), "trang_thai": "cho"}
+    cfg.setdefault("lenh", []).append(order)
+    save(cfg)
+    note = (f"✅ Đã ghi lệnh hoán đổi {units_text(units)} ccq {sd['ma']} → {cfg['ma']} (≈ {money(estimate)}): "
+            f"khớp NAV phiên <b>{trading:%d/%m}</b>.")
+    if quiet:
+        return note
+    matched = match_orders(now)
+    return note + ("\n" + "\n".join(matched) if matched else " Tối ngày khớp bot cập nhật số ccq hai quỹ.")
+
+
+def record_plan(direct, side_buy, units, ym, main_day, side_day, now):
+    """Bấm "Đã đặt các lệnh trên": ghi mua quỹ chính, mua quỹ chờ, hoán đổi trong một lần."""
+    cfg = config()
+    notes = []
+    if direct:
+        notes.append(record_order(direct, main_day, now, ym, quiet=True))
+    if side_buy:
+        notes.append(record_order(side_buy, side_day, now, ym, fund=side(cfg), quiet=True))
+    if units:
+        notes.append(record_switch(units, side_day, now, ym, quiet=True))
+    matched = match_orders(now)
+    return "\n".join(notes + matched) + ("" if matched else "\nTối ngày khớp (khoảng 17h có NAV) bot tính số ccq "
+                                                            "và cập nhật /taisan.")
+
+
 def match_orders(now=None):
-    """Lệnh chờ khớp đã có NAV phiên khớp: tính số ccq, cộng vào /taisan. Trả các câu báo."""
+    """Lệnh chờ khớp đã có NAV phiên khớp: tính số ccq, cập nhật /taisan. Trả các câu báo.
+    Lệnh mua: số ccq = tiền / NAV (phí mua 0%). Lệnh hoán đổi quỹ chờ → quỹ chính: giá trị = số ccq ra × NAV quỹ
+    chờ, số ccq vào = giá trị / NAV quỹ chính cùng phiên (phí hoán đổi 0%)."""
     now = now or now_vn()
     cfg = config()
     due = [o for o in cfg.get("lenh", []) if o["trang_thai"] == "cho" and o["phien"] <= now.date().isoformat()]
     if not due:
         return []
-    navs = dict(nav_history(cfg))
-    if any(date.fromisoformat(o["phien"]) not in navs for o in due):
-        navs = dict(nav_history(cfg, fresh=True))
+    funds = {cfg["ma"]: cfg, **({side(cfg)["ma"]: side(cfg)} if side(cfg) else {})}
+    navs = {}
+
+    def nav_of(code, wanted):
+        """(ngày khớp thật, NAV): phiên đầu tiên từ ngày wanted (nghỉ lễ thì phiên sau đó), None nếu chưa có NAV."""
+        if code not in navs:
+            navs[code] = dict(nav_history(funds[code]))
+            if not any(d >= wanted for d in navs[code]):
+                navs[code] = dict(nav_history(funds[code], fresh=True))
+        found = sorted(d for d in navs[code] if wanted <= d <= wanted + timedelta(days=10))
+        return (found[0], navs[code][found[0]]) if found else None
+
+    def add_units(data, code, units, cost):
+        hold = holding(data, cfg, code)
+        if hold is None:
+            hold = {"id": ts.new_id(data), "loai": "quy", "ma": code, "sl": 0, "gia_von": None}
+            data["items"].append(hold)
+        total = hold["sl"] * (hold.get("gia_von") or 0) + cost
+        hold["sl"] = round(hold["sl"] + units, 2)
+        hold["gia_von"] = total / hold["sl"] if hold["sl"] > 0 else None
+        return hold
+
     data = ts.load()
     notes = []
     for o in due:
-        wanted = date.fromisoformat(o["phien"])
-        found = sorted(d for d in navs if wanted <= d <= wanted + timedelta(days=10))  # nghỉ lễ: phiên sau đó
-        if not found:
+        code = o.get("quy", cfg["ma"])
+        if code not in funds:
             continue
-        nav = navs[found[0]]
-        o["phien"] = found[0].isoformat()
+        got = nav_of(code, date.fromisoformat(o["phien"]))
+        if not got:
+            continue
+        day, nav = got
+        if o.get("loai") == "doi":
+            main = nav_of(cfg["ma"], day)
+            if not main or main[0] != day:
+                continue
+            value = o["ccq_ra"] * nav
+            src = holding(data, cfg, code)
+            if src:
+                src["sl"] = round(max(0, src["sl"] - o["ccq_ra"]), 2)
+            ccq = round(value / main[1], 2)
+            hold = add_units(data, cfg["ma"], ccq, value)
+            o.update({"trang_thai": "khop", "phien": day.isoformat(), "nav": main[1], "nav_ra": nav, "ccq": ccq,
+                      "tien": round(value)})
+            notes.append(f"✅ Hoán đổi {units_text(o['ccq_ra'])} ccq {code} (NAV {vn_num(nav, 2)}đ, ≈ {money(value)}) → "
+                         f"<b>{units_text(ccq)} ccq {cfg['ma']}</b> phiên {day:%d/%m}. Đang có "
+                         f"{units_text(hold['sl'])} ccq {cfg['ma']}.")
+            continue
         ccq = round(o["tien"] / nav, 2)
-        hold = holding(data, cfg)
-        if hold is None:
-            hold = {"id": ts.new_id(data), "loai": "quy", "ma": cfg["ma"], "sl": 0, "gia_von": None}
-            data["items"].append(hold)
-        cost = hold["sl"] * (hold.get("gia_von") or 0) + o["tien"]
-        hold["sl"] = round(hold["sl"] + ccq, 2)
-        hold["gia_von"] = cost / hold["sl"]
-        o.update({"trang_thai": "khop", "nav": nav, "ccq": ccq})
-        notes.append(f"✅ Lệnh {cfg['ma']} {ct.vnd(o['tien'])} đã khớp phiên {o['phien'][8:]}/{o['phien'][5:7]}: "
-                     f"NAV {vn_num(nav, 2)}đ → <b>{units_text(ccq)} ccq</b>. Đang có {units_text(hold['sl'])} ccq, "
-                     f"giá vốn {vn_num(hold['gia_von'], 0)}đ.\nSố ccq trên Fmarket khác thì sửa: /dautu ccq số_ccq")
+        hold = add_units(data, code, ccq, o["tien"])
+        o.update({"trang_thai": "khop", "phien": day.isoformat(), "nav": nav, "ccq": ccq})
+        notes.append(f"✅ Lệnh {code} {ct.vnd(o['tien'])} đã khớp phiên {day:%d/%m}: NAV {vn_num(nav, 2)}đ → "
+                     f"<b>{units_text(ccq)} ccq</b>. Đang có {units_text(hold['sl'])} ccq, giá vốn "
+                     f"{vn_num(hold['gia_von'], 0)}đ.\nSố ccq trên Fmarket khác thì sửa: /dautu ccq số_ccq"
+                     + (f" {code.lower()}" if code != cfg["ma"] else ""))
     if notes:
         ts.save(data)
         save(cfg)
@@ -575,24 +755,32 @@ def match_orders(now=None):
 
 
 def fix_units(text):
+    """/dautu ccq 66,43: sửa số ccq của lệnh khớp gần nhất vào quỹ chính; /dautu ccq 36,7 vff: lệnh mua quỹ chờ."""
     cfg = config()
-    done = [o for o in cfg.get("lenh", []) if o["trang_thai"] == "khop"]
+    parts = text.split()
+    sd = side(cfg)
+    other = bool(sd) and any(ct.plain(x) == sd["ma"].lower() for x in parts[1:])
+    code = sd["ma"] if other else cfg["ma"]
+    done = [o for o in cfg.get("lenh", []) if o["trang_thai"] == "khop"
+            and (o.get("quy") == code and o.get("loai") != "doi" if other else goes_main(cfg, o))]
     try:
-        new = ts.number(text)
+        new = ts.number(parts[0] if parts else "")
     except ValueError:
-        return "Gõ số ccq theo Fmarket, ví dụ: /dautu ccq 66,43"
+        return "Gõ số ccq theo Fmarket, ví dụ: /dautu ccq 66,43" + (f" (lệnh {sd['ma']}: /dautu ccq 36,7 "
+                                                                    f"{sd['ma'].lower()})" if sd else "")
     if not done or new <= 0:
         return "Chưa có lệnh nào đã khớp để sửa"
     o = done[-1]
     data = ts.load()
-    hold = holding(data, cfg)
+    hold = holding(data, cfg, code)
     cost = hold["sl"] * (hold.get("gia_von") or 0)
     hold["sl"] = round(hold["sl"] - o["ccq"] + new, 2)
     hold["gia_von"] = cost / hold["sl"] if hold["sl"] else None
     o["ccq"], o["nav"] = new, o["tien"] / new
     ts.save(data)
     save(cfg)
-    return f"✅ Đã sửa lệnh phiên {o['phien'][8:]}/{o['phien'][5:7]}: {units_text(new)} ccq. Đang có {units_text(hold['sl'])} ccq"
+    return (f"✅ Đã sửa lệnh {code} phiên {o['phien'][8:]}/{o['phien'][5:7]}: {units_text(new)} ccq. Đang có "
+            f"{units_text(hold['sl'])} ccq {code}")
 
 
 DATE = re.compile(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?:/(\d{4}))?(?![\d/])")
@@ -732,6 +920,30 @@ def dautu(args):
         item["tien"] = max(0, item["tien"] - found[0])
         ts.save(data)
         return f"Đã rút {money(found[0])} khỏi quỹ chờ, còn {money(item['tien'])}"
+    sd = side(cfg)
+    if word == "quycho" and not found:
+        return set_side(cfg, rest)
+    if sd and word in (sd["ma"].lower(), "gopthem"):
+        if not found:
+            return f"Góp thêm mỗi tháng vào {sd['ma']} (ngoài phần VA), ví dụ: /dautu {sd['ma'].lower()} 1tr"
+        ym = current_period(cfg)
+        cfg.setdefault("them", {})[ym] = found[0]
+        save(cfg)
+        text, rows = view()
+        return f"✅ Từ tháng {ym_text(ym)} góp thêm {money(found[0])}/tháng vào {sd['ma']}\n\n" + text, rows
+    if word in ("doi", "hoandoi"):
+        try:
+            units = ts.number(rest.split()[0]) if rest.split() else 0
+        except ValueError:
+            units = 0
+        if units <= 0:
+            return "Gõ số ccq đã hoán đổi, ví dụ: /dautu doi 125,5 (thêm ngày đặt nếu là lệnh cũ: /dautu doi 125,5 9/11)"
+        now = now_vn()
+        spec = order_spec(cfg, " ".join(rest.split()[1:]), now, sd)
+        if isinstance(spec, str):
+            return spec
+        day, trading, ym = spec
+        return record_switch(units, trading, now, ym, day)
     if word in ("quycho", "sodu"):
         if not found:
             return USAGE
@@ -743,12 +955,37 @@ def dautu(args):
         if not found:
             return USAGE
         now = now_vn()
-        spec = order_spec(cfg, rest[:found[1]] + " " + rest[found[2]:], now)
+        other = rest[:found[1]] + " " + rest[found[2]:]
+        fund = sd if sd and sd["ma"].lower() in ct.plain(other).split() else None
+        spec = order_spec(cfg, other, now, fund)
         if isinstance(spec, str):
             return spec
         day, trading, ym = spec
-        return record_order(found[0], trading, now, ym, day)
+        return record_order(found[0], trading, now, ym, day, fund=fund)
     return USAGE
+
+
+def set_side(cfg, text):
+    """/dautu quycho VFF: quỹ chờ là quỹ trái phiếu (hoán đổi miễn phí sang quỹ chính); /dautu quycho tien: tiền gửi."""
+    word = ct.plain(text).strip()
+    if word in ("tien", "tietkiem", "guitien"):
+        cfg.pop("cho", None)
+        save(cfg)
+        return "✅ Quỹ chờ là tiền gửi tiết kiệm như trước"
+    code = text.strip().upper()
+    if not re.fullmatch(r"[A-Z][A-Z0-9-]{2,11}", code) or code == cfg["ma"]:
+        return "Gõ mã quỹ trái phiếu trên Fmarket, ví dụ: /dautu quycho VFF (về tiền gửi: /dautu quycho tien)"
+    fund = find_fund(code)
+    if not fund:
+        return f"Không thấy quỹ {html.escape(code)} trên Fmarket"
+    cfg["cho"] = {"ma": code, "id": fund[0]}
+    save(cfg)
+    sess = session(cfg["cho"])
+    text, rows = view()
+    return (f"✅ Quỹ chờ là {code} ({html.escape(fund[1].title())}). Tiền góp mua {cfg['ma']} trước, phần VA chưa mua "
+            f"thì vào {code}; tháng cần mua nhiều hơn tiền góp thì hoán đổi từ {code} (miễn phí). {code} vừa là phần "
+            f"trái phiếu của danh mục, vừa là tiền chờ.\nPhiên {code} kế tiếp: {sess['phien']:%d/%m} (đóng sổ "
+            f"{sess['dong']:%H:%M %d/%m}). Góp thêm mỗi tháng vào {code}: /dautu {code.lower()} 1tr\n\n" + text), rows
 
 
 def from_text(text, now):
@@ -758,16 +995,20 @@ def from_text(text, now):
     if len(t) < 3 or t[0] != "mua":
         return None
     cfg = config()
-    if not active(cfg) or cfg["ma"].lower() not in t[1:3]:
+    sd = side(cfg)
+    codes = [cfg["ma"].lower()] + ([sd["ma"].lower()] if sd else []) if active(cfg) else []
+    code = next((c for c in t[1:3] if c in codes), None)
+    if not code:
         return None
     found = ct.parse_amount(text)
     if not found:
         return None
-    spec = order_spec(cfg, text[:found[1]] + " " + text[found[2]:], now)
+    fund = sd if sd and code == sd["ma"].lower() else None
+    spec = order_spec(cfg, text[:found[1]] + " " + text[found[2]:], now, fund)
     if isinstance(spec, str):
         return spec
     day, trading, ym = spec
-    return record_order(found[0], trading, now, ym, day)
+    return record_order(found[0], trading, now, ym, day, fund=fund)
 
 
 def on_button(arg, message, now):
@@ -784,6 +1025,14 @@ def on_button(arg, message, now):
             return "Lệnh này đã ghi rồi", None
         note = record_order(int(amount), trading, now, period or None)
         return "Đã ghi lệnh", ("edit", lambda: (note, [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]))
+    if kind == "dat2":
+        direct, side_buy, units, ym, main_day, side_day = value.split(":")
+        cfg = config()
+        if any(o["ky"] == ym and o["dat"] == now.date().isoformat() for o in cfg.get("lenh", [])):
+            return "Các lệnh này đã ghi rồi", None
+        note = record_plan(int(direct), int(side_buy), int(units) / 100, ym,
+                           datetime.strptime(main_day, "%Y%m%d").date(), datetime.strptime(side_day, "%Y%m%d").date(), now)
+        return "Đã ghi các lệnh", ("edit", lambda: (note, [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]))
     if kind == "bo":
         note = skip(value)
         return note[:190], ("edit", lambda: view())
@@ -812,7 +1061,7 @@ def salary_part(day):
     if not active(cfg):
         return None
     ym = ym_of(day)
-    gop = gop_of(cfg, ym)
+    gop = total_of(cfg, ym)
     added = cfg.get("nap", {}).get(ym, 0)
     note = ""
     try:
@@ -838,7 +1087,14 @@ def evening_line(day):
     (_, v0), (d1, v1) = navs[-2], navs[-1]
     peak = max(v for d, v in navs if (d1 - d).days <= 365)
     when = "hôm nay" if d1 == day else f"{d1:%d/%m}"
-    return (f"💹 {cfg['ma']} {vn_num(v1, 2)}đ ({when}, {pct(v1 / v0 - 1)}) · cách đỉnh 52 tuần {pct(v1 / peak - 1)}")
+    line = f"💹 {cfg['ma']} {vn_num(v1, 2)}đ ({when}, {pct(v1 / v0 - 1)}) · cách đỉnh 52 tuần {pct(v1 / peak - 1)}"
+    sd = side(cfg)
+    if sd:
+        snavs = nav_history(sd)
+        if len(snavs) >= 2:
+            year = [v for d, v in snavs if (snavs[-1][0] - d).days <= 365]
+            line += f" · {sd['ma']} {vn_num(snavs[-1][1], 2)}đ ({pct(snavs[-1][1] / year[0] - 1)} 12 tháng)"
+    return line
 
 
 def holdings_alert(cfg):

@@ -344,6 +344,14 @@ Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu 
 - **Góp tiền**: ghi `+ lương …` thì gợi ý chia lương có nút 📈 để tiền vào quỹ chờ; qua hạn cuối tháng mà chưa để thì
   bot tự tính phần góp tháng đó vào quỹ chờ (sửa số dư thật: `/dautu quycho 12tr`). Quỹ dự phòng chưa tới mốc 1 tháng
   chi thiết yếu thì bot khuyên tạm dừng góp (không chặn): nút ⏸ hoặc `/dautu bo`.
+- **Quỹ chờ là quỹ trái phiếu** (`/dautu quycho VFF`): hoán đổi VFF ↔ VMEEF miễn phí (bán VFF ra tiền mặt trong
+  12 tháng đầu mới mất 2%), nên VFF vừa là phần trái phiếu của danh mục, vừa là tiền chờ cho VA. Góp thêm mỗi tháng vào
+  VFF: `/dautu vff 1tr` (ví dụ 4tr VA + 1tr VFF). Mỗi tháng tiền góp mua VMEEF trước theo VA, phần chưa mua vào VFF; tháng
+  cần mua nhiều hơn tiền góp thì hoán đổi từ VFF. Tin ngày hạn ghi sẵn từng lệnh (mua VMEEF, mua VFF, hoán đổi bao nhiêu
+  ccq) và một nút ✅ ghi tất cả; khớp lệnh bot tự cập nhật số ccq hai quỹ (VFF giao dịch thứ Ba, thứ Năm). Đã mua VFF
+  ngoài lịch: nhắn `mua VFF 1tr`; đã hoán đổi: `/dautu doi 125,5`; sửa số ccq VFF: `/dautu ccq 36,7 vff`. Chạy thử trên
+  NAV thật (góp 5tr: 4tr VA + 1tr VFF, VA được rút từ VFF): tài sản cuối gần bằng dồn cả 5tr vào cổ phiếu (−1% tới +2%),
+  sụt giảm lớn nhất nhẹ hơn 4–6 điểm; VFF tăng 6–10% mỗi năm, giảm sâu nhất −4,3% (2014), vẫn tăng trong đợt sập 2022.
 - Bản tin tối của bot bản tin có thêm dòng NAV quỹ, % hôm nay, cách đỉnh 52 tuần. Fmarket cập nhật danh mục mà top 10
   có VIC, VHM, VRE, VPL thì bot báo.
 - Chạy thử trên NAV thật (Fmarket) từ năm bắt đầu khác nhau, so với mua đều 4tr đầu mỗi tháng (DCA), tiền chờ lãi
