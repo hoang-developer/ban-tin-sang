@@ -320,6 +320,13 @@ def expense_summary(now, job, kind, title):
             except Exception as e:
                 print(f"[lỗi] {make.__name__}: {e!r}", file=sys.stderr)
     if count:
+        try:
+            import tietkiem
+            saved = tietkiem.period_line(kind, now.date())  # đã bớt trong kỳ và từ khi dùng bot
+            if saved:
+                text += "\n" + saved
+        except Exception as e:
+            print(f"[lỗi] tiết kiệm trong tổng kết: {e!r}", file=sys.stderr)
         for chat in chitieu.owner_chats():
             tg.send(chat, f"{title}\n{text}", chitieu.REPORT_BUTTONS, tok=tok)
             for reply in extras:
@@ -357,6 +364,22 @@ def chi_tieu_thang(now, chat):
     if now.day != 1 or not between(now, (8, 0), (23, 0)):
         return None
     return expense_summary(now, "chi_tieu_thang", "thangtruoc", "🗓 <b>Tổng kết tháng</b>")
+
+
+def nhac_ghi_chep(now, chat):
+    """21h: hôm nay chưa ghi khoản chi nào thì nhắc một lần (kèm chuỗi ngày ghi, số đã bớt), qua bot chi tiêu."""
+    tok = chitieu.token()
+    if not between(now, (21, 0), (23, 0)) or not tok or done_today("nhac_ghi_chep", now):
+        return None
+    import tietkiem
+    chitieu.reset()
+    mark_done("nhac_ghi_chep", now)
+    reply = tietkiem.reminder(now.date())
+    if not reply:
+        return "hôm nay đã ghi"
+    for owner in chitieu.owner_chats():
+        tg.send(owner, reply[0], reply[1], tok=tok)
+    return "đã nhắc"
 
 
 def tai_chinh_sang(now, chat):
@@ -457,7 +480,8 @@ def nhan_dinh_phien(now, chat):
 
 
 JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi,
-        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien, dau_tu]
+        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien, dau_tu,
+        nhac_ghi_chep]
 
 
 def run(now):

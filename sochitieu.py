@@ -1175,6 +1175,11 @@ def dautu():
     return module
 
 
+def tietkiem():
+    import tietkiem as module  # tiết kiệm từ khi dùng bot, chuỗi ngày ghi chép
+    return module
+
+
 def period_kind(args):
     """Tham số kỳ của /bieudo, /nhanxet: trống là tháng này, '10' là tháng 10, 'thangtruoc'..."""
     word = plain("".join(args))
@@ -1209,10 +1214,11 @@ COMMANDS = {
     "no": ("Sổ nợ: còn bao nhiêu, mỗi tháng trả, nhắc trả", lambda args: sono().no_cmd(args)),
     "kehoach": ("Lộ trình xây tài sản, chia lương mỗi tháng", lambda args: kehoach().kehoach(args)),
     "dautu": ("Đầu tư quỹ mở hằng tháng: tháng này nên mua bao nhiêu", lambda args: dautu().dautu(args)),
+    "tietkiem": ("Tiết kiệm từ khi dùng bot, chuỗi ngày ghi chép", lambda args: tietkiem().tietkiem(args)),
 }
 COMMANDS["help"] = COMMANDS["huongdan"]
 # Danh sách lệnh hiện ở nút Menu của Telegram: chỉ các lệnh chính, lệnh khác vẫn gõ được (/huongdan)
-VISIBLE = ["menu", "baocao", "no", "kehoach", "dautu", "taisan", "duphong", "hoi", "huongdan"]
+VISIBLE = ["menu", "baocao", "tietkiem", "no", "kehoach", "dautu", "taisan", "duphong", "hoi", "huongdan"]
 MENU = [{"command": n, "description": COMMANDS[n][0]} for n in VISIBLE]
 
 
@@ -1250,6 +1256,10 @@ def answer(text, now):
     except Exception as e:  # phần phân tích lỗi thì vẫn báo đã ghi
         print(f"[lỗi] phân tích sau khi ghi: {e!r}", file=sys.stderr)
         extra = []
+    try:
+        extra += tietkiem().after_record(entries, now.date())  # chuỗi ngày ghi, hôm nay so với mốc, đã bớt
+    except Exception as e:
+        print(f"[lỗi] tiết kiệm sau khi ghi: {e!r}", file=sys.stderr)
     reply, rows = entries_message(entries, now.date(), extra=debt_lines + extra)
     rows = (rows or []) + debt_rows
     hint = salary_fund_hint(entries, now.date())
@@ -1323,6 +1333,8 @@ def on_button(data, message, now):
         return duphong().on_button(arg, message, now)
     if kind == "dt":
         return dautu().on_button(arg, message, now)
+    if kind == "tk":
+        return tietkiem().on_button(arg, message, now)
     if kind == "bd":
         return "Đang vẽ biểu đồ…", ("send", lambda: phantich().chart_reply(arg, day))
     if kind == "db":

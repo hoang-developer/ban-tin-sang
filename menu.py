@@ -35,6 +35,8 @@ GUIDE = ("📖 <b>Mọi lệnh</b> (dễ nhất là bấm /menu)\n"
          "\n📊 <b>Chi tiêu</b>\n"
          "/baocao báo cáo, có nút chọn kỳ · /homnay · /tuan · /thang (/thang 10)\n"
          "/bieudo biểu đồ · /dubao chi hằng ngày còn được tiêu bao nhiêu · /nhanxet nhận xét của AI\n"
+         "/tietkiem chi lặt vặt so với trước khi dùng bot, chuỗi ngày ghi chép (/tietkiem khongtieu: hôm nay không "
+         "tiêu gì)\n"
          "/hoi hỏi bằng câu thường · /lichsu 10 khoản gần nhất · /xoa xóa khoản vừa ghi\n"
          "/chuaxep xếp nhóm khoản chưa rõ · /xuat file Excel (/xuat 10)\n"
          "\n💼 <b>Tài sản</b>\n"
@@ -104,6 +106,9 @@ def home(day):
     debt = part("nợ", lambda: sono.home_line(day))
     if debt:
         lines.append(debt)
+    saved = part("tiết kiệm", lambda: __import__("tietkiem").home_line(day))
+    if saved:
+        lines.append(saved)
     if ts.load()["items"] or kho.get(ts.K_GOLD):
         v = part("tài sản", lambda: ts.valuation(day))
         if v:
