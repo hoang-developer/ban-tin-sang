@@ -36,7 +36,8 @@ NOT_ADVICE = "<i>Tham khảo, không phải lời khuyên đầu tư</i>"
 USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
          "/dautu: tình trạng, tháng này nên mua bao nhiêu\n"
          "/dautu batdau 4tr VMEEF: bật (số góp mỗi tháng, mã quỹ trên Fmarket)\n"
-         "/dautu dadat 3tr: đã đặt lệnh mua (thêm ngày khớp nếu là lệnh cũ: /dautu dadat 1tr 10/11)\n"
+         "/dautu dadat 3tr: vừa đặt lệnh mua xong · lệnh đặt hôm khác thì thêm ngày đặt: /dautu dadat 1tr 9/11 "
+         "(đặt sau 14:40 thì thêm: sau 14h40); bot tự tính phiên khớp\n"
          "/dautu ccq 66,4: sửa số ccq của lệnh khớp gần nhất theo Fmarket\n"
          "/dautu nap 2tr · /dautu rut 1tr · /dautu quycho 12tr: thêm, rút, đặt lại số dư quỹ chờ\n"
          "/dautu gop 5tr: đổi số góp mỗi tháng · /dautu tang 1%: đổi mức tăng của kế hoạch\n"
@@ -425,11 +426,11 @@ def history_text():
         return "Chưa có lệnh nào. Đặt xong trên Fmarket thì bấm ✅ hoặc gõ /dautu dadat 3tr", [[("📈 Đầu tư", "dt:xem")]]
     lines = [f"🧾 <b>Các lệnh {cfg['ma']}</b>"]
     for o in orders[-15:]:
+        when = f"đặt {o['dat'][8:]}/{o['dat'][5:7]} → phiên {o['phien'][8:]}/{o['phien'][5:7]}"
         if o["trang_thai"] == "khop":
-            lines.append(f"• {o['phien'][8:]}/{o['phien'][5:7]}: {money(o['tien'])} → {units_text(o['ccq'])} ccq, "
-                         f"NAV {vn_num(o['nav'], 2)}")
+            lines.append(f"• {when}: {money(o['tien'])} → {units_text(o['ccq'])} ccq, NAV {vn_num(o['nav'], 2)}")
         else:
-            lines.append(f"• {o['phien'][8:]}/{o['phien'][5:7]}: {money(o['tien'])} · chờ khớp")
+            lines.append(f"• {when}: {money(o['tien'])} · chờ khớp")
     return "\n".join(lines), [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
 
 
@@ -476,10 +477,38 @@ def cutoff_day(trading):
     return d
 
 
-def record_order(amount, trading_day=None, now=None, period=None):
+def next_trading(cfg, d, include=False):
+    """Ngày giao dịch đầu tiên sau d (include: tính cả d). Theo lịch NAV thật nếu có (bỏ ngày lễ), không thì
+    thứ Hai–thứ Sáu."""
+    known = [x for x, _ in nav_history(cfg) if (x >= d if include else x > d)]
+    if known:
+        return known[0]
+    x = d if include else d + timedelta(days=1)
+    while x.weekday() >= 5:
+        x += timedelta(days=1)
+    return x
+
+
+def order_spec(cfg, text, now):
+    """Phần chữ ngoài số tiền của "/dautu dadat", "mua VMEEF": (ngày đặt, phiên khớp, kỳ) hoặc câu báo lỗi.
+    Có ngày (9/11): lệnh đặt hôm đó, mặc định trước 14:40 ("sau 14h40" thì sang phiên sau). Không có ngày: vừa đặt
+    xong, tính theo giờ hiện tại."""
+    day = read_date(text, now.date())
+    if day and day > now.date():
+        return "Ngày đặt lệnh chưa tới. Gõ ngày bạn đã đặt trên Fmarket, ví dụ: /dautu dadat 1tr 9/11"
+    late = bool(re.search(r"sau\s*14", ct.plain(text))) or (day is None and (now.hour, now.minute) >= (14, 40))
+    day = day or now.date()
+    cutoff = next_trading(cfg, day, include=True)  # đặt cuối tuần, ngày lễ: sổ lệnh đóng ở ngày giao dịch kế tiếp
+    if late and cutoff == day:
+        cutoff = next_trading(cfg, cutoff)
+    return day, next_trading(cfg, cutoff), ym_of(cutoff)
+
+
+def record_order(amount, trading_day=None, now=None, period=None, order_day=None):
     """Đã đặt lệnh mua `amount`: trừ quỹ chờ (thiếu thì phần thiếu tính là góp thêm của tháng), ghi lệnh chờ khớp.
     period: kỳ của lệnh (nút bấm mang theo); không có thì suy từ ngày đóng sổ của phiên khớp."""
     now = now or now_vn()
+    order_day = order_day or now.date()
     cfg = config()
     close_periods(cfg, now)
     sess = session(cfg, now)
@@ -496,13 +525,13 @@ def record_order(amount, trading_day=None, now=None, period=None):
     else:
         item["tien"] -= amount
     order = {"id": max([o["id"] for o in cfg.get("lenh", [])] + [0]) + 1, "ky": ym, "tien": amount,
-             "dat": now.date().isoformat(), "phien": trading.isoformat(), "trang_thai": "cho"}
+             "dat": order_day.isoformat(), "phien": trading.isoformat(), "trang_thai": "cho"}
     cfg.setdefault("lenh", []).append(order)
     ts.save(data)
     save(cfg)
     matched = match_orders(now)
-    note = (f"✅ Đã ghi lệnh mua {cfg['ma']} {ct.vnd(amount)}, khớp NAV phiên {trading:%d/%m}. "
-            f"Quỹ chờ còn {money(item['tien'])}.")
+    note = (f"✅ Đã ghi lệnh mua {cfg['ma']} {ct.vnd(amount)}: đặt {order_day:%d/%m} → khớp NAV phiên "
+            f"<b>{trading:%d/%m}</b>. Quỹ chờ còn {money(item['tien'])}.")
     if matched:
         return note + "\n" + matched[0]
     return note + " Tối ngày khớp (khoảng 17h có NAV) bot tính số ccq và cộng vào /taisan."
@@ -569,8 +598,8 @@ def fix_units(text):
 DATE = re.compile(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?:/(\d{4}))?(?![\d/])")
 
 
-def trading_date(text, day):
-    """'10/11' -> ngày khớp lệnh (năm nay; xa hơn 6 tháng tới thì là năm trước); None nếu không có ngày."""
+def read_date(text, day):
+    """'9/11' -> ngày (năm nay; xa hơn 6 tháng tới thì là năm trước); None nếu không có ngày."""
     m = DATE.search(text)
     if not m:
         return None
@@ -632,7 +661,8 @@ def start(args, switch=False):
     lines = [f"✅ Đã bật đầu tư {code} ({html.escape(fund[1].title())}): góp {money(gop)}/tháng từ tháng {ym_text(ym)}."]
     if base:
         lines.append(f"Đã tính {units_text(hold['sl'])} ccq đang có ({money(base)}) vào điểm xuất phát.")
-    lines.append("Đã mua trong tháng này (trước khi bật) thì ghi lại: /dautu dadat 1tr 10/11 (số tiền, ngày khớp).")
+    lines.append("Đã mua trong tháng này (trước khi bật) thì ghi lại: /dautu dadat 1tr 9/11 (số tiền, ngày đặt lệnh; "
+                 "bot tự tính phiên khớp).")
     if not kho.get(ts.K_SALARY):
         lines.append("Đặt ngày lương để bot nhắc để tiền vào quỹ chờ: /luong 5 số_tiền_lương")
     text, rows = view()
@@ -712,17 +742,18 @@ def dautu(args):
     if word in ("dadat", "mua", "datlenh"):
         if not found:
             return USAGE
-        day = trading_date(rest[:found[1]] + " " + rest[found[2]:], ct.today())
-        if day and day.weekday() >= 5:
-            return "Ngày khớp lệnh phải là ngày giao dịch (thứ Hai–thứ Sáu)"
-        if day and (day - ct.today()).days > 7:
-            return "Ngày khớp lệnh quá xa, gõ lại: /dautu dadat 3tr 10/11"
-        return record_order(found[0], day)
+        now = now_vn()
+        spec = order_spec(cfg, rest[:found[1]] + " " + rest[found[2]:], now)
+        if isinstance(spec, str):
+            return spec
+        day, trading, ym = spec
+        return record_order(found[0], trading, now, ym, day)
     return USAGE
 
 
 def from_text(text, now):
-    """Tin "mua VMEEF 3tr" (thêm ngày khớp nếu là lệnh cũ: "mua VMEEF 1tr 10/11"): ghi lệnh; None nếu không phải."""
+    """Tin "mua VMEEF 3tr" (lệnh đặt hôm khác thì thêm ngày đặt: "mua VMEEF 1tr 9/11"): ghi lệnh; None nếu không
+    phải."""
     t = ct.plain(text).split()
     if len(t) < 3 or t[0] != "mua":
         return None
@@ -732,10 +763,11 @@ def from_text(text, now):
     found = ct.parse_amount(text)
     if not found:
         return None
-    day = trading_date(text[:found[1]] + " " + text[found[2]:], now.date())
-    if day and (day.weekday() >= 5 or (day - now.date()).days > 7):
-        return "Ngày khớp lệnh phải là ngày giao dịch gần đây, ví dụ: mua VMEEF 1tr 10/11"
-    return record_order(found[0], day, now)
+    spec = order_spec(cfg, text[:found[1]] + " " + text[found[2]:], now)
+    if isinstance(spec, str):
+        return spec
+    day, trading, ym = spec
+    return record_order(found[0], trading, now, ym, day)
 
 
 def on_button(arg, message, now):

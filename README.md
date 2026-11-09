@@ -337,8 +337,9 @@ Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu 
   Fmarket nên tính đúng cả dịp nghỉ lễ). Sáng hôm đó 8:30 bot nhắc kèm số tiền và nút ✅ Đã đặt lệnh, 13:00 nhắc lại
   nếu chưa bấm. Ngày thường `/dautu` chỉ cho con số dự kiến.
 - **Khớp lệnh**: sau 17h ngày khớp, bot lấy NAV, tính số ccq (phí mua 0%), cộng vào `/taisan`. Fmarket báo số khác
-  thì `/dautu ccq 66,43`. Mua ngoài lịch: `/dautu dadat 3tr` hoặc nhắn `mua VMEEF 3tr` (lệnh cũ thêm ngày khớp:
-  `/dautu dadat 1tr 10/11`).
+  thì `/dautu ccq 66,43`. Mua ngoài lịch: vừa đặt xong thì `/dautu dadat 3tr` hoặc nhắn `mua VMEEF 3tr`; lệnh đặt
+  hôm khác thì thêm **ngày đặt lệnh** (`/dautu dadat 1tr 9/11`, đặt sau 14:40 thì thêm `sau 14h40`), bot tự tính phiên
+  khớp (đặt trước 14:40 khớp phiên giao dịch kế tiếp, cuối tuần và ngày lễ theo lịch NAV thật).
 - **Góp tiền**: ghi `+ lương …` thì gợi ý chia lương có nút 📈 để tiền vào quỹ chờ; qua hạn cuối tháng mà chưa để thì
   bot tự tính phần góp tháng đó vào quỹ chờ (sửa số dư thật: `/dautu quycho 12tr`). Quỹ dự phòng chưa tới mốc 1 tháng
   chi thiết yếu thì bot khuyên tạm dừng góp (không chặn): nút ⏸ hoặc `/dautu bo`.
