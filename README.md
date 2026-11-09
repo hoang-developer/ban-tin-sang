@@ -165,6 +165,7 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/suckhoe` | Khám sức khỏe tài chính cá nhân |
 | `/duphong` | Quỹ dự phòng: mục tiêu 3–12 tháng chi thiết yếu, tiến độ, mỗi tháng cần để bao nhiêu, để quỹ ở đâu (xem dưới) |
 | `/luong` | Nhắc ngày nhận lương: `/luong 10 25tr` |
+| `/tietkiem` | Chi lặt vặt so với trước khi dùng bot, đã bớt bao nhiêu, chuỗi ngày ghi chép, nhắc 21h (xem dưới) |
 | `/dautu` | Đầu tư quỹ mở hằng tháng (Value Averaging): tháng này nên mua bao nhiêu, nhắc hạn đặt lệnh (xem dưới) |
 
 Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước kèm biểu đồ và nhận
@@ -349,6 +350,28 @@ Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu 
   4,5%/năm: VA thắng VMEEF 3/3 lần, VESAF 6/7, SSISCA 10/10, DCDS 20/20; hơn trung vị 0,6–1,4% tổng tài sản cuối kỳ,
   sụt giảm lớn nhất thấp hơn (DCDS −42% so với −54%). Đổi lại có lúc quỹ chờ lên vài chục triệu, nhiều tháng liền không
   mua rồi một tháng mua lớn. Kết quả quá khứ không bảo đảm tương lai; tham khảo, không phải lời khuyên đầu tư.
+
+### Tiết kiệm từ khi dùng bot, chuỗi ngày ghi chép
+
+Code ở [tietkiem.py](tietkiem.py). `/tietkiem` cho xem chi lặt vặt so với **trước khi dùng bot**, để thấy ghi chép đều
+giúp bớt được bao nhiêu.
+
+- **Mốc**: chi lặt vặt (mỗi khoản dưới 1 triệu, không tính thu nhập, trả nợ) trung bình mỗi ngày trước khi dùng bot,
+  mặc định 323.700đ/ngày, tính từ sao kê thẻ tín dụng và tài khoản 11/09–20/10/2026 (đã bỏ trả thẻ, chuyển giữa tài
+  khoản của mình, trả nợ, khoản mua hộ; trừ tiền bạn bè trả lại). Đổi: `/tietkiem moc 300k`; ngày bắt đầu tính:
+  `/tietkiem batdau 04/11`.
+- **Đã bớt** = cộng dồn (mốc − chi lặt vặt của ngày) qua các **ngày có ghi**: có ít nhất một khoản chi, hoặc bấm
+  "🙅 Hôm nay không tiêu" (`/tietkiem khongtieu`). Ngày không ghi gì thì không tính (không ghi không phải là tiết
+  kiệm); hôm nay chưa hết ngày nên chưa cộng. Mốc từ sao kê không có tiền mặt còn sổ ghi có, nên số đã bớt có thể thấp
+  hơn thực tế một chút.
+- Sau mỗi khoản ghi có dòng `🔥 6 ngày · hôm nay 180k/324k · từ 04/11 đã bớt ~1,9tr`; màn hình `/menu` và tổng kết
+  tuần cũng có. Chạm mốc (chuỗi 7/30/100/365 ngày, bớt được 1/5/10/20/50/100 triệu) thì bot chúc mừng một lần.
+- **Chuỗi ngày ghi chép**: quên một ngày thì ghi bù (`hôm qua ăn tối 250k` hoặc nút "↩️ Hôm qua không tiêu") là chuỗi
+  vẫn giữ. Bot không nhấn vào chuyện đứt chuỗi, chỉ hiện chuỗi hiện tại và kỷ lục (nghiên cứu: chuỗi đứt làm giảm động
+  lực, cho sửa lại thì đỡ).
+- **Nhắc 21h** (một lần, chỉ khi hôm đó chưa ghi khoản chi nào), kèm chuỗi và số đã bớt; tắt: `/tietkiem nhac tat`.
+- **Đã để dành thật**: tiền nạp quỹ dự phòng, góp đầu tư (`/dautu`), trả nợ từ ngày bắt đầu. Chi ít hơn mốc chỉ thành
+  tiền để dành khi chuyển đi, nên `/tietkiem` có nút chuyển phần đã bớt vào quỹ chờ đầu tư hoặc quỹ dự phòng.
 
 ### Cài bot chi tiêu (làm một lần)
 
