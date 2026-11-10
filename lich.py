@@ -423,7 +423,8 @@ def tai_san_cuoi_ngay(now, chat):
 
 def dau_tu(now, chat):
     """Đầu tư quỹ mở (/dautu, qua bot chi tiêu): ngày hạn đặt lệnh cuối tháng nhắc lúc 8:30 và 13:00 (nếu chưa
-    đặt), qua 14:40 thì chốt kỳ, sau 17h báo lệnh đã khớp, mỗi ngày xem danh mục quỹ có cổ phiếu cần để ý không."""
+    đặt), qua 14:40 thì chốt kỳ, sau 17h báo lệnh đã khớp, 20h báo giá trị và lãi/lỗ các quỹ (ngày có NAV mới), mỗi
+    ngày xem danh mục quỹ có cổ phiếu cần để ý không."""
     tok = chitieu.token()
     if not tok or not between(now, (8, 30), (23, 45)):
         return None
@@ -452,6 +453,12 @@ def dau_tu(now, chat):
     for note in dautu.match_job(now):
         replies.append((note, [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]))
         notes.append("lệnh đã khớp")
+    if (now.hour, now.minute) >= (20, 0) and not done_today("dau_tu_baocao", now):
+        report = dautu.daily_report(now)  # lãi/lỗ các quỹ theo NAV (chỉ ngày có NAV mới)
+        mark_done("dau_tu_baocao", now)
+        if report:
+            replies.append(report)
+            notes.append("báo lãi/lỗ quỹ")
     if not done_today("dau_tu_danhmuc", now):
         mark_done("dau_tu_danhmuc", now)
         alert = dautu.holdings_alert(dautu.config())

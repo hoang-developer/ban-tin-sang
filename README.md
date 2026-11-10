@@ -73,7 +73,7 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
   các mã đang theo dõi và giá vàng, tự sửa lại mỗi 15 phút.
 - **🎯 Đoán xanh/đỏ**: 8:15 bot hỏi VN-Index hôm nay xanh hay đỏ (nhận đoán tới 9:15), 15h chấm điểm.
 - **📈 Đầu tư quỹ mở** (bot chi tiêu, nếu bật `/dautu`): ngày hạn đặt lệnh cuối tháng nhắc 8:30 và 13:00, sau 17h
-  báo lệnh đã khớp; bản tin tối có dòng NAV quỹ.
+  báo lệnh đã khớp, 20h báo giá trị và lãi/lỗ các quỹ theo NAV; bản tin tối có dòng NAV quỹ.
 - **🔔 Nhắc ngày** (7h): ngày trong `/nho` còn 3 ngày hoặc là hôm nay.
 - **💰 Tin cổ tức** (7:30): tin cổ tức, chốt quyền của các mã đang theo dõi (Google News).
 - **🌙 Bản tin tối** (21h): thời tiết và gợi ý ngày mai, chứng khoán hôm nay, giá vàng so với hôm
@@ -352,7 +352,9 @@ Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu 
   ngoài lịch: nhắn `mua VFF 1tr`; đã hoán đổi: `/dautu doi 125,5`; sửa số ccq VFF: `/dautu ccq 36,7 vff`. Chạy thử trên
   NAV thật (góp 5tr: 4tr VA + 1tr VFF, VA được rút từ VFF): tài sản cuối gần bằng dồn cả 5tr vào cổ phiếu (−1% tới +2%),
   sụt giảm lớn nhất nhẹ hơn 4–6 điểm; VFF tăng 6–10% mỗi năm, giảm sâu nhất −4,3% (2014), vẫn tăng trong đợt sập 2022.
-- Bản tin tối của bot bản tin có thêm dòng NAV quỹ, % hôm nay, cách đỉnh 52 tuần. Fmarket cập nhật danh mục mà top 10
+- Bản tin tối của bot bản tin có thêm dòng NAV quỹ, % hôm nay, cách đỉnh 52 tuần.
+- **Tin tối 20h** (bot chi tiêu, chỉ ngày có NAV mới): từng quỹ đang giữ có số ccq × NAV mới nhất = giá trị, lãi/lỗ so
+  với giá vốn; tổng các quỹ; lệnh còn chờ khớp. Tắt: `/dautu baocao tat`. Fmarket cập nhật danh mục mà top 10
   có VIC, VHM, VRE, VPL thì bot báo.
 - Chạy thử trên NAV thật (Fmarket) từ năm bắt đầu khác nhau, so với mua đều 4tr đầu mỗi tháng (DCA), tiền chờ lãi
   4,5%/năm: VA thắng VMEEF 3/3 lần, VESAF 6/7, SSISCA 10/10, DCDS 20/20; hơn trung vị 0,6–1,4% tổng tài sản cuối kỳ,
