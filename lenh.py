@@ -324,9 +324,11 @@ UNITS = {"chi": 0.1, "chỉ": 0.1, "luong": 1, "lượng": 1, "cay": 1, "cây": 
 
 
 def amount_text(taels):
-    tenths = round(taels * 10)
-    whole, rest = divmod(tenths, 10)
-    return " ".join(([f"{whole} lượng"] if whole else []) + ([f"{rest} chỉ"] if rest else [])) or "0 chỉ"
+    chi = round(taels * 10, 2)  # 0,02 lượng = 0,2 chỉ (vàng ép vỉ 0,1 chỉ)
+    whole = int(chi // 10)
+    rest = round(chi - whole * 10, 2)
+    rest_text = f"{rest:g}".replace(".", ",")
+    return " ".join(([f"{whole} lượng"] if whole else []) + ([f"{rest_text} chỉ"] if rest else [])) or "0 chỉ"
 
 
 def wallet(items, prices=None):
