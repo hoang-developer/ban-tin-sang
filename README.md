@@ -353,8 +353,8 @@ Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu 
   NAV thật (góp 5tr: 4tr VA + 1tr VFF, VA được rút từ VFF): tài sản cuối gần bằng dồn cả 5tr vào cổ phiếu (−1% tới +2%),
   sụt giảm lớn nhất nhẹ hơn 4–6 điểm; VFF tăng 6–10% mỗi năm, giảm sâu nhất −4,3% (2014), vẫn tăng trong đợt sập 2022.
 - Bản tin tối của bot bản tin có thêm dòng NAV quỹ, % hôm nay, cách đỉnh 52 tuần.
-- **Tin tối 20h** (bot chi tiêu, chỉ ngày có NAV mới): từng quỹ đang giữ có số ccq × NAV mới nhất = giá trị, lãi/lỗ so
-  với giá vốn; tổng các quỹ; lệnh còn chờ khớp. Tắt: `/dautu baocao tat`. Fmarket cập nhật danh mục mà top 10
+- **Tin tối 20h** (bot chi tiêu, chỉ ngày có NAV mới), mỗi quỹ một dòng: giá trị theo NAV và lãi/lỗ so với tiền gốc
+  (`VMEEF 1,01tr · 🟢 +7k (+0,7%)`), thêm dòng tổng và số tiền đang chờ khớp. Tắt: `/dautu baocao tat`. Fmarket cập nhật danh mục mà top 10
   có VIC, VHM, VRE, VPL thì bot báo.
 - Chạy thử trên NAV thật (Fmarket) từ năm bắt đầu khác nhau, so với mua đều 4tr đầu mỗi tháng (DCA), tiền chờ lãi
   4,5%/năm: VA thắng VMEEF 3/3 lần, VESAF 6/7, SSISCA 10/10, DCDS 20/20; hơn trung vị 0,6–1,4% tổng tài sản cuối kỳ,

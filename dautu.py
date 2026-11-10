@@ -359,10 +359,12 @@ def pct(x):
 
 
 def gain_text(gain, cost):
-    """'lãi 22k (+0,6%)', 'lỗ 22k (-0,6%)' hoặc 'hòa vốn' (chênh dưới 1.000đ)."""
+    """'🟢 +22k (+0,6%)', '🔴 −22k (−0,6%)' hoặc '⚪ hòa vốn' (chênh dưới 1.000đ)."""
     if abs(gain) < 1000:
-        return "hòa vốn"
-    return (f"lãi <b>{money(gain)}</b>" if gain > 0 else f"lỗ <b>{money(-gain)}</b>") + (f" ({pct(gain / cost)})" if cost else "")
+        return "⚪ hòa vốn"
+    sign = "+" if gain > 0 else "−"
+    return f"{'🟢' if gain > 0 else '🔴'} {sign}{money(abs(gain))}" + (f" ({pct(gain / cost).replace('-', '−')})"
+                                                                     if cost else "")
 
 
 def nav_line(cfg, s):
@@ -1126,51 +1128,33 @@ def holdings_alert(cfg):
 
 
 def daily_report(now):
-    """Tin tối (từ 20h, ngày có NAV mới): từng quỹ đang giữ có giá trị bao nhiêu theo NAV, lãi/lỗ so với giá vốn;
-    tổng danh mục so với số tiền đã góp. None nếu tắt, chưa có gì, hoặc hôm nay không có NAV mới (cuối tuần, ngày lễ)."""
+    """Tin tối (từ 20h, ngày có NAV mới), ngắn gọn: mỗi quỹ đang giữ một dòng (giá trị theo NAV, lãi/lỗ so với tiền
+    gốc), một dòng tổng. None nếu tắt, chưa có gì, hoặc hôm nay không có NAV mới (cuối tuần, ngày lễ)."""
     cfg = config()
     if not active(cfg) or cfg.get("baocao_toi") is False:
         return None
-    funds = [cfg] + ([side(cfg)] if side(cfg) else [])
     data = ts.load()
-    orders = [o for o in cfg.get("lenh", []) if o["trang_thai"] == "cho"]
     lines, fresh_today = [], False
     total_value = total_cost = 0.0
-    for f in funds:
+    for f in [cfg] + ([side(cfg)] if side(cfg) else []):
         hold = holding(data, cfg, f["ma"])
-        if not hold or hold["sl"] <= 0:
-            continue
-        navs = nav_history(f, fresh=True)
+        navs = nav_history(f, fresh=True) if hold and hold["sl"] > 0 else []
         if not navs:
             continue
-        (d1, v1) = navs[-1]
-        fresh_today |= d1 == now.date()
-        value = hold["sl"] * v1
-        cost = hold["sl"] * (hold.get("gia_von") or v1)
+        day, nav = navs[-1]
+        fresh_today |= day == now.date()
+        value, cost = hold["sl"] * nav, hold["sl"] * (hold.get("gia_von") or nav)
         total_value += value
         total_cost += cost
-        day = f" ({d1:%d/%m}" + (f", {pct(v1 / navs[-2][1] - 1)} so với phiên trước)" if len(navs) >= 2 else ")")
-        gain = value - cost
-        lines.append(f"<b>{f['ma']}</b>: {units_text(hold['sl'])} ccq × {vn_num(v1, 2)}đ{day} = <b>{money(value)}</b>\n"
-                     f"   Giá vốn {money(cost)} ({vn_num(cost / hold['sl'], 0)}đ/ccq) → {gain_text(gain, cost)}")
+        lines.append(f"{f['ma']} <b>{money(value)}</b> · {gain_text(value - cost, cost)}")
     if not lines or not fresh_today:
         return None
-    pending = sum(o["tien"] for o in orders if o.get("loai") != "doi")
-    if orders:
-        lines.append("⏳ Chờ khớp: " + " · ".join(
-            (f"hoán đổi {units_text(o['ccq_ra'])} ccq {o['quy']}" if o.get("loai") == "doi"
-             else f"{o.get('quy', cfg['ma'])} {money(o['tien'])}") + f" (phiên {o['phien'][8:]}/{o['phien'][5:7]})"
-            for o in orders))
-    cash = next((it["tien"] for it in data["items"] if it["loai"] == "tien" and it.get("dautu")), 0)
-    total = total_value + pending + cash
-    gain = total_value - total_cost
-    contributed = sum(cfg.get("nap", {}).values()) + cfg.get("goc", 0)
-    head = f"📊 <b>Quỹ của bạn tối {now:%d/%m}</b> (theo NAV mới nhất trên Fmarket)"
-    tail = [f"Tổng các quỹ {money(total_value)}: {gain_text(gain, total_cost)} so với giá vốn {money(total_cost)}"]
-    if contributed and (pending or cash):
-        tail.append(f"Cả danh mục (gồm {money(pending + cash)} chờ khớp, chưa đặt lệnh) {money(total)} · đã góp "
-                    f"{money(contributed)}")
-    return "\n".join([head] + lines + tail + ["<i>Tắt tin này: /dautu baocao tat</i>"]), [[("📈 Đầu tư", "dt:xem")]]
+    if len(lines) > 1:
+        lines.append(f"Tổng <b>{money(total_value)}</b> · {gain_text(total_value - total_cost, total_cost)}")
+    pending = sum(o["tien"] for o in cfg.get("lenh", []) if o["trang_thai"] == "cho")
+    if pending:
+        lines.append(f"⏳ {money(pending)} đang chờ khớp")
+    return f"📊 <b>Quỹ tối {now:%d/%m}</b> (so với tiền gốc)\n" + "\n".join(lines), [[("📈 Chi tiết", "dt:xem")]]
 
 
 def match_job(now):
