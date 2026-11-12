@@ -45,7 +45,9 @@ USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
          "/dautu baocao tat (hoặc bat): tin tối 20h về giá trị, lãi/lỗ các quỹ theo NAV\n"
          "<b>Quỹ chờ là quỹ trái phiếu</b> (vừa là phần trái phiếu của danh mục, vừa là tiền chờ): /dautu quycho VFF "
          "(về tiền gửi: /dautu quycho tien) · góp thêm mỗi tháng: /dautu vff 1tr · đã mua VFF: nhắn mua VFF 1tr · "
-         "đã hoán đổi: /dautu doi 125,5 (số ccq VFF)")
+         "đã hoán đổi: /dautu doi 125,5 (số ccq VFF)\n"
+         "<b>Khoản tiền lớn</b> (ví dụ tiền bán cổ phiếu) đã mua VFF: /dautu taicocau 15,5tr — phần cổ phiếu (80%) rải "
+         "dần vào VMEEF trong 3 tháng (đổi: /dautu taicocau 15,5tr 6 thang 70%)")
 
 
 # ---- Lưu trữ ---------------------------------------------------------------------------
@@ -251,12 +253,23 @@ def gop_of(cfg, ym):
     return max(steps)[1] if steps else 0
 
 
+def extra_of(cfg, ym):
+    """Phần cộng thêm vào kế hoạch quỹ chính trong tháng ym khi rải một khoản tiền lớn (/dautu taicocau)."""
+    return cfg.get("ke_hoach_them", {}).get(ym, 0)
+
+
 def target(cfg, ym):
     """Giá trị kế hoạch của kỳ ym."""
     value = None
     for m in months(cfg["bat_dau"], ym):
-        value = cfg.get("goc", 0) + gop_of(cfg, m) if value is None else value * (1 + cfg.get("tang", DEFAULT_TANG)) + gop_of(cfg, m)
+        add = gop_of(cfg, m) + extra_of(cfg, m)
+        value = cfg.get("goc", 0) + add if value is None else value * (1 + cfg.get("tang", DEFAULT_TANG)) + add
     return value or 0
+
+
+def contributed_of(cfg):
+    """Tổng tiền đã góp: góp hằng tháng + khoản góp một lần (tái cơ cấu) + giá trị có sẵn lúc bắt đầu."""
+    return sum(cfg.get("nap", {}).values()) + sum(cfg.get("ngoai", {}).values()) + cfg.get("goc", 0)
 
 
 def close_periods(cfg, now=None):
@@ -346,7 +359,7 @@ def status(cfg, now=None, fresh=False):
             "direct": direct, "switch": switch, "switch_units": switch_units, "side_buy": side_buy, "side": sd,
             "side_value": side_value, "side_nav": side_nav, "side_day": side_day, "money_now": money_now,
             "short": need > available + STEP, "ordered": ordered, "invested": invested, "cost": cost,
-            "contributed": sum(cfg.get("nap", {}).values()) + cfg.get("goc", 0),
+            "contributed": contributed_of(cfg),
             "drawdown": nav / peak - 1 if peak and nav else None,
             "month_change": nav / month_start[-1] - 1 if month_start and nav else None,
             "fund": fund, "below_milestone": bool(fund and fund["monthly"] and fund["covered"] < 1)}
@@ -472,6 +485,10 @@ def view(day=None, fresh=False):
         flagged = [h["ma"] for h in info["top"] if h["ma"] in WATCH]
         lines.append(f"Top 10 ({info.get('top_luc') or '—'}): {top}"
                      + (f"\n⚠️ Có cổ phiếu nhóm Vingroup: {', '.join(flagged)}" if flagged else ""))
+    left = {k: v for k, v in cfg.get("ke_hoach_them", {}).items() if k >= s["ym"]}
+    if left:
+        lines.append(f"🔁 Đang rải thêm vào {cfg['ma']}: {money(sum(left.values()))} còn lại, tới tháng "
+                     f"{ym_text(max(left))} (/dautu taicocau xoa để bỏ)")
     lines.append(NOT_ADVICE)
     return "\n".join(lines), buttons(cfg, s, sess, final)
 
@@ -617,7 +634,7 @@ def order_spec(cfg, text, now, fund=None):
     return day, next_trading(fund or cfg, cutoff), ym_of(cutoff)  # fund: quỹ chờ có lịch giao dịch riêng
 
 
-def record_order(amount, trading_day=None, now=None, period=None, order_day=None, fund=None, quiet=False):
+def record_order(amount, trading_day=None, now=None, period=None, order_day=None, fund=None, quiet=False, lump=False):
     """Đã đặt lệnh mua `amount`: trừ quỹ chờ (thiếu thì phần thiếu tính là góp thêm của tháng), ghi lệnh chờ khớp.
     period: kỳ của lệnh (nút bấm mang theo); không có thì suy từ ngày đóng sổ của phiên khớp. fund: mua quỹ chờ (VFF)."""
     now = now or now_vn()
@@ -632,14 +649,17 @@ def record_order(amount, trading_day=None, now=None, period=None, order_day=None
         ym = cfg["bat_dau"]
     data = ts.load()
     item = wait_item(data, cfg)
-    if item["tien"] < amount:
+    if lump:  # khoản góp một lần (tiền bán cổ phiếu...): không trừ vào tiền góp hằng tháng
+        cfg.setdefault("ngoai", {})[ym] = cfg.get("ngoai", {}).get(ym, 0) + amount
+    elif item["tien"] < amount:
         extra = amount - item["tien"]
         cfg.setdefault("nap", {})[ym] = cfg.get("nap", {}).get(ym, 0) + extra
         item["tien"] = 0
     else:
         item["tien"] -= amount
     order = {"id": max([o["id"] for o in cfg.get("lenh", [])] + [0]) + 1, "ky": ym, "tien": amount, "quy": code,
-             "loai": "mua", "dat": order_day.isoformat(), "phien": trading.isoformat(), "trang_thai": "cho"}
+             "loai": "mua", "dat": order_day.isoformat(), "phien": trading.isoformat(), "trang_thai": "cho",
+             **({"ngoai": True} if lump else {})}
     cfg.setdefault("lenh", []).append(order)
     ts.save(data)
     save(cfg)
@@ -946,6 +966,8 @@ def dautu(args):
         save(cfg)
         text, rows = view()
         return f"✅ Từ tháng {ym_text(ym)} góp thêm {money(found[0])}/tháng vào {sd['ma']}\n\n" + text, rows
+    if word in ("taicocau", "gopmotlan", "rai"):
+        return restructure(cfg, rest, found, now_vn())
     if word in ("doi", "hoandoi"):
         try:
             units = ts.number(rest.split()[0]) if rest.split() else 0
@@ -978,6 +1000,57 @@ def dautu(args):
         day, trading, ym = spec
         return record_order(found[0], trading, now, ym, day, fund=fund)
     return USAGE
+
+
+def restructure(cfg, rest, found, now):
+    """/dautu taicocau 15,5tr [3 thang] [80%] [ngày đặt]: đã mua quỹ chờ bằng một khoản tiền lớn (ví dụ tiền bán cổ
+    phiếu); phần cổ phiếu (mặc định 80%) được cộng dần vào kế hoạch quỹ chính trong N tháng (mặc định 3), mỗi cuối
+    tháng hoán đổi từ quỹ chờ theo VA. /dautu taicocau xoa: bỏ phần rải còn lại."""
+    sd = side(cfg)
+    if ct.plain(rest).split()[:1] == ["xoa"]:
+        ym = current_period(cfg, now)
+        left = {k: v for k, v in cfg.get("ke_hoach_them", {}).items() if k >= ym}
+        cfg["ke_hoach_them"] = {k: v for k, v in cfg.get("ke_hoach_them", {}).items() if k < ym}
+        save(cfg)
+        return f"Đã bỏ phần rải còn lại ({money(sum(left.values()))}); tiền vẫn ở {sd['ma'] if sd else 'quỹ chờ'}"
+    if not sd:
+        return "Cần quỹ chờ là quỹ trái phiếu trước: /dautu quycho VFF"
+    if not found:
+        return ("Ghi khoản tiền lớn đã mua VFF và rải dần vào VMEEF: /dautu taicocau 15,5tr (mặc định rải phần cổ phiếu "
+                "80% trong 3 tháng; đổi: /dautu taicocau 15,5tr 6 thang 70%)")
+    amount = found[0]
+    other = rest[:found[1]] + " " + rest[found[2]:]
+    plain = ct.plain(other)
+    n = int(m[1]) if (m := re.search(r"(\d{1,2})\s*thang", plain)) else 3
+    share = int(m[1]) if (m := re.search(r"(\d{1,3})\s*%", other)) else 80
+    if not 1 <= n <= 24 or not 0 <= share <= 100:
+        return "Số tháng từ 1 tới 24, tỉ lệ cổ phiếu từ 0% tới 100%, ví dụ: /dautu taicocau 15,5tr 3 thang 80%"
+    date_text = re.sub(r"\d{1,2}\s*(thang|tháng)|\d{1,3}\s*%", " ", other)
+    spec = order_spec(cfg, date_text, now, sd)
+    if isinstance(spec, str):
+        return spec
+    day, trading, ym = spec
+    note = record_order(amount, trading, now, ym, day, fund=sd, quiet=True, lump=True)
+    cfg = config()
+    equity = round(amount * share / 100, -4)
+    per = (equity / n) // 10_000 * 10_000
+    start = current_period(cfg, now)
+    plan = cfg.setdefault("ke_hoach_them", {})
+    for i in range(n):
+        m_ = ym_add(start, i)
+        plan[m_] = plan.get(m_, 0) + (per if i < n - 1 else equity - per * (n - 1))
+    save(cfg)
+    steps = []
+    for i in range(n):
+        m_ = ym_add(start, i)
+        part = per if i < n - 1 else equity - per * (n - 1)
+        steps.append(f"• Hạn cuối tháng {int(m_[5:])}/{m_[:4]} (khoảng {last_weekday(m_):%d/%m}): thêm ~{money(part)}")
+    return "\n".join([note,
+                      f"🔁 Rải {money(equity)} ({share}%) từ {sd['ma']} vào {cfg['ma']} trong {n} tháng, "
+                      f"{money(amount - equity)} giữ lại ở {sd['ma']}:", *steps,
+                      f"Ngày hạn bot nhắc như thường lệ, tin nhắc gộp sẵn phần này vào lệnh hoán đổi {sd['ma']} → "
+                      f"{cfg['ma']}. VA vẫn chỉnh: {cfg['ma']} giảm thì hoán đổi nhiều hơn, tăng nhanh thì ít hơn. "
+                      "Bỏ phần còn lại: /dautu taicocau xoa"])
 
 
 def set_side(cfg, text):
