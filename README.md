@@ -353,6 +353,11 @@ Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu 
   NAV thật (góp 5tr: 4tr VA + 1tr VFF, VA được rút từ VFF): tài sản cuối gần bằng dồn cả 5tr vào cổ phiếu (−1% tới +2%),
   sụt giảm lớn nhất nhẹ hơn 4–6 điểm; VFF tăng 6–10% mỗi năm, giảm sâu nhất −4,3% (2014), vẫn tăng trong đợt sập 2022.
 - Bản tin tối của bot bản tin có thêm dòng NAV quỹ, % hôm nay, cách đỉnh 52 tuần.
+- **Khoản tiền lớn** (ví dụ tiền bán cổ phiếu): mua hết vào VFF, rồi `/dautu taicocau 15,5tr` (mặc định rải 80% phần
+  cổ phiếu trong 3 tháng; đổi: `/dautu taicocau 15,5tr 6 thang 70%`). Bot ghi lệnh mua VFF (không tính vào tiền góp hằng
+  tháng) và cộng dần phần cổ phiếu vào kế hoạch VMEEF, mỗi ngày hạn cuối tháng tin nhắc gộp sẵn lệnh hoán đổi VFF →
+  VMEEF; VA vẫn chỉnh theo giá. Chạy thử trên NAV thật: mua hết ngay thắng rải 55–64% số lần, rải 3 tháng thiệt trung
+  bình ~0,4% nhưng tránh được trường hợp mua đúng đỉnh. Bỏ phần còn lại: `/dautu taicocau xoa`.
 - **Tin tối 20h** (bot chi tiêu, chỉ ngày có NAV mới), mỗi quỹ một dòng: giá trị theo NAV và lãi/lỗ so với tiền gốc
   (`VMEEF 1,01tr · 🟢 +7k (+0,7%)`), thêm dòng tổng và số tiền đang chờ khớp. Tắt: `/dautu baocao tat`. Fmarket cập nhật danh mục mà top 10
   có VIC, VHM, VRE, VPL thì bot báo.
