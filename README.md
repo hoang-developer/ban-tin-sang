@@ -73,7 +73,7 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
   các mã đang theo dõi và giá vàng, tự sửa lại mỗi 15 phút.
 - **🎯 Đoán xanh/đỏ**: 8:15 bot hỏi VN-Index hôm nay xanh hay đỏ (nhận đoán tới 9:15), 15h chấm điểm.
 - **📈 Đầu tư quỹ mở** (bot chi tiêu, nếu bật `/dautu`): ngày hạn đặt lệnh cuối tháng nhắc 8:30 và 13:00, sau 17h
-  báo lệnh đã khớp, 20h báo giá trị và lãi/lỗ các quỹ theo NAV; bản tin tối có dòng NAV quỹ.
+  báo lệnh đã khớp, tin tối 21h có giá trị và lãi/lỗ các quỹ theo NAV; bản tin tối có dòng NAV quỹ.
 - **🔔 Nhắc ngày** (7h): ngày trong `/nho` còn 3 ngày hoặc là hôm nay.
 - **💰 Tin cổ tức** (7:30): tin cổ tức, chốt quyền của các mã đang theo dõi (Google News).
 - **🌙 Bản tin tối** (21h): thời tiết và gợi ý ngày mai, chứng khoán hôm nay, giá vàng so với hôm
@@ -138,11 +138,24 @@ riêng cho AI).
 **Kiểm thử** ([tests/](tests)): `python -m unittest discover -s tests -t .` chạy bot trong bộ nhớ (kho, Telegram, Fmarket,
 AI đều giả lập; NAV thật của VMEEF, VFF trong `tests/data`), GitHub tự chạy mỗi lần đẩy code.
 
-**Menu** ([menu.py](menu.py)): `/menu` (hoặc `/start`) mở màn hình tổng quan: tháng này đã chi bao nhiêu, quỹ dự
-phòng, nợ, tài sản ròng và việc nên làm, kèm 6 nút **📊 Chi tiêu · 💼 Tài sản · 💳 Nợ · 🎯 Kế hoạch · 📝 Cách ghi ·
-⚙️ Cài đặt**. Bấm nút thì mở ngay trong tin đó, có nút ⬅️ Menu để quay lại. Lần đầu bot gửi thêm hàng nút cố định
-dưới ô chat (🏠 Menu · 📊 Chi tiêu · 💼 Tài sản · 🎯 Kế hoạch). Nút Menu của Telegram chỉ còn 8 lệnh chính (`/menu`,
-`/baocao`, `/no`, `/kehoach`, `/taisan`, `/duphong`, `/hoi`, `/huongdan`); các lệnh khác vẫn gõ được, xem `/huongdan`.
+**Menu: 4 mục** ([menu.py](menu.py)), cũng là 4 nút cố định dưới ô chat (bot gửi lần đầu, hoặc khi bạn bấm nút của
+hàng cũ):
+
+- **🏠 Hôm nay** (`/menu`, `/start`): hôm nay đã chi gì, còn được tiêu bao nhiêu, tháng này đã chi/thu, tài khoản
+  chính, chuỗi ngày ghi, và **việc cần làm** hôm nay, mỗi việc kèm nút làm luôn: hạn đặt lệnh quỹ, đã nhận lương chưa,
+  lương về thì ✅ Làm hết theo kế hoạch (chưa thì từng khoản nợ tới kỳ), khoản chưa rõ nhóm; sau 18h chưa ghi gì thì
+  có nút 🙅 Hôm nay không tiêu. Nút nhanh: Chi tiêu tháng, Dự báo, Vừa ghi, ➕ Thêm, Cài đặt.
+- **💰 Tiền của tôi**: tài sản ròng và mỗi ngăn tiền một dòng: tài khoản chính, tài khoản khác, quỹ dự phòng (so với mục
+  tiêu), quỹ mở và quỹ chờ, tiết kiệm, vàng, cổ phiếu (lãi/lỗ), nợ. Nút: tài khoản chính, chuyển tiền, chi tiết giá,
+  biểu đồ, quỹ dự phòng, sổ nợ, đầu tư, sức khỏe.
+- **🎯 Kế hoạch**: chia lương tháng này, đang ở bước mấy của lộ trình, nút ✅ Làm hết theo kế hoạch, 🎯 Lộ trình.
+- **💬 Hỏi**: câu hay hỏi bấm là có (còn được tiêu bao nhiêu, tháng này tiêu vào đâu, so với tháng trước, còn nợ bao
+  nhiêu, quỹ lãi lỗ, tài chính có ổn không, nhận xét tháng này); câu khác cứ nhắn câu thường.
+- **⚙️ Cài đặt** (từ Hôm nay): nhóm, ngân sách, ngày lương, bật/tắt nhắc ghi chép 21h và báo lãi/lỗ quỹ buổi tối, xuất
+  Excel.
+
+Bấm nút thì mở ngay trong tin đó, có nút ⬅️ Hôm nay để quay lại. Nút Menu của Telegram chỉ còn vài lệnh chính (`/menu`,
+`/taisan`, `/kehoach`, `/hoi`, `/baocao`, `/huongdan`); các lệnh khác vẫn gõ được, xem `/huongdan`.
 Khai báo nhiều thứ một lần: dán nhiều lệnh trong một tin, mỗi lệnh một dòng, bot chạy lần lượt.
 
 Số tiền hiểu được: `35k`, `35.000đ`, `35 nghìn`, `1tr2` (1.200.000đ), `2tr500`, `1,5tr`, `1k5`; số trơn
@@ -191,9 +204,16 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/tietkiem` | Chi lặt vặt so với trước khi dùng bot, đã bớt bao nhiêu, chuỗi ngày ghi chép, nhắc 21h (xem dưới) |
 | `/dautu` | Đầu tư quỹ mở hằng tháng (Value Averaging): tháng này nên mua bao nhiêu, nhắc hạn đặt lệnh (xem dưới) |
 
-Tối Chủ nhật 20h bot gửi tổng kết tuần, ngày 1 hằng tháng gửi tổng kết tháng trước kèm biểu đồ và nhận
-xét, 21h hằng ngày báo nếu có gì cần để ý, 9h nhắc lương và sổ tiết kiệm sắp đáo hạn, 18h lưu tài sản ròng
-(qua lịch chạy `/api/tick` sẵn có).
+**Thông báo gộp** ([thongbao.py](thongbao.py)), mỗi buổi tối đa một tin (qua lịch chạy `/api/tick` sẵn có):
+
+- **☀️ Sáng** (từ 9h): đã nhận lương chưa, sổ tiết kiệm sắp đáo hạn, khoản nợ tới hạn chưa trả, chung một tin, nút
+  của từng việc nằm dưới tin.
+- **🌙 Tối** (từ 21h): hôm nay chưa ghi gì thì nhắc (nút 🙅 không tiêu), nhóm tiêu tăng vọt hay sắp vượt ngân sách,
+  lãi/lỗ các quỹ ngày có NAV mới; đã ghi thì thêm dòng hôm nay chi bao nhiêu, trong mức hay quá. Không có gì đáng
+  nói thì không gửi.
+- Tối Chủ nhật 20h tổng kết tuần; ngày 1 tổng kết tháng trước (kèm dòng nợ, quỹ dự phòng), biểu đồ và nhận xét. 18h
+  lưu tài sản ròng.
+- Tin cần làm ngay vẫn gửi riêng: nhắc hạn đặt lệnh quỹ (8:30, 13:00), lệnh quỹ vừa khớp (sau 17h).
 
 ### Hiểu mình tiêu thế nào
 
@@ -410,7 +430,7 @@ Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu 
   tháng) và cộng dần phần cổ phiếu vào kế hoạch VMEEF, mỗi ngày hạn cuối tháng tin nhắc gộp sẵn lệnh hoán đổi VFF →
   VMEEF; VA vẫn chỉnh theo giá. Chạy thử trên NAV thật: mua hết ngay thắng rải 55–64% số lần, rải 3 tháng thiệt trung
   bình ~0,4% nhưng tránh được trường hợp mua đúng đỉnh. Bỏ phần còn lại: `/dautu taicocau xoa`.
-- **Tin tối 20h** (bot chi tiêu, chỉ ngày có NAV mới), mỗi quỹ một dòng: giá trị theo NAV và lãi/lỗ so với tiền gốc
+- **Lãi/lỗ quỹ trong tin tối 21h** (bot chi tiêu, chỉ ngày có NAV mới), mỗi quỹ một dòng: giá trị theo NAV và lãi/lỗ so với tiền gốc
   (`VMEEF 1,01tr · 🟢 +7k (+0,7%)`), thêm dòng tổng và số tiền đang chờ khớp. Tắt: `/dautu baocao tat`. Fmarket cập nhật danh mục mà top 10
   có VIC, VHM, VRE, VPL thì bot báo.
 - Chạy thử trên NAV thật (Fmarket) từ năm bắt đầu khác nhau, so với mua đều 4tr đầu mỗi tháng (DCA), tiền chờ lãi
@@ -436,7 +456,8 @@ giúp bớt được bao nhiêu.
 - **Chuỗi ngày ghi chép**: quên một ngày thì ghi bù (`hôm qua ăn tối 250k` hoặc nút "↩️ Hôm qua không tiêu") là chuỗi
   vẫn giữ. Bot không nhấn vào chuyện đứt chuỗi, chỉ hiện chuỗi hiện tại và kỷ lục (nghiên cứu: chuỗi đứt làm giảm động
   lực, cho sửa lại thì đỡ).
-- **Nhắc 21h** (một lần, chỉ khi hôm đó chưa ghi khoản chi nào), kèm chuỗi và số đã bớt; tắt: `/tietkiem nhac tat`.
+- **Nhắc 21h** (trong tin tối, chỉ khi hôm đó chưa ghi khoản chi nào), kèm chuỗi và số đã bớt; tắt ở ⚙️ Cài đặt hoặc
+  `/tietkiem nhac tat`.
 - **Đã để dành thật**: tiền nạp quỹ dự phòng, góp đầu tư (`/dautu`), trả nợ từ ngày bắt đầu. Chi ít hơn mốc chỉ thành
   tiền để dành khi chuyển đi, nên `/tietkiem` có nút chuyển phần đã bớt vào quỹ chờ đầu tư hoặc quỹ dự phòng.
 

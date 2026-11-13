@@ -270,7 +270,7 @@ class MoiNgayDuocTieu(unittest.TestCase):
         text, _ = h.say("cơm trưa 50k")
         self.assertNotIn("được tiêu", text)
         dubao = h.parts(ct.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
-        self.assertIn("Ghi lương tháng này", dubao)
+        self.assertIn("Nhắn «+ lương 19tr» khi lương về", dubao)
 
     def test_hoi_bang_cau_thuong(self):
         setup_month()

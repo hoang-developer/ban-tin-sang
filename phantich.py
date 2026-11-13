@@ -140,7 +140,7 @@ def forecast_text(day):
     f = forecast(day)
     lines = [f"🔮 <b>Dự báo chi tiêu tháng {day.month}</b> (hôm nay {dmy(day)}, còn {f['left']} ngày)"]
     if not f["spent"] and not f["rate"]:
-        return "\n".join(lines + ["Chưa có khoản nào để dự báo. Nhắn kiểu: cà phê 35k"])
+        return "\n".join(lines + ["Chưa có khoản nào để dự báo. Nhắn kiểu: cà phê 35k"] + spend_lines(day))
     lines.append(f"Đã chi: <b>{vnd(f['spent'])}</b>")
     lines.append(f"Mỗi ngày đang tiêu khoảng <b>{approx(f['rate'])}</b> (không tính khoản từ {short(LARGE)})")
     if f["upcoming"]:
@@ -226,7 +226,7 @@ def daily_text(day):
     lines = [f"🔮 <b>Dự báo chi tiêu hằng ngày tháng {day.month}</b>",
              f"<i>{html.escape(daily_label(f['codes']))} · hôm nay {dmy(day)}, còn {f['left']} ngày</i>"]
     if not f["spent"] and not f["rate"]:
-        return "\n".join(lines + ["Chưa có khoản nào để dự báo. Nhắn kiểu: cà phê 35k"])
+        return "\n".join(lines + ["Chưa có khoản nào để dự báo. Nhắn kiểu: cà phê 35k"] + spend_lines(day))
     lines.append(f"Đã chi: <b>{vnd(f['spent'])}</b> ({f['elapsed']} ngày, TB {approx(f['spent'] / f['elapsed'])}/ngày)"
                  f" · hôm nay {vnd(f['today'])}")
     parts = " · ".join(f"{ct.name(c).split()[0]} {short(r)}" for c, r in f["rates"].items() if r)
@@ -294,8 +294,8 @@ def spend_lines(day):
     import kehoach
     s = spendable(day)
     if not s:
-        return ["<i>Ghi lương tháng này (+ lương 19tr) hoặc đặt ngân sách tổng (/ngansach tổng 15tr) để biết mỗi ngày "
-                "được tiêu bao nhiêu</i>"]
+        return ["<i>Nhắn «+ lương 19tr» khi lương về, hoặc «ngân sách tổng 15tr», để biết mỗi ngày được tiêu bao "
+                "nhiêu</i>"]
     icon = "🚨" if s["per_day"] <= 0 else "💡"
     return [f"{icon} {kehoach.spend_text(s, bold=True)}", f"<i>{kehoach.basis_text(s)}</i>"]
 

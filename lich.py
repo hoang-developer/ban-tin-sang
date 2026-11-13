@@ -302,18 +302,8 @@ def expense_summary(now, job, kind, title):
     chitieu.reset()  # đọc lại nhóm tự chỉnh mới nhất
     text, count = chitieu.report(kind, now.date())
     extras = []
-    if count and kind == "thangtruoc":  # tổng kết tháng: kèm biểu đồ, nhận xét (1 lượt AI), quỹ dự phòng, sổ nợ
-        if sono.active():
-            try:
-                extras.append(sono.view(now.date()))
-            except Exception as e:
-                print(f"[lỗi] sổ nợ trong tổng kết: {e!r}", file=sys.stderr)
-        if any(it.get("duphong") for it in taisan.load()["items"]):
-            try:
-                import duphong
-                extras.append(duphong.text(now.date()))
-            except Exception as e:
-                print(f"[lỗi] quỹ dự phòng trong tổng kết: {e!r}", file=sys.stderr)
+    if count and kind == "thangtruoc":  # tổng kết tháng: thêm dòng nợ, quỹ dự phòng; biểu đồ, nhận xét (1 lượt AI)
+        text += "".join("\n" + line for line in month_lines(now.date()))
         for make in (phantich.chart_reply, phantich.commentary):
             try:
                 extras.append(make(kind, now.date()))
@@ -338,18 +328,41 @@ def expense_summary(now, job, kind, title):
     return f"{count} khoản"
 
 
-def chi_tieu_de_y(now, chat):
-    """21h hằng ngày: nhóm tiêu tăng vọt, nhóm đang trên đà vượt ngân sách (qua bot chi tiêu, có mới báo)."""
+def month_lines(day):
+    """Dòng sổ nợ, quỹ dự phòng, tài sản ròng cho tổng kết tháng (gộp vào tin tổng kết, không gửi riêng)."""
+    lines = []
+    try:
+        debt = sono.home_line(day)
+        if debt:
+            lines.append(debt)
+    except Exception as e:
+        print(f"[lỗi] sổ nợ trong tổng kết: {e!r}", file=sys.stderr)
+    try:
+        if any(it.get("duphong") for it in taisan.load()["items"]):
+            import duphong
+            f = duphong.status(day)
+            if f["target"]:
+                lines.append(f"🛟 Quỹ dự phòng {taisan.short(f['balance'])}/{taisan.short(f['target'])} · "
+                             f"{f['balance'] / f['target'] * 100:.0f}%")
+    except Exception as e:
+        print(f"[lỗi] quỹ dự phòng trong tổng kết: {e!r}", file=sys.stderr)
+    return lines
+
+
+def tong_ket_toi(now, chat):
+    """21h: một tin tối gộp (thongbao.evening): nhắc ghi chép nếu hôm nay chưa ghi, điều cần để ý, lãi/lỗ quỹ."""
     tok = chitieu.token()
-    if not between(now, (21, 0), (23, 0)) or not tok or done_today("chi_tieu_de_y", now):
+    if not between(now, (21, 0), (23, 0)) or not tok or done_today("tong_ket_toi", now):
         return None
+    import thongbao
     chitieu.reset()
-    lines = phantich.alerts(now.date())
-    if lines:
-        for owner in chitieu.owner_chats():
-            tg.send(owner, "👀 <b>Để ý chi tiêu</b>\n" + "\n".join(lines) + "\nXem thêm: /dubao · /nhanxet", tok=tok)
-    mark_done("chi_tieu_de_y", now)
-    return f"{len(lines)} điều cần để ý"
+    mark_done("tong_ket_toi", now)
+    message = thongbao.evening(now)
+    if not message:
+        return "không có gì cần báo"
+    for owner in chitieu.owner_chats():
+        tg.send(owner, message[0], message[1], tok=tok)
+    return "đã gửi"
 
 
 def chi_tieu_tuan(now, chat):
@@ -366,45 +379,21 @@ def chi_tieu_thang(now, chat):
     return expense_summary(now, "chi_tieu_thang", "thangtruoc", "🗓 <b>Tổng kết tháng</b>")
 
 
-def nhac_ghi_chep(now, chat):
-    """21h: hôm nay chưa ghi khoản chi nào thì nhắc một lần (kèm chuỗi ngày ghi, số đã bớt), qua bot chi tiêu."""
-    tok = chitieu.token()
-    if not between(now, (21, 0), (23, 0)) or not tok or done_today("nhac_ghi_chep", now):
-        return None
-    import tietkiem
-    chitieu.reset()
-    mark_done("nhac_ghi_chep", now)
-    reply = tietkiem.reminder(now.date())
-    if not reply:
-        return "hôm nay đã ghi"
-    for owner in chitieu.owner_chats():
-        tg.send(owner, reply[0], reply[1], tok=tok)
-    return "đã nhắc"
-
-
 def tai_chinh_sang(now, chat):
-    """Từ 9h: nhắc đã nhận lương chưa (3 ngày từ ngày lương), sổ tiết kiệm sắp đáo hạn, khoản nợ tới hạn mà tháng
-    này chưa trả (qua bot chi tiêu)."""
+    """Từ 9h: một tin sáng (thongbao.morning): đã nhận lương chưa (3 ngày từ ngày lương), sổ tiết kiệm sắp đáo hạn,
+    khoản nợ tới hạn mà tháng này chưa trả (qua bot chi tiêu)."""
     tok = chitieu.token()
     if not between(now, (9, 0), (21, 0)) or not tok or done_today("tai_chinh_sang", now):
         return None
+    import thongbao
     chitieu.reset()
-    due = taisan.salary_due(now.date())
-    notes = taisan.maturity_notes(now.date())
-    try:
-        debts = sono.reminders(now.date())
-    except Exception as e:
-        print(f"[lỗi] nhắc trả nợ: {e!r}", file=sys.stderr)
-        debts = None
-    for owner in chitieu.owner_chats():
-        if due:
-            tg.send(owner, due[0], due[1], tok=tok)
-        if notes:
-            tg.send(owner, "\n".join(notes), tok=tok)
-        if debts:
-            tg.send(owner, debts[0], debts[1], tok=tok)
     mark_done("tai_chinh_sang", now)
-    return f"nhắc lương: {'có' if due else 'không'}, đáo hạn: {len(notes)}, nhắc nợ: {'có' if debts else 'không'}"
+    message = thongbao.morning(now.date())  # một tin: lương, sổ đáo hạn, nợ tới hạn
+    if not message:
+        return "không có gì cần nhắc"
+    for owner in chitieu.owner_chats():
+        tg.send(owner, message[0], message[1], tok=tok)
+    return "đã gửi tin sáng"
 
 
 def tai_san_cuoi_ngay(now, chat):
@@ -423,7 +412,7 @@ def tai_san_cuoi_ngay(now, chat):
 
 def dau_tu(now, chat):
     """Đầu tư quỹ mở (/dautu, qua bot chi tiêu): ngày hạn đặt lệnh cuối tháng nhắc lúc 8:30 và 13:00 (nếu chưa
-    đặt), qua 14:40 thì chốt kỳ, sau 17h báo lệnh đã khớp, 20h báo giá trị và lãi/lỗ các quỹ (ngày có NAV mới), mỗi
+    đặt), qua 14:40 thì chốt kỳ, sau 17h báo lệnh đã khớp (lãi/lỗ các quỹ: tin tối 21h, thongbao.py), mỗi
     ngày xem danh mục quỹ có cổ phiếu cần để ý không."""
     tok = chitieu.token()
     if not tok or not between(now, (8, 30), (23, 45)):
@@ -453,12 +442,6 @@ def dau_tu(now, chat):
     for reply in dautu.match_job(now):
         replies.append(reply)
         notes.append("lệnh đã khớp")
-    if (now.hour, now.minute) >= (20, 0) and not done_today("dau_tu_baocao", now):
-        report = dautu.daily_report(now)  # lãi/lỗ các quỹ theo NAV (chỉ ngày có NAV mới)
-        mark_done("dau_tu_baocao", now)
-        if report:
-            replies.append(report)
-            notes.append("báo lãi/lỗ quỹ")
     if not done_today("dau_tu_danhmuc", now):
         mark_done("dau_tu_danhmuc", now)
         alert = dautu.holdings_alert(dautu.config())
@@ -487,8 +470,7 @@ def nhan_dinh_phien(now, chat):
 
 
 JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi,
-        chi_tieu_tuan, chi_tieu_thang, chi_tieu_de_y, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien, dau_tu,
-        nhac_ghi_chep]
+        chi_tieu_tuan, chi_tieu_thang, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien, dau_tu, tong_ket_toi]
 
 
 def run(now):

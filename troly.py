@@ -817,7 +817,7 @@ def screen(a, text, now):
     menu = ct.menu()
     if name == "chi_tieu":
         return ct.report(a.get("ky") or "thang", day)[0], ct.REPORT_BUTTONS
-    direct = {"tong_quan": "home", "tai_san": "ts", "no": "no", "ke_hoach": "kh"}
+    direct = {"tong_quan": "home", "tai_san": "tien", "no": "no", "ke_hoach": "lt"}
     if name in direct:
         return menu.screen(direct[name], day)
     makers = {

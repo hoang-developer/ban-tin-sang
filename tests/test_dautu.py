@@ -38,10 +38,17 @@ class DauTu(unittest.TestCase):
         h.run_jobs()
         self.assertEqual((units("VMEEF"), units("VFF")), (264.48, 36.34))
         h.at(2026, 10, 1, 20, 5)
-        text, _ = h.run_jobs()[0]
+        self.assertEqual(h.run_jobs(), [])  # lãi/lỗ quỹ không gửi riêng nữa: nằm trong tin tối 21h
+        h.at(2026, 10, 1, 21, 5)
+        sent = h.run_jobs()
+        self.assertEqual(len(sent), 1)  # một tin tối gộp
+        text, buttons = sent[0]
+        self.assertIn("🌙 Tối 01/10", text)
+        self.assertIn("📊 Quỹ (so với tiền gốc)", text)
         self.assertIn("VMEEF 4tr · 🔴 −22k (−0,6%)", text)
         self.assertIn("Tổng 4,98tr", text)
-        h.at(2026, 10, 3, 20, 5)  # thứ Bảy: không có NAV mới, không gửi
+        self.assertIn("dt:xem", buttons)
+        h.at(2026, 10, 3, 21, 5)  # thứ Bảy: không có NAV mới, không gì khác cần báo: không gửi
         self.assertEqual(h.run_jobs(), [])
 
     def test_sua_so_ccq_bang_nut(self):
