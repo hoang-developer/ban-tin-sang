@@ -100,6 +100,16 @@ def prompt(owners=()):
             'dụng) | "chuyen_noi_bo" (chuyển giữa các tài khoản của CHÍNH chủ tài khoản: cùng tên người; người trả nợ '
             'thẻ tín dụng thường chính là chủ tài khoản), '
             '"nhom": một mã trong ' + groups + "}]}\n"
+            "Riêng khi ảnh là XÁC NHẬN LỆNH QUỸ MỞ (mua hoặc hoán đổi chứng chỉ quỹ, ví dụ trên Fmarket), ĐƠN MUA VÀNG "
+            "tích trữ (vàng nhẫn, vàng miếng, vàng ép vỉ) hoặc KẾT QUẢ LỆNH CỔ PHIẾU (mua/bán, khối lượng, giá khớp) thì "
+            'trả {"loai": "tai_san", "giao_dich": [], "viec": {...}}, với "viec" là một trong ba dạng:\n'
+            '{"viec": "quy", "chieu": "mua" | "hoan_doi", "ma": mã quỹ mua, "tien": số tiền mua (đồng), "ccq": số ccq đem '
+            'hoán đổi, "ngay": "YYYY-MM-DD" ngày đặt lệnh}\n'
+            '{"viec": "vang", "loai": "nhan" (nhẫn, 24k, ép vỉ) | "sjc" (vàng miếng SJC), "chi": TỔNG số chỉ (số vỉ × số '
+            'chỉ mỗi vỉ; 1 lượng = 10 chỉ), "tien": số tiền thực trả (Thành tiền, sau giảm giá)}\n'
+            '{"viec": "co_phieu", "chieu": "mua" | "ban", "ma": mã cổ phiếu, "sl": khối lượng, "gia": giá khớp tính bằng '
+            'nghìn đồng như trên ảnh (12.00 là 12), "gia_von": giá vốn hoặc giá hòa vốn nếu ảnh có}\n'
+            "Trường nào ảnh không ghi thì bỏ hẳn, không đoán.\n"
             "Hóa đơn: 1 phần tử, so_tien là TỔNG GIÁ TRỊ (dòng TỔNG CỘNG / Tong tien / TỔNG THANH TOÁN, kể cả phần trả "
             "bằng voucher hay điểm; không lấy tiền khách đưa, tiền thừa, số dư hay từng dòng phương thức thanh toán). "
             + owner +
@@ -139,8 +149,8 @@ def read_receipt(data, mime):
         txs.append({"tien": money_of(it.get("so_tien")), "chieu": chieu, "ngay": it.get("ngay"),
                     "noi_dung": ct.norm(str(it.get("noi_dung") or ""))[:60], "noi_ban": str(it.get("noi_ban") or "")[:40],
                     "diem": money_of(it.get("diem")), "nhom": str(it.get("nhom") or ""), "kieu": kieu})
-    print(f"[ảnh] đọc bằng {model}: {len(txs)} giao dịch", file=sys.stderr)
-    return {"loai": raw.get("loai"), "giao_dich": txs, "model": model}
+    print(f"[ảnh] đọc bằng {model}: {raw.get('loai')}, {len(txs)} giao dịch", file=sys.stderr)
+    return {"loai": raw.get("loai"), "giao_dich": txs, "model": model, "viec": raw.get("viec")}
 
 
 def fingerprint(ngay, tien, chieu):
@@ -175,6 +185,12 @@ def photo(message, tok, now):
         print(f"[lỗi] đọc ảnh: {e!r}", file=sys.stderr)
         kho.delete(seen)
         return "⚠️ Chưa đọc được ảnh (AI bận hoặc ảnh quá mờ). Gửi lại sau, hoặc nhắn tay kiểu: cà phê 35k"
+    if info["loai"] == "tai_san" and info.get("viec"):
+        # lệnh quỹ, đơn mua vàng, kết quả lệnh cổ phiếu: hỏi trường còn thiếu rồi xin xác nhận trước khi ghi
+        reply = ct.troly().from_photo(info["viec"], (message.get("chat") or {}).get("id"), now)
+        if reply is not None:
+            kho.delete(seen)  # chưa ghi gì cho tới khi bấm ✅; gửi lại ảnh này vẫn được
+            return reply
     txs = info["giao_dich"]
     if info["loai"] == "khac" or not txs:
         kho.delete(seen)

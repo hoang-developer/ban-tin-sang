@@ -450,8 +450,8 @@ def dau_tu(now, chat):
                 notes.append("nhắc lại")
     elif dautu.close_periods(dautu.config(), now):
         notes.append("chốt kỳ")
-    for note in dautu.match_job(now):
-        replies.append((note, [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]))
+    for reply in dautu.match_job(now):
+        replies.append(reply)
         notes.append("lệnh đã khớp")
     if (now.hour, now.minute) >= (20, 0) and not done_today("dau_tu_baocao", now):
         report = dautu.daily_report(now)  # lãi/lỗ các quỹ theo NAV (chỉ ngày có NAV mới)

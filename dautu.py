@@ -559,7 +559,9 @@ def history_text():
             lines.append(f"• {when}: {money(o['tien'])} → {units_text(o['ccq'])} ccq, NAV {vn_num(o['nav'], 2)}")
         else:
             lines.append(f"• {when}: {money(o['tien'])} · chờ khớp")
-    return "\n".join(lines), [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
+    fixable = list(dict.fromkeys(o.get("quy", cfg["ma"]) for o in orders
+                                 if o["trang_thai"] == "khop" and o.get("loai") != "doi"))
+    return "\n".join(lines), [[fix_button(code)] for code in fixable[-2:]] + [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
 
 
 def chart_reply():
@@ -715,7 +717,13 @@ def record_plan(direct, side_buy, units, ym, main_day, side_day, now):
 
 
 def match_orders(now=None):
-    """Lệnh chờ khớp đã có NAV phiên khớp: tính số ccq, cập nhật /taisan. Trả các câu báo.
+    """Các câu báo lệnh vừa khớp (xem match_details)."""
+    return [note for _, note in match_details(now)]
+
+
+def match_details(now=None):
+    """Lệnh chờ khớp đã có NAV phiên khớp: tính số ccq, cập nhật /taisan. Trả [(mã quỹ vừa mua hoặc None nếu là hoán
+    đổi, câu báo)].
     Lệnh mua: số ccq = tiền / NAV (phí mua 0%). Lệnh hoán đổi quỹ chờ → quỹ chính: giá trị = số ccq ra × NAV quỹ
     chờ, số ccq vào = giá trị / NAV quỹ chính cùng phiên (phí hoán đổi 0%)."""
     now = now or now_vn()
@@ -767,17 +775,16 @@ def match_orders(now=None):
             hold = add_units(data, cfg["ma"], ccq, value)
             o.update({"trang_thai": "khop", "phien": day.isoformat(), "nav": main[1], "nav_ra": nav, "ccq": ccq,
                       "tien": round(value)})
-            notes.append(f"✅ Hoán đổi {units_text(o['ccq_ra'])} ccq {code} (NAV {vn_num(nav, 2)}đ, ≈ {money(value)}) → "
-                         f"<b>{units_text(ccq)} ccq {cfg['ma']}</b> phiên {day:%d/%m}. Đang có "
-                         f"{units_text(hold['sl'])} ccq {cfg['ma']}.")
+            notes.append((None, f"✅ Hoán đổi {units_text(o['ccq_ra'])} ccq {code} (NAV {vn_num(nav, 2)}đ, ≈ "
+                                f"{money(value)}) → <b>{units_text(ccq)} ccq {cfg['ma']}</b> phiên {day:%d/%m}. Đang có "
+                                f"{units_text(hold['sl'])} ccq {cfg['ma']}."))
             continue
         ccq = round(o["tien"] / nav, 2)
         hold = add_units(data, code, ccq, o["tien"])
         o.update({"trang_thai": "khop", "phien": day.isoformat(), "nav": nav, "ccq": ccq})
-        notes.append(f"✅ Lệnh {code} {ct.vnd(o['tien'])} đã khớp phiên {day:%d/%m}: NAV {vn_num(nav, 2)}đ → "
-                     f"<b>{units_text(ccq)} ccq</b>. Đang có {units_text(hold['sl'])} ccq, giá vốn "
-                     f"{vn_num(hold['gia_von'], 0)}đ.\nSố ccq trên Fmarket khác thì sửa: /dautu ccq số_ccq"
-                     + (f" {code.lower()}" if code != cfg["ma"] else ""))
+        notes.append((code, f"✅ Lệnh {code} {ct.vnd(o['tien'])} đã khớp phiên {day:%d/%m}: NAV {vn_num(nav, 2)}đ → "
+                            f"<b>{units_text(ccq)} ccq</b>. Đang có {units_text(hold['sl'])} ccq, giá vốn "
+                            f"{vn_num(hold['gia_von'], 0)}đ."))
     if notes:
         ts.save(data)
         save(cfg)
@@ -1230,9 +1237,14 @@ def daily_report(now):
     return f"📊 <b>Quỹ tối {now:%d/%m}</b> (so với tiền gốc)\n" + "\n".join(lines), [[("📈 Chi tiết", "dt:xem")]]
 
 
+def fix_button(code):
+    return (f"✏️ Fmarket báo số ccq {code} khác", f"y:them:sua_ccq:{code}")
+
+
 def match_job(now):
-    """Sau 17h: lệnh đã có NAV thì tính ccq. Trả các câu báo."""
+    """Sau 17h: lệnh đã có NAV thì tính ccq. Trả các tin báo [(câu báo, nút)]; lệnh mua có nút sửa số ccq."""
     if (now.hour, now.minute) < (17, 0) or not active():
         return []
-    return match_orders(now)
+    return [(note, ([[fix_button(code)]] if code else []) + [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]])
+            for code, note in match_details(now)]
 

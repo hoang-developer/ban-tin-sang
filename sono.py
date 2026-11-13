@@ -228,6 +228,13 @@ def declare(text, day):
     info = parse_debt(text)
     if not info or not info["ten"]:
         return USAGE
+    return declare_info(info, day)
+
+
+def declare_info(info, day):
+    """Thêm hoặc cập nhật một khoản nợ từ các trường đã đọc: {"ten", "con", "goc", "thang", "lai", "ngay_tra", "nay"}
+    (trường không có để None)."""
+    info = {"con": None, "goc": None, "thang": None, "lai": None, "ngay_tra": None, "nay": False, **info}
     data = ts.load()
     d = next((x for x in debts(data) if ts.same_name(x["ten"], info["ten"])), None)
     created = d is None
@@ -415,9 +422,10 @@ def freed(data=None, ym=None):
 def view(day):
     data = ts.load()
     items, done = active(data), [d for d in debts(data) if d["tien"] <= 0]
-    back = [("🗂 Sửa, xóa", "no:ds"), ("➕ Cách thêm", "no:hd"), ct.BACK]
+    back = [("🗂 Sửa, xóa", "no:ds"), ("➕ Thêm khoản nợ", "y:them:no_moi"), ct.BACK]
     if not items and not done:
-        return "💳 Chưa có khoản nợ nào.\n\n" + USAGE, [[ct.BACK]]
+        return ("💳 Chưa có khoản nợ nào. Bấm ➕ để thêm, hoặc nhắn câu thường, ví dụ: «vay anh Nam 10tr, mỗi tháng trả "
+                "2tr, không lãi».", [[("➕ Thêm khoản nợ", "y:them:no_moi"), ct.BACK]])
     total, monthly = sum(d["tien"] for d in items), monthly_total(data)
     lines = [f"💳 <b>Sổ nợ: còn {short(total)}</b>" + (f" · trả {short(monthly)}/tháng" if monthly else "")]
     for i, d in enumerate(items, 1):

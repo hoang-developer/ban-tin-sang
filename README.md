@@ -115,6 +115,29 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
 - Nhiều khoản một lúc: mỗi khoản một dòng.
 - 📷 **Gửi ảnh** hóa đơn hoặc màn hình chuyển khoản: bot đọc rồi ghi (xem mục Ghi bằng ảnh).
 
+**Nhắn câu thường, không cần nhớ lệnh** ([troly.py](troly.py), cần bật AI): ngoài khoản chi, bot hiểu cả các việc khác
+và chỉ ghi sau khi bạn bấm ✅ trên thẻ "Mình hiểu là…" (có nút ✏️ Sửa: nhắn phần cần sửa, ví dụ «6 tháng»; ❌ Thôi):
+
+- `mua 2 chỉ vàng nhẫn hết 27tr` · `gửi tiết kiệm VCB 50tr lãi 4,7% 6 tháng` · `vay anh Nam 10tr, mỗi tháng trả 2tr`
+- `nạp 2tr vào quỹ dự phòng` · `tài khoản Techcombank còn 14tr` · `cho Dương vay 2tr` · `nhận lương 19tr`
+- `sáng nay đặt mua 3tr VMEEF` · `bán 1300 HAG giá 12` · `đặt ngân sách ăn uống 3tr` · `hôm nay không tiêu gì`
+- Hỏi: `tôi còn nợ bao nhiêu?` · `quỹ lãi lỗ thế nào?` · `tháng này cà phê hết bao nhiêu?`
+- Thiếu thông tin thì bot hỏi từng câu (có nút chọn nhanh, nút Bỏ qua), trả lời ngắn như `4,7%` hay `6 tháng`.
+- 📷 Ảnh lệnh mua/hoán đổi quỹ, đơn mua vàng, kết quả lệnh cổ phiếu: bot đọc, hỏi phần còn thiếu (ví dụ mã cổ phiếu)
+  rồi hiện thẻ xác nhận.
+- Nút **➕ Thêm** ở màn hình Tài sản, Sổ nợ: chọn loại rồi bot hỏi từng bước. Lệnh vừa khớp có nút sửa số ccq.
+
+Cách chạy: khoản chi thường ("cà phê 35k") vẫn ghi ngay, không qua AI. Tin có chữ dễ là việc khác (chuyển, nạp, vàng,
+vay, quỹ, tiết kiệm…) hoặc không có số tiền thì AI phân loại thành "việc" kèm các trường; code kiểm tra lại từng trường
+(số tiền đối chiếu với số đọc được trong câu), tính toán và ghi bằng các hàm sẵn có. AI bảo là khoản chi thì bot nhớ, lần
+sau ghi ngay. AI bận: bot hỏi lại bằng nút ("Ghi là khoản chi" / "Không ghi"), không tự đoán. AI nhận thêm tên các khoản
+nợ, tài khoản, mã quỹ của bạn (không kèm số tiền) để gọi đúng tên. Thử một câu mà không ghi gì: mở
+`https://ban-tin-sang.vercel.app/api/chitieu?hieu=mua 2 chỉ vàng nhẫn hết 27tr` (tối đa 40 câu mỗi ngày, không gửi tên
+riêng cho AI).
+
+**Kiểm thử** ([tests/](tests)): `python -m unittest discover -s tests -t .` chạy bot trong bộ nhớ (kho, Telegram, Fmarket,
+AI đều giả lập; NAV thật của VMEEF, VFF trong `tests/data`), GitHub tự chạy mỗi lần đẩy code.
+
 **Menu** ([menu.py](menu.py)): `/menu` (hoặc `/start`) mở màn hình tổng quan: tháng này đã chi bao nhiêu, quỹ dự
 phòng, nợ, tài sản ròng và việc nên làm, kèm 6 nút **📊 Chi tiêu · 💼 Tài sản · 💳 Nợ · 🎯 Kế hoạch · 📝 Cách ghi ·
 ⚙️ Cài đặt**. Bấm nút thì mở ngay trong tin đó, có nút ⬅️ Menu để quay lại. Lần đầu bot gửi thêm hàng nút cố định

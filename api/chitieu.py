@@ -7,6 +7,7 @@ import hmac
 import json
 import os
 import sys
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -39,7 +40,7 @@ def handle_message(message, tok):
         if image:  # ảnh hóa đơn, màn hình chuyển khoản (chữ kèm ảnh là ghi chú / #nhóm)
             reply = docanh.photo(message, tok, datetime.now(VN_TZ))
         else:
-            reply = chitieu.answer(text, datetime.now(VN_TZ))
+            reply = chitieu.answer(text, datetime.now(VN_TZ), chat_id)
     except Exception as e:
         print(f"[lỗi] trả lời {text or 'ảnh'!r}: {e!r}", file=sys.stderr)
         reply = "⚠️ Bot gặp lỗi, thử lại sau nhé."
@@ -54,7 +55,20 @@ def handle_button(query, tok):
     tg.handle_button(query, chitieu.on_button, datetime.now(VN_TZ), tok)
 
 
+def try_page(environ):
+    """?hieu=<câu>: cho xem bot hiểu một câu nói thường thế nào, không ghi gì (tối đa vài chục câu mỗi ngày)."""
+    query = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
+    if "hieu" not in query or not kho.ready():
+        return None
+    import troly
+    chitieu.reset()
+    return troly.try_text(query["hieu"][0], datetime.now(VN_TZ).date())
+
+
 def status_page(environ, tok):
+    tried = try_page(environ)
+    if tried:
+        return tried
     if not tok:
         return ("Chưa có biến CHITIEU_BOT_TOKEN trên Vercel. Tạo bot qua @BotFather, thêm token vào biến đó "
                 "rồi Redeploy (xem README, mục Bot chi tiêu).\n"

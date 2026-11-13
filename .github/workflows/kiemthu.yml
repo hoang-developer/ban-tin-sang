@@ -1,0 +1,21 @@
+name: Kiểm thử
+
+# Chạy bộ kiểm thử (thư mục tests/) mỗi khi đẩy code hoặc mở pull request. Bot chạy thử trong bộ nhớ:
+# không gọi Telegram, Redis, Fmarket hay AI thật.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  kiemthu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s tests -t . -v
