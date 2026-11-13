@@ -1228,6 +1228,14 @@ MENU = [{"command": n, "description": COMMANDS[n][0]} for n in VISIBLE]
 
 
 def answer(text, now, chat=None):
+    """Trả lời một tin nhắn (respond); tin đầu tiên sau khi đổi hàng nút dưới ô chat thì kèm hàng nút mới."""
+    reply = respond(text, now, chat)
+    if isinstance(reply, (str, tuple)) and kho.ready():
+        reply = menu().with_keyboard(reply)
+    return reply
+
+
+def respond(text, now, chat=None):
     """Trả lời một tin nhắn: lệnh, khoản chi/thu cần ghi, hoặc câu nói thường về việc khác (troly.py hiểu, hỏi lại
     khi thiếu, xin xác nhận trước khi ghi). chat: mã chat, để nhớ bot đang hỏi dở việc gì."""
     if not kho.ready():
