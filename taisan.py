@@ -34,7 +34,7 @@ FMARKET = "https://api.fmarket.vn/res/products/filter"
 VCB_FX = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx"
 BUTTONS = [[("📊 Biểu đồ", "ts:bd"), ("🩺 Khám sức khỏe", "ts:sk")],
            [("🗂 Sửa, xóa", "ts:ds"), ("🔄 Cập nhật giá", "ts:xem")],
-           [("➕ Cách khai báo", "ts:hd"), ct.BACK]]
+           [("➕ Thêm", "y:them"), ct.BACK]]
 NOT_ADVICE = "<i>Chỉ để tham khảo, không phải lời khuyên mua bán chứng khoán hay đầu tư.</i>"
 
 
@@ -349,10 +349,15 @@ def add_saving(data, args):
         except ValueError:
             return None
     months = 0 if re.search(r"khong ky han|kkh", bare) or not term else int(term[1])
-    data["items"].append({"id": new_id(data), "loai": "tietkiem", "ten": name, "tien": amount,
-                          "lai": number(rate[1]), "ky": months, "ngay": start.isoformat()})
+    return add_saving_item(data, name, amount, number(rate[1]), months, start)
+
+
+def add_saving_item(data, name, amount, rate, months, start):
+    """Thêm một sổ tiết kiệm (chưa lưu): tên, tiền gốc, lãi %/năm, kỳ hạn tháng (0 là không kỳ hạn), ngày gửi."""
+    data["items"].append({"id": new_id(data), "loai": "tietkiem", "ten": name[:30], "tien": amount,
+                          "lai": rate, "ky": months, "ngay": start.isoformat()})
     due = f", đáo hạn {add_months(start, months):%d/%m/%Y}" if months else ", không kỳ hạn"
-    return f"✅ Đã thêm sổ tiết kiệm {html.escape(name)} {ct.vnd(amount)}, lãi {rate[1]}%/năm{due}"
+    return f"✅ Đã thêm sổ tiết kiệm {html.escape(name[:30])} {ct.vnd(amount)}, lãi {qty_text(rate)}%/năm{due}"
 
 
 def is_etf(code):

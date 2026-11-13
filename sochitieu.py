@@ -1180,6 +1180,11 @@ def tietkiem():
     return module
 
 
+def troly():
+    import troly as module  # hiểu câu nói thường, hỏi lại khi thiếu, thẻ xác nhận
+    return module
+
+
 def period_kind(args):
     """Tham số kỳ của /bieudo, /nhanxet: trống là tháng này, '10' là tháng 10, 'thangtruoc'..."""
     word = plain("".join(args))
@@ -1222,31 +1227,51 @@ VISIBLE = ["menu", "baocao", "tietkiem", "no", "kehoach", "dautu", "taisan", "du
 MENU = [{"command": n, "description": COMMANDS[n][0]} for n in VISIBLE]
 
 
-def answer(text, now):
-    """Trả lời một tin nhắn: lệnh, hoặc các khoản chi/thu cần ghi."""
+def answer(text, now, chat=None):
+    """Trả lời một tin nhắn: lệnh, khoản chi/thu cần ghi, hoặc câu nói thường về việc khác (troly.py hiểu, hỏi lại
+    khi thiếu, xin xác nhận trước khi ghi). chat: mã chat, để nhớ bot đang hỏi dở việc gì."""
     if not kho.ready():
         return NEED_STORE
     reset()
+    helper = troly()
     screen = menu().from_keyboard(text)  # nút cố định dưới ô chat
     if screen:
+        helper.forget(chat)
         return screen
     many = menu().run_lines(text, now)  # nhiều lệnh, mỗi lệnh một dòng
     if many:
         return many
     parts = text.split()
     if parts and parts[0].startswith("/"):
+        helper.forget(chat)  # gõ lệnh: bỏ việc đang hỏi dở
         command = parts[0][1:].split("@")[0].lower()
         if command in COMMANDS:
             return COMMANDS[command][1](parts[1:])
         return f"Không có lệnh /{html.escape(command[:30])}. Bấm /menu để mở menu, /huongdan để xem mọi lệnh"
+    pending = helper.on_reply(text, now, chat)  # bot đang hỏi dở, hoặc đang chờ lời sửa một thẻ
+    if pending is not None:
+        return pending
     traded = taisan().trade(text, now)  # "mua 1000 FPT giá 95", "bán 500 FPT giá 120"
     if traded:
         return traded
     fund_order = dautu().from_text(text, now)  # "mua VMEEF 3tr": ghi lệnh mua quỹ đang đầu tư
     if fund_order:
         return fund_order
-    if phantich().is_question(text):
-        return phantich().hoi(text, now.date())
+    known = helper.quick(text, now)  # "hôm nay không tiêu gì": hiểu bằng luật, không cần AI
+    if known is not None:
+        return known
+    question = phantich().is_question(text)
+    if question and not (ai_key() and helper.beyond_spending(text)):
+        return phantich().hoi(text, now.date())  # câu hỏi về chi tiêu đã ghi
+    if question or helper.wants(text):  # không phải khoản chi thường: nhờ AI hiểu câu
+        reply = helper.understand(text, now, chat, question)
+        if reply is not None:
+            return reply
+    return record_text(text, now)
+
+
+def record_text(text, now):
+    """Ghi các khoản chi/thu trong tin nhắn (mỗi dòng một khoản) và trả câu báo kèm nút."""
     entries = add(text, now)
     if not entries:
         return "Không thấy số tiền. Nhắn kiểu: <b>cà phê 35k</b> hoặc bấm /menu"
@@ -1335,6 +1360,8 @@ def on_button(data, message, now):
         return dautu().on_button(arg, message, now)
     if kind == "tk":
         return tietkiem().on_button(arg, message, now)
+    if kind == "y":
+        return troly().on_button(arg, message, now)
     if kind == "bd":
         return "Đang vẽ biểu đồ…", ("send", lambda: phantich().chart_reply(arg, day))
     if kind == "db":

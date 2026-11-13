@@ -17,8 +17,9 @@ MAIN = [[("📊 Chi tiêu", "m:chi"), ("💼 Tài sản", "m:ts")],
         [("💳 Nợ", "m:no"), ("🎯 Kế hoạch", "m:kh")],
         [("📝 Cách ghi", "m:ghi"), ("⚙️ Cài đặt", "m:cd")]]
 GREETING = ("👋 <b>Bot ghi chi tiêu và xây tài sản</b>\n"
-            "Nhắn số tiền kèm nội dung để ghi, ví dụ: <b>cà phê 35k</b>. Gửi ảnh hóa đơn, ảnh chuyển khoản cũng được.\n"
-            "Các nút dưới ô chat mở nhanh menu.")
+            "Nhắn số tiền kèm nội dung để ghi, ví dụ: <b>cà phê 35k</b>. Việc khác cứ nhắn câu thường (mua vàng, gửi tiết "
+            "kiệm, vay, trả nợ, hỏi còn nợ bao nhiêu…), bot hỏi lại nếu thiếu và xin xác nhận trước khi ghi. Gửi ảnh hóa "
+            "đơn, chuyển khoản, lệnh quỹ, đơn mua vàng cũng được.\nCác nút dưới ô chat mở nhanh menu.")
 HOW_TO = ("📝 <b>Cách ghi</b>\n"
           "• Nhắn số tiền kèm nội dung: cà phê 35k · đổ xăng 80000 · tiền nhà 5tr (1tr2 là 1.200.000đ)\n"
           "• Khoản thu: + lương 19tr\n"
@@ -28,7 +29,11 @@ HOW_TO = ("📝 <b>Cách ghi</b>\n"
           "• 📷 Gửi ảnh hóa đơn, màn hình chuyển khoản, lịch sử giao dịch ngân hàng\n"
           "• Trả nợ: trả nợ chú Tư 5tr (tự trừ vào sổ nợ /no)\n"
           "• Mua bán cổ phiếu, ETF: mua 500 E1VFVN30 giá 33,6 · bán 100 FPT giá 120\n"
-          "• Hỏi: tháng này ăn uống hết bao nhiêu?\n"
+          "• Hỏi: tháng này ăn uống hết bao nhiêu? · tôi còn nợ bao nhiêu? · quỹ lãi lỗ thế nào?\n"
+          "• Việc khác nhắn câu thường, bot hỏi lại nếu thiếu và xin xác nhận trước khi ghi: mua 2 chỉ vàng nhẫn hết 27tr · "
+          "gửi tiết kiệm VCB 50tr lãi 4,7% 6 tháng · vay anh Nam 10tr · nạp 2tr vào quỹ dự phòng · tài khoản Techcombank "
+          "còn 14tr · hôm nay không tiêu gì\n"
+          "• 📷 Ảnh lệnh mua quỹ, đơn mua vàng, kết quả bán cổ phiếu: bot đọc rồi hỏi lại trước khi ghi\n"
           "Xếp sai nhóm thì bấm ✏️ Đổi nhóm, lần sau bot tự nhớ. Khoản chưa rõ nhóm thì bot hỏi luôn.\n"
           "Khai báo nhiều thứ một lần: dán nhiều lệnh, mỗi lệnh một dòng.")
 GUIDE = ("📖 <b>Mọi lệnh</b> (dễ nhất là bấm /menu)\n"
