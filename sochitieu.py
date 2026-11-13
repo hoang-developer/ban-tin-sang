@@ -776,7 +776,7 @@ def with_picker(rows, reference, keep="↩️ Thôi"):
 REPORT_BUTTONS = [[("Hôm nay", "bc:ngay"), ("Tuần này", "bc:tuan"), ("Tháng này", "bc:thang"),
                    ("Tháng trước", "bc:thangtruoc")],
                   [("📈 Biểu đồ", "bd:thang"), ("🔮 Dự báo", "db"), ("💬 Nhận xét", "nx:thang")]]
-BACK = ("⬅️ Menu", "m:home")  # nút quay về màn hình tổng quan (menu.py)
+BACK = ("⬅️ Hôm nay", "m:home")  # nút quay về màn hình 🏠 Hôm nay (menu.py)
 CHI_BUTTONS = REPORT_BUTTONS + [[("🧾 Lịch sử", "m:ls"), ("🗂 Chưa xếp", "m:cx"), ("🎯 Ngân sách", "m:ns")], [BACK]]
 
 
@@ -1213,7 +1213,7 @@ COMMANDS = {
     "duphong": ("Quỹ dự phòng: mục tiêu, tiến độ, mỗi tháng cần để bao nhiêu", lambda args: duphong().duphong(args)),
     "nhanxet": ("Nhận xét chi tiêu tháng (AI); /nhanxet 10 cho tháng 10", lambda args: phantich().commentary(period_kind(args), today())),
     "xuat": ("Xuất file CSV mở bằng Excel: /xuat 10", xuat),
-    "menu": ("Tổng quan và menu nút bấm", lambda args: menu().menu_cmd(args)),
+    "menu": ("🏠 Hôm nay: đã chi, còn được tiêu, việc cần làm", lambda args: menu().menu_cmd(args)),
     "start": ("Bắt đầu", lambda args: menu().start(args)),
     "huongdan": ("Cách dùng và mọi lệnh", lambda args: menu().guide(args)),
     "no": ("Sổ nợ: còn bao nhiêu, mỗi tháng trả, nhắc trả", lambda args: sono().no_cmd(args)),
@@ -1223,7 +1223,7 @@ COMMANDS = {
 }
 COMMANDS["help"] = COMMANDS["huongdan"]
 # Danh sách lệnh hiện ở nút Menu của Telegram: chỉ các lệnh chính, lệnh khác vẫn gõ được (/huongdan)
-VISIBLE = ["menu", "baocao", "tietkiem", "no", "kehoach", "dautu", "taisan", "duphong", "hoi", "huongdan"]
+VISIBLE = ["menu", "taisan", "kehoach", "hoi", "baocao", "huongdan"]
 MENU = [{"command": n, "description": COMMANDS[n][0]} for n in VISIBLE]
 
 

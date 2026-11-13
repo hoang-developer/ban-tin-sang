@@ -116,10 +116,15 @@ def plan(day):
     n = numbers(day)
     f = n["fund"]
     lines = [f"📋 <b>Chia lương tháng {day.month}/{day.year}</b>"]
+    try:
+        lines.append(step_line(day, n))
+    except Exception as e:
+        print(f"[lỗi] bước lộ trình: {e!r}", file=sys.stderr)
     if n["income"]:
         lines.append(f"💰 Thu: <b>{short(n['income'])}</b>" + (f" ({n['income_basis']})" if n["income_basis"] else ""))
     else:
-        lines.append("💰 Chưa có thu nhập tháng này: ghi «+ lương 19tr» hoặc đặt ngày lương: /luong 5 19tr")
+        lines.append("💰 Chưa có thu nhập tháng này: nhắn «+ lương 19tr», hoặc «lương về ngày 5, khoảng 19tr» để tới ngày "
+                     "bot hỏi")
     step = 1
     if n["debts"]:
         parts = []
@@ -377,10 +382,8 @@ def invest_summary(day):
     return " · ".join(f"{label} {short(sums[k])}" for k, label in INVEST if sums.get(k))
 
 
-def roadmap(day):
-    if not kho.ready():
-        return ct.NEED_STORE
-    n = numbers(day)
+def roadmap_steps(day, n):
+    """Các bước lộ trình [(đã xong, chữ)], bước đang làm, các khoản nợ không lãi."""
     f, data = n["fund"], n["data"]
     _, _, days = ts.monthly_flows(day)
     debts = sono.active(data)
@@ -406,10 +409,24 @@ def roadmap(day):
                   + (f" ({short(f['target'])}): {f['balance'] / f['target'] * 100:.0f}%" if f["target"] else "")))
     held = invest_summary(day)
     inv = n["invest"]
-    plan_text = (f"{inv['ma']} {short(inv['gop'])}/tháng, mua theo Value Averaging (/dautu)" if inv and inv["gop"] else
-                 f"{inv['ma']} ({inv['note']})" if inv else "tiết kiệm, vàng, ETF, quỹ mở, cổ phiếu (/dautu)")
+    plan_text = (f"{inv['ma']} {short(inv['gop'])}/tháng, mua theo Value Averaging" if inv and inv["gop"] else
+                 f"{inv['ma']} ({inv['note']})" if inv else "tiết kiệm, vàng, ETF, quỹ mở, cổ phiếu")
     steps.append((False, f"📈 Đầu tư đều mỗi tháng: {plan_text}" + (f"\n      đang có: {held}" if held else "")))
     current = next((i for i, (done, _) in enumerate(steps) if not done), len(steps) - 1)
+    return steps, current, zero
+
+
+def step_line(day, n):
+    """'🎯 Bước 2/5: 🛟 Quỹ dự phòng mốc đầu…' cho màn hình Kế hoạch."""
+    steps, current, _ = roadmap_steps(day, n)
+    return f"🎯 Lộ trình bước {current + 1}/{len(steps)}: {steps[current][1].split(chr(10))[0]}"
+
+
+def roadmap(day):
+    if not kho.ready():
+        return ct.NEED_STORE
+    n = numbers(day)
+    steps, current, zero = roadmap_steps(day, n)
     lines = ["🎯 <b>Lộ trình xây tài sản</b>"]
     for i, (done, text) in enumerate(steps):
         mark = "✅" if done else "👉" if i == current else "⬜"

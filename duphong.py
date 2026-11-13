@@ -143,7 +143,7 @@ def text(day):
     if s["rows"]:
         lines.append("Đang tính vào quỹ: " + " · ".join(f"{html.escape(n)} {money(v)}" for n, v in s["rows"]))
     else:
-        lines.append("<i>Chưa có tài sản nào trong quỹ: bấm ➕ hoặc /duphong nap 2tr; đã có sổ tiết kiệm thì /duphong tinh "
+        lines.append("<i>Chưa có tài sản nào trong quỹ: bấm ➕ hoặc nhắn «nạp 2tr vào quỹ dự phòng»; đã có sổ tiết kiệm thì /duphong tinh "
                      "tên sổ</i>")
     lines.append(NOT_ADVICE)
     return "\n".join(lines), buttons(s)
