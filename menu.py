@@ -342,6 +342,14 @@ def with_keyboard(reply):
     return {"messages": [(GREETING, bottom_keyboard()), reply]}
 
 
+def push_keyboard(send):
+    """Hàng nút dưới ô chat vừa đổi mà chưa gửi: gửi lời chào kèm hàng nút mới (việc theo giờ gọi). True nếu đã gửi."""
+    if not kho.put_new(KEYBOARD_FLAG, True, 3 * 365 * 86400):
+        return False
+    send(GREETING, bottom_keyboard())
+    return True
+
+
 def start(args):
     if not kho.ready():
         return ct.NEED_STORE
@@ -363,11 +371,8 @@ def from_keyboard(text):
     """Chữ của nút cố định dưới ô chat -> màn hình tương ứng; None nếu không phải nút. Nút của hàng cũ vẫn chạy và
     kèm hàng nút mới."""
     label = text.strip()
-    if label in BOTTOM:
-        return screen(BOTTOM[label], ct.today())
-    if label in OLD_BOTTOM:
-        return with_keyboard(screen(OLD_BOTTOM[label], ct.today()))
-    return None
+    name = BOTTOM.get(label) or OLD_BOTTOM.get(label)
+    return with_keyboard(screen(name, ct.today())) if name else None
 
 
 def on_button(arg, message, now):
@@ -396,7 +401,7 @@ def run_lines(text, now):
     out = []
     for line in lines[:20]:
         try:
-            reply = ct.answer(line, now)
+            reply = ct.respond(line, now)
         except Exception as e:
             print(f"[lỗi] lệnh {line!r}: {e!r}", file=sys.stderr)
             reply = "⚠️ Lỗi, thử lại riêng lệnh này"

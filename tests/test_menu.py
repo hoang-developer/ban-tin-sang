@@ -106,6 +106,27 @@ class BonMuc(unittest.TestCase):
         h.at(2026, 11, 13, 21, 5)
         self.assertIsNone(thongbao.evening(h.CLOCK["now"]))
 
+    def test_hang_nut_moi_tu_gui_khi_chay_theo_gio(self):
+        h.SENT.clear()
+        lich.ban_phim_moi(h.CLOCK["now"], str(h.CHAT))
+        self.assertEqual(len(h.SENT), 1)
+        text, markup = h.SENT[0]
+        self.assertIn("Bốn nút dưới ô chat", text)
+        self.assertEqual(markup["keyboard"][1][1]["text"], "💬 Hỏi")
+        h.SENT.clear()
+        lich.ban_phim_moi(h.CLOCK["now"], str(h.CHAT))
+        self.assertEqual(h.SENT, [])  # chỉ một lần
+        text, _ = h.say("cà phê 35k")  # đã gửi rồi: tin trả lời bình thường
+        self.assertIn("Đã ghi", text)
+
+    def test_tin_dau_tien_sau_cap_nhat_kem_hang_nut_moi(self):
+        with kho.memo():
+            reply = h.ct.answer("cà phê 35k", h.CLOCK["now"], h.CHAT)
+        self.assertIn("Bốn nút dưới ô chat", reply["messages"][0][0])
+        self.assertIn("Đã ghi", h.parts(reply)[0])
+        text, _ = h.say("🎯 Kế hoạch")  # lần sau không gửi lại
+        self.assertIn("Chia lương", text)
+
 
 class ThongBaoGop(unittest.TestCase):
     def setUp(self):

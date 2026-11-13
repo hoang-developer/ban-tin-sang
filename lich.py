@@ -349,6 +349,17 @@ def month_lines(day):
     return lines
 
 
+def ban_phim_moi(now, chat):
+    """Từ 7h tới 22h: hàng nút dưới ô chat của bot chi tiêu vừa đổi mà chưa gửi thì gửi luôn (không chờ người dùng nhắn)."""
+    tok = chitieu.token()
+    if not tok or not between(now, (7, 0), (22, 0)):
+        return None
+    import menu
+    owners = list(chitieu.owner_chats())
+    sent = menu.push_keyboard(lambda text, markup: [tg.send(o, text, markup, tok=tok) for o in owners])
+    return "đã gửi hàng nút mới" if sent else None
+
+
 def tong_ket_toi(now, chat):
     """21h: một tin tối gộp (thongbao.evening): nhắc ghi chép nếu hôm nay chưa ghi, điều cần để ý, lãi/lỗ quỹ."""
     tok = chitieu.token()
@@ -470,7 +481,8 @@ def nhan_dinh_phien(now, chat):
 
 
 JOBS = [ban_tin_sang, canh_bao, bang_dien, gui_doan, cham_doan, nhac_ngay, co_tuc, ban_tin_toi,
-        chi_tieu_tuan, chi_tieu_thang, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien, dau_tu, tong_ket_toi]
+        chi_tieu_tuan, chi_tieu_thang, tai_chinh_sang, tai_san_cuoi_ngay, nhan_dinh_phien, dau_tu, tong_ket_toi,
+        ban_phim_moi]
 
 
 def run(now):
