@@ -286,6 +286,34 @@ Code ở [taisan.py](taisan.py).
   tài sản ròng. Chi và thu lấy từ sổ 90 ngày qua. AI (nếu bật) viết 2 nhận xét và 2–3 việc nên làm có
   con số; được dặn không khuyên mua bán mã nào, không dự đoán giá. Chỉ để tham khảo.
 
+### Một dòng tiền: tài khoản chính, chuyển giữa các ngăn
+
+Code ở [taisan.py](taisan.py) (phần "Tài khoản chính"), [kehoach.py](kehoach.py) (làm hết theo kế hoạch, mỗi ngày
+được tiêu). Tiền của bạn nằm ở nhiều ngăn: tài khoản ngân hàng, ví, quỹ dự phòng, quỹ chờ đầu tư, sổ tiết kiệm,
+vàng, cổ phiếu, khoản nợ. Bot nối các ngăn thành một dòng tiền:
+
+- **Tài khoản chính** (💼 Tài sản → 🏦 Tài khoản chính, hoặc nhắn `tài khoản VCB còn 30tr` rồi bấm "là tài khoản
+  chính"): nơi lương về và hay tiêu nhất. Số dư = số dư thật lúc chốt + thu − chi ghi sổ sau lúc chốt ± tiền chuyển
+  sang ngăn khác. Tính lại mỗi lần xem, nên sửa hay xóa khoản chi thì số dư tự đúng; khoản ghi bù ngày trước lúc chốt
+  không tính (đã nằm trong số dư). Lệch với app ngân hàng thì bấm ✏️ Cập nhật số dư thật (hoặc nhắn lại câu trên).
+- **Chuyển giữa các ngăn trừ nơi đi, cộng nơi đến** (tài sản ròng không đổi): nạp/rút quỹ dự phòng, để/rút tiền quỹ
+  chờ đầu tư (`để 4tr vào quỹ chờ`, `/dautu nap`, `/dautu rut`), phần tiền mua quỹ không lấy từ quỹ chờ, gửi tiết
+  kiệm, mua vàng, cho vay, mua bán cổ phiếu (không khai báo tài khoản DNSE thì tiền đi/về tài khoản chính), chuyển
+  giữa hai tài khoản của mình (`chuyển 5tr từ VCB sang MoMo`, `rút 2tr tiền mặt`; tài khoản đến chưa có thì tạo).
+  Trả nợ là khoản chi nhóm Trả nợ nên tự trừ tài khoản chính và dư nợ. Thẻ xác nhận ghi rõ "Tiền từ VCB: còn ~…";
+  tiền có sẵn ở chỗ khác thì bấm 🔁 Tiền có sẵn, không trừ. Lệnh mua quỹ đã đặt chưa khớp vẫn tính vào tài sản (theo
+  số tiền) tới khi thành ccq.
+- **✅ Làm hết theo kế hoạch** (nút trên tin "Lương về!" và tin Chia lương): một lần bấm làm mọi việc còn lại của
+  tháng: trả các khoản nợ tới kỳ (ghi khoản chi Trả nợ, trừ dư nợ), nạp quỹ dự phòng, để tiền vào quỹ chờ đầu tư. Bot
+  hỏi lại một lần (liệt kê từng việc, tổng tiền, tài khoản chính còn bao nhiêu sau đó) rồi mới làm; tính lại lúc bấm
+  nên bấm hai lần không làm hai lần.
+- **Mỗi ngày được tiêu**: một con số dùng chung cho tin sau khi ghi, `/dubao`, màn hình tổng quan, Chia lương. Có
+  ngân sách tổng thì theo ngân sách; không thì theo kế hoạch: thu − trả nợ tới kỳ − quỹ dự phòng − đầu tư là phần để
+  chi tiêu cả tháng (không tính trả nợ). Trừ phần đã chi trước hôm nay và khoản lớn sắp tới (tháng trước có, tháng
+  này chưa thấy), chia đều cho hôm nay và các ngày còn lại. Ngân sách hằng ngày (`/ngansach hằng ngày`) vẫn tính
+  riêng cho ăn uống, đi chợ, đi lại. Khi có con số này, dòng tiết kiệm dưới tin chỉ còn chuỗi ngày và số đã bớt.
+- Chưa chọn tài khoản chính thì mọi thứ như trước (bot chỉ ghi vào từng ngăn, không trừ số dư tài khoản nào).
+
 ### Quỹ dự phòng (bước đầu xây dựng tài chính)
 
 Code ở [duphong.py](duphong.py). `/duphong` cho xem:
@@ -343,8 +371,9 @@ khoản nợ tới kỳ, nạp quỹ tháng này, xếp nhóm khoản chưa rõ)
 **Chia lương** (`/kehoach chia`, nút 📋, tự gợi ý khi ghi lương): thu tháng này → trả nợ tới kỳ (đã trả ✅ hay chưa)
 → chi tiêu dự kiến (trung bình 90 ngày qua, không tính trả nợ; có ngân sách tổng thì theo ngân sách) → quỹ dự phòng
 (mức để kịp hạn, cộng tiền trước đây trả các khoản nợ đã xong; không quá phần thu còn lại) → còn lại. Nút trả nợ, nạp
-quỹ ngay trên tin. Chưa ghi lương thì dùng số ở `/luong`, không có thì thu trung bình 3 tháng. Đã bật `/dautu` thì
-thêm bước 📈 góp vào quỹ chờ (sau quỹ dự phòng).
+quỹ ngay trên tin, hoặc ✅ Làm hết theo kế hoạch (xem mục Một dòng tiền). Chưa ghi lương thì dùng số ở `/luong`,
+không có thì thu trung bình 3 tháng. Đã bật `/dautu` thì thêm bước 📈 góp vào quỹ chờ (sau quỹ dự phòng). Cuối tin là
+"hôm nay còn được tiêu bao nhiêu" và số dư tài khoản chính.
 
 ### Đầu tư quỹ mở hằng tháng (Value Averaging)
 

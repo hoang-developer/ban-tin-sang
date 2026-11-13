@@ -111,10 +111,11 @@ def app(environ, start_response):
     try:
         length = int(environ.get("CONTENT_LENGTH") or 0)
         update = json.loads(environ["wsgi.input"].read(length))
-        if "callback_query" in update:
-            handle_button(update["callback_query"], tok)
-        else:
-            handle_message(update.get("message") or {}, tok)
+        with kho.memo():  # đọc trùng trong một tin thì dùng lại, đỡ hàng chục lần gọi Redis
+            if "callback_query" in update:
+                handle_button(update["callback_query"], tok)
+            else:
+                handle_message(update.get("message") or {}, tok)
     except Exception as e:
         print(f"[lỗi] {e!r}", file=sys.stderr)
     # Luôn trả 200, kẻo Telegram gửi lại mãi một tin nhắn gây lỗi

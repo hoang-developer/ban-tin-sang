@@ -169,13 +169,16 @@ def fund_item(data):
     return item
 
 
-def change(amount, day):
-    """Thêm (amount > 0) hoặc rút (amount < 0) tiền ở tài khoản "Quỹ dự phòng"; trả câu báo."""
+def change(amount, day, from_main=True):
+    """Thêm (amount > 0) hoặc rút (amount < 0) tiền ở tài khoản "Quỹ dự phòng"; trả câu báo. Có tài khoản chính thì
+    tiền đi từ đó (rút thì về đó); from_main=False: tiền có sẵn, không trừ tài khoản nào."""
     data = ts.load()
     item = fund_item(data)
     before = status(day)
+    old = item["tien"]
     item["tien"] = max(0, item["tien"] + amount)
     item["ngay"] = day.isoformat()
+    moved = ts.move_main(data, old - item["tien"], "quỹ dự phòng", day) if from_main else None
     ts.save(data)
     cfg = config()
     if not cfg.get("bat_dau"):
@@ -196,7 +199,7 @@ def change(amount, day):
     else:
         note = (f"Đã rút {money(-amount)} khỏi quỹ dự phòng, còn {money(after['balance'])}. Dùng xong nhớ bù lại dần: "
                 f"/duphong")
-    return note + "\n<i>Đây là chuyển tiền vào quỹ, không tính là khoản chi</i>"
+    return note + (f"\n{moved}" if moved else "") + "\n<i>Đây là chuyển tiền vào quỹ, không tính là khoản chi</i>"
 
 
 def toggle(name):

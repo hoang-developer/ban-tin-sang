@@ -143,14 +143,15 @@ def saved_text(x):
     return f"đã bớt ~{money(x)}" if x >= 0 else f"đang chi hơn mốc {money(-x)}"
 
 
-def after_record(entries, day):
-    """Dòng thêm dưới tin "Đã ghi": chuỗi, hôm nay so với mốc, đã bớt; kèm chúc mừng khi chạm mốc (mỗi mốc một lần)."""
+def after_record(entries, day, brief=False):
+    """Dòng thêm dưới tin "Đã ghi": chuỗi, hôm nay so với mốc, đã bớt; kèm chúc mừng khi chạm mốc (mỗi mốc một lần).
+    brief: tin đã có dòng "hôm nay còn được tiêu" (con số chung) nên không hiện thêm mốc mỗi ngày cho đỡ rối."""
     if not any(e["nhom"] != ct.INCOME for e in entries):
         return []
     s = summary(day)
     if day < s["start"]:
         return []
-    line = (f"🔥 {s['streak']} ngày · hôm nay {money(s['today'])}/{money(s['base'])}"
+    line = (f"🔥 {s['streak']} ngày" + ("" if brief else f" · hôm nay {money(s['today'])}/{money(s['base'])}")
             + (f" · từ {s['start']:%d/%m} {saved_text(s['saved'])}" if s["days"] else ""))
     return [line] + milestones(s)
 
@@ -339,9 +340,11 @@ def on_button(arg, message, now):
         if where == "dt":
             import dautu
             cfg_dt = dautu.config()
-            left = dautu.add_money(cfg_dt, amount, dautu.current_period(cfg_dt))
+            moved = []
+            left = dautu.add_money(cfg_dt, amount, dautu.current_period(cfg_dt), notes=moved)
             dautu.save(cfg_dt)
-            note = f"Đã chuyển {money(amount)} vào quỹ chờ {cfg_dt['ma']} ({money(left)})"
+            note = f"Đã chuyển {money(amount)} vào quỹ chờ {cfg_dt['ma']} ({money(left)})" + "".join(
+                f" · {x[2:]}" for x in moved)
         else:
             import duphong
             note = duphong.change(amount, day).split("\n")[0][2:]

@@ -57,7 +57,7 @@ JOBS = {
         F("ngay", "ngay", can=False)]},
     "tai_khoan": {"nhan": "🏦 Số dư tài khoản", "xac_nhan": True, "truong": [
         F("ten", "chu", "Tài khoản hay ví nào? (ví dụ Techcombank, MoMo, tiền mặt)"),
-        F("tien", "tien", "Số dư hiện tại bao nhiêu?")]},
+        F("tien", "tien", "Số dư hiện tại bao nhiêu?"), F("chinh", "co", can=False)]},
     "vang": {"nhan": "🥇 Mua vàng", "xac_nhan": True, "truong": [
         F("loai", "chon", "Vàng nhẫn (24k, ép vỉ) hay vàng miếng SJC?", chon=[("nhan", "Nhẫn 24k"), ("sjc", "Miếng SJC")]),
         F("chi", "so", "Bao nhiêu chỉ? (1 lượng = 10 chỉ)"),
@@ -71,6 +71,12 @@ JOBS = {
         F("chieu", "chon", can=False, chon=[("mua", "Mua"), ("hoan_doi", "Hoán đổi")]),
         F("ma", "chu", can=False), F("tien", "tien", "Số tiền bao nhiêu?", can=False), F("ccq", "so", can=False),
         F("ngay", "ngay", can=False), F("sau_gio", "co", can=False)]},
+    "quy_cho": {"nhan": "📈 Quỹ chờ đầu tư", "xac_nhan": True, "truong": [
+        F("tien", "tien", "Số tiền bao nhiêu?"),
+        F("chieu", "chon", can=False, chon=[("nap", "Để vào"), ("rut", "Rút ra")])]},
+    "chuyen_tk": {"nhan": "🔁 Chuyển tiền", "xac_nhan": True, "truong": [
+        F("tien", "tien", "Chuyển bao nhiêu?"), F("den", "chu", "Chuyển sang tài khoản, ví nào?"),
+        F("tu", "chu", "Chuyển từ tài khoản, ví nào?", can=False)]},
     "sua_ccq": {"nhan": "✏️ Sửa số ccq", "xac_nhan": False, "truong": [
         F("ccq", "so", "Fmarket báo lệnh vừa khớp được bao nhiêu ccq?"), F("ma", "chu", can=False)]},
     "no_moi": {"nhan": "💳 Khoản nợ", "xac_nhan": True, "truong": [
@@ -95,6 +101,7 @@ SIMPLE = ("chi", "hoi", "xem", "khong_tieu", "xoa_cuoi", "khac")
 ADD_MENU = [[("🏦 Tài khoản, ví", "y:them:tai_khoan"), ("🐷 Sổ tiết kiệm", "y:them:tiet_kiem")],
             [("🥇 Vàng", "y:them:vang"), ("🤝 Cho vay", "y:them:cho_vay")],
             [("💳 Khoản nợ", "y:them:no_moi"), ("📈 Mua bán cổ phiếu", "y:them:co_phieu")],
+            [("🔁 Chuyển giữa tài khoản", "y:them:chuyen_tk"), ("🏦 Tài khoản chính", "ts:chinh")],
             [("📖 Cổ phiếu, quỹ, tiền số có sẵn", "ts:hd"), ct.BACK]]
 EXAMPLES = ("• mua 2 chỉ vàng nhẫn hết 27tr\n• gửi tiết kiệm VCB 50tr lãi 4,7% 6 tháng\n• vay anh Nam 10tr, mỗi tháng trả "
             "2tr\n• nạp 2tr vào quỹ dự phòng\n• tài khoản Techcombank còn 14tr\n• tôi còn nợ bao nhiêu?")
@@ -196,7 +203,8 @@ def prompt(day, personal=True):
         '- "du_phong": nạp vào hoặc rút khỏi quỹ dự phòng (quỹ khẩn cấp). "tien", "chieu": "nap" | "rut".\n'
         '- "tiet_kiem": gửi hoặc mở sổ tiết kiệm ở ngân hàng. "ten" (ngân hàng hay tên sổ), "tien", "lai" (%/năm), '
         '"ky" (số tháng; 0 nếu không kỳ hạn), "ngay" (ngày gửi).\n'
-        '- "tai_khoan": báo số dư hiện có của một tài khoản, ví, tiền mặt. "ten", "tien".\n'
+        '- "tai_khoan": báo số dư hiện có của một tài khoản, ví, tiền mặt. "ten", "tien", "chinh": true nếu nói là tài '
+        'khoản chính hay tài khoản nhận lương.\n'
         '- "vang": MUA vàng tích trữ. "loai": "nhan" (nhẫn, vàng 24k/9999, vàng ép vỉ) | "sjc" (vàng miếng SJC), "chi" '
         '(tổng số chỉ; 1 lượng = 1 cây = 10 chỉ), "tien" (tổng tiền đã trả).\n'
         '- "co_phieu": mua hoặc bán cổ phiếu, ETF trên sàn. "chieu": "mua" | "ban", "ma", "sl" (số cổ phiếu), "gia" '
@@ -205,6 +213,10 @@ def prompt(day, personal=True):
         'mua; hoán đổi thì không cần), "tien" (số tiền mua), "ccq" (số ccq đem hoán đổi), "ngay" (ngày đặt lệnh, chỉ khi '
         'người dùng nói rõ ngày hay buổi), "sau_gio": true nếu nói đặt sau 14h40.\n'
         '- "sua_ccq": báo số ccq thực tế của lệnh quỹ vừa khớp. "ccq", "ma".\n'
+        '- "quy_cho": để tiền vào, hoặc rút ra khỏi, quỹ chờ đầu tư (tiền chờ mua quỹ mở theo kế hoạch). "tien", "chieu": '
+        '"nap" | "rut".\n'
+        '- "chuyen_tk": chuyển tiền giữa hai tài khoản, ví của CHÍNH MÌNH (ngân hàng sang ví MoMo, rút tiền mặt ở ATM). '
+        '"tu" (tài khoản đi, nếu có nói), "den" (tài khoản đến), "tien". Chuyển cho người khác là "chi".\n'
         '- "ngan_sach": đặt ngân sách chi tiêu mỗi tháng. "nhom" ("tổng", "hằng ngày" hoặc tên nhóm chi như "ăn uống"), '
         '"tien".\n'
         '- "ngay_luong": cho biết ngày nhận lương hằng tháng. "ngay_luong" (1–31), "tien".\n'
@@ -234,6 +246,9 @@ def prompt(day, personal=True):
         'hôm nay còn được tiêu bao nhiêu → {"viec": "xem", "man": "du_bao"}\n'
         'chuyển khoản tiền nhà 5tr → {"viec": "chi"}\n'
         'nạp 1tr vào quỹ dự phòng → {"viec": "du_phong", "tien": 1000000, "chieu": "nap"}\n'
+        'chuyển 5tr từ VCB sang MoMo → {"viec": "chuyen_tk", "tu": "VCB", "den": "MoMo", "tien": 5000000}\n'
+        'rút 2tr tiền mặt → {"viec": "chuyen_tk", "den": "tiền mặt", "tien": 2000000}\n'
+        'để 4tr vào quỹ chờ → {"viec": "quy_cho", "tien": 4000000, "chieu": "nap"}\n'
         'bán 1300 HAG giá 12 → {"viec": "co_phieu", "chieu": "ban", "ma": "HAG", "sl": 1300, "gia": 12}\n'
         'tôi còn nợ bao nhiêu → {"viec": "xem", "man": "no"}\n'
         'quỹ lãi lỗ thế nào rồi → {"viec": "xem", "man": "dau_tu"}\n'
@@ -390,6 +405,8 @@ def missing(a):
     for f in fields:
         if f["can"] and a.get(f["ten"]) is None:
             return f
+    if job == "chuyen_tk" and not a.get("tu") and main_name() is None:
+        return field(job, "tu")  # chưa có tài khoản chính: phải biết tiền đi từ đâu
     for f in fields:
         if f["goi"] and a.get(f["ten"]) is None and f["ten"] not in a.get("_bo", []):
             return f
@@ -418,6 +435,10 @@ def show(f, v):
         return dict(choices(f)).get(v, str(v))
     if f["kieu"] == "ngay":
         return f"ngày {v[8:]}/{v[5:7]}"
+    if name == "chinh":
+        return "tài khoản chính"
+    if name in ("tu", "den"):
+        return ("từ " if name == "tu" else "sang ") + html.escape(str(v))
     if f["kieu"] == "co":
         return "sau 14h40"
     return html.escape(str(v))
@@ -451,7 +472,8 @@ def describe(a):
                 + (f"kỳ hạn {int(a['ky'])} tháng" if a.get("ky") else "không kỳ hạn") + start
                 + "\n<i>Là tài sản, không tính là khoản chi</i>")
     if job == "tai_khoan":
-        return f"🏦 Số dư <b>{esc(a['ten'])}</b> hiện là <b>{money}</b>"
+        return f"🏦 Số dư <b>{esc(a['ten'])}</b> hiện là <b>{money}</b>" + (
+            "\n<i>Là tài khoản chính: từ giờ bot tự cộng thu, trừ chi vào đây</i>" if a.get("chinh") else "")
     if job == "vang":
         kind = "vàng miếng SJC" if a["loai"] == "sjc" else "vàng nhẫn 24k"
         paid = ""
@@ -474,6 +496,16 @@ def describe(a):
             "" if a.get("lai") is None else ", không lãi" if not a["lai"] else f", lãi {num(a['lai'])}%/năm") + (
             f", hạn ngày {int(a['ngay_tra'])}" if a.get("ngay_tra") else "")
         return f"💳 Khoản nợ <b>{esc(a['ten'])}</b>: còn nợ <b>{money}</b>{extra}"
+    if job == "quy_cho":
+        out = a.get("chieu") == "rut"
+        code = fund_code()
+        return (f"📈 {'Rút' if out else 'Để'} <b>{money}</b> {'khỏi' if out else 'vào'} quỹ chờ đầu tư"
+                + (f" {esc(code)}" if code else "") + ("" if out else "\n<i>Là để dành, không tính là khoản chi</i>"))
+    if job == "chuyen_tk":
+        main = main_name()
+        src = a.get("tu") or main or "?"
+        return (f"🔁 Chuyển <b>{money}</b> từ <b>{esc(src)}</b> sang <b>{esc(a['den'])}</b>"
+                "\n<i>Chuyển giữa tài khoản của bạn, không tính là khoản chi</i>")
     if job == "cho_vay":
         return f"🤝 Cho <b>{esc(a['ten'])}</b> vay <b>{money}</b>\n<i>Ghi là khoản phải thu (tài sản), không tính là chi</i>"
     if job == "ngan_sach":
@@ -505,16 +537,78 @@ def big_side_buy(a):
         return None
 
 
-def card(a, chat):
+def money_move(a):
+    """Tiền của việc này đi ra (âm) hay về (dương) tài khoản chính bao nhiêu; 0 nếu không liên quan."""
+    job = a["viec"]
+    if job == "du_phong" and a.get("tien"):
+        return a["tien"] if a.get("chieu") == "rut" else -a["tien"]
+    if job in ("tiet_kiem", "cho_vay", "vang") and a.get("tien"):
+        return -a["tien"]
+    if job == "quy_cho" and a.get("tien"):
+        return a["tien"] if a.get("chieu") == "rut" else -a["tien"]
+    if job == "co_phieu" and a.get("sl") and a.get("gia"):
+        if ct.taisan().broker_cash(ct.taisan().load()):
+            return 0  # tiền đi, về tài khoản chứng khoán
+        value = a["sl"] * price_dong(a["gia"])
+        return value if a.get("chieu") == "ban" else -value
+    return 0
+
+
+def source(a):
+    """(dòng nguồn tiền trên thẻ, nhãn nút đổi) hoặc None nếu chưa có tài khoản chính hoặc việc không đụng tiền."""
+    delta = money_move(a)
+    if not delta:
+        return None
+    try:
+        ts = ct.taisan()
+        main = ts.main_account()
+        if not main:
+            return None
+        name, left = html.escape(main["ten"]), ts.main_balance(main)
+    except Exception as e:
+        print(f"[lỗi] tài khoản chính: {e!r}", file=sys.stderr)
+        return None
+    if a.get("san"):
+        return (f"🏦 Tiền có sẵn, không {'cộng vào' if delta > 0 else 'trừ'} {name}",
+                f"🔁 {'Về' if delta > 0 else 'Lấy từ'} {main['ten'][:20]}")
+    line = (f"🏦 Tiền về <b>{name}</b>: còn ~{ts.short(left + delta)}" if delta > 0 else
+            f"🏦 Tiền từ <b>{name}</b>: còn ~{ts.short(left + delta)} sau khi chuyển")
+    return line, ("🔁 Không cộng vào tài khoản nào" if delta > 0 else "🔁 Tiền có sẵn, không trừ")
+
+
+def card(a, chat, cid=None):
     """Thẻ "Mình hiểu là…": lưu việc, chờ bấm ✅ mới ghi."""
-    cid = kho.command("INCR", K_CARD_ID)
+    cid = cid or kho.command("INCR", K_CARD_ID)
     kho.put(f"{K_CARD}{cid}", a, CARD_SECONDS)
     rows = [[("✅ Đúng, ghi lại", f"y:ok:{cid}"), ("✏️ Sửa", f"y:sua:{cid}"), ("❌ Thôi", f"y:huy:{cid}")]]
     main = big_side_buy(a)
     if main:
         rows.insert(1, [(f"🔁 Ghi và rải 80% sang {main} trong 3 tháng", f"y:ok:{cid}:rai")])
+    text = describe(a)
+    src = source(a)
+    if src:
+        text += "\n" + src[0]
+        rows.insert(1, [(src[1], f"y:nguon:{cid}")])
+    if a["viec"] == "tai_khoan" and not a.get("chinh") and no_main():
+        rows.insert(1, [("✅ Ghi, là tài khoản chính (lương về, hay tiêu)", f"y:ok:{cid}:chinh")])
     head = "📷 Đọc từ ảnh, kiểm tra lại giúp mình:" if a.get("_anh") else "Mình hiểu là:"
-    return f"{head}\n{describe(a)}", rows
+    return f"{head}\n{text}", rows
+
+
+def main_name():
+    try:
+        main = ct.taisan().main_account()
+        return main["ten"] if main else None
+    except Exception as e:
+        print(f"[lỗi] tài khoản chính: {e!r}", file=sys.stderr)
+        return None
+
+
+def no_main():
+    try:
+        return ct.taisan().main_account() is None
+    except Exception:
+        return False
 
 
 def advance(a, chat, now):
@@ -552,31 +646,64 @@ def run(a, now, chat, option=None):
         return ct.record_text("+ " + dated(a, f"{a['tien']}đ {a.get('ghi_chu') or 'thu nhập'}", day), now)
     if job == "tra_no":
         return ct.record_text(dated(a, f"{a['tien']}đ trả nợ {a['ten']}", day), now)
+    paid = not a.get("san")  # tiền đi từ (về) tài khoản chính, nếu có
     if job == "du_phong":
-        note = ct.duphong().change(-a["tien"] if a.get("chieu") == "rut" else a["tien"], day)
+        note = ct.duphong().change(-a["tien"] if a.get("chieu") == "rut" else a["tien"], day, from_main=paid)
         return note, [[("🛟 Quỹ dự phòng", "dp:xem"), ct.BACK]]
     if job == "tiet_kiem":
         data = ts.load()
         start_day = date.fromisoformat(a["ngay"]) if a.get("ngay") else day
         note = ts.add_saving_item(data, a["ten"], a["tien"], a["lai"], int(a.get("ky") or 0), start_day)
+        moved = ts.move_main(data, -a["tien"], f"sổ tiết kiệm {a['ten']}", day) if paid else None
         ts.save(data)
-        return note, [[("💼 Tài sản", "m:ts"), ct.BACK]]
+        return note + (f"\n{moved}" if moved else ""), [[("💼 Tài sản", "m:ts"), ct.BACK]]
     if job in ("tai_khoan", "cho_vay"):
         data = ts.load()
         name = a["ten"] if job == "tai_khoan" else f"Cho {a['ten']} vay"
         note = ts.add_simple(data, "tien" if job == "tai_khoan" else "khac", [name, f"{a['tien']}đ"])
         if not note:
             return "⚠️ Chưa ghi được, thử lại với tên ngắn hơn nhé"
+        if job == "cho_vay" and paid:
+            moved = ts.move_main(data, -a["tien"], f"cho {a['ten']} vay", day)
+            note += f"\n{moved}" if moved else ""
+        if job == "tai_khoan" and (a.get("chinh") or option == "chinh"):
+            item = next(it for it in data["items"] if it["loai"] == "tien" and ts.same_name(it["ten"], name[:30]))
+            if ts.can_be_main(item) and not item.get("chinh"):
+                ts.set_main(data, item)
+                note += ("\n🏦 Đã đặt làm tài khoản chính: từ giờ bot tự cộng thu, trừ chi, trừ tiền nạp quỹ, góp đầu "
+                         "tư… vào đây")
         ts.save(data)
-        return note, [[("💼 Tài sản", "m:ts"), ct.BACK]]
+        return note, [[("🏦 Tài khoản chính", "ts:chinh"), ("💼 Tài sản", "m:ts"), ct.BACK]]
     if job == "vang":
         args = [a["loai"], num(a["chi"]), "chi"]
         if a.get("tien"):
             args.append(f"{a['tien'] / (a['chi'] / 10) / 1e6:.2f}".replace(".", ","))
         note = ts.add_gold(args)
+        if note and a.get("tien") and paid:
+            data = ts.load()
+            moved = ts.move_main(data, -a["tien"], f"mua {num(a['chi'])} chỉ vàng", day)
+            if moved:
+                ts.save(data)
+                note += f"\n{moved}"
         return (note or "⚠️ Chưa ghi được số vàng này", [[("💼 Tài sản", "m:ts"), ct.BACK]])
     if job == "co_phieu":
         return run_stock(a, now)
+    if job == "quy_cho":
+        dt = ct.dautu()
+        cfg = dt.config()
+        if not dt.active(cfg):
+            return "Chưa bật đầu tư quỹ định kỳ nên chưa có quỹ chờ.", [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
+        notes = []
+        if a.get("chieu") == "rut":
+            taken, left = dt.take_money(cfg, a["tien"], to_main=paid, notes=notes)
+            head = f"✅ Đã rút {ct.vnd(taken)} khỏi quỹ chờ {cfg['ma']}, còn {ct.vnd(left)}"
+        else:
+            left = dt.add_money(cfg, a["tien"], dt.current_period(cfg), from_main=paid, notes=notes)
+            dt.save(cfg)
+            head = f"✅ Đã để {ct.vnd(a['tien'])} vào quỹ chờ {cfg['ma']}: {ct.vnd(left)}"
+        return "\n".join([head] + notes), [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
+    if job == "chuyen_tk":
+        return run_transfer(a, now, chat)
     if job == "quy":
         return run_fund(a, now, option)
     if job == "sua_ccq":
@@ -593,6 +720,49 @@ def run(a, now, chat, option=None):
     return "⚠️ Việc này bot chưa làm được"
 
 
+def run_transfer(a, now, chat):
+    """Chuyển giữa hai tài khoản tiền của mình: trừ nơi đi, cộng nơi đến (tài khoản đến chưa có thì tạo)."""
+    ts, day = ct.taisan(), now.date()
+    data = ts.load()
+    src = ts.find_account(data, a["tu"]) if a.get("tu") else ts.main_account(data)
+    if src is None:
+        if a.get("tu"):
+            return f"Không thấy tài khoản «{html.escape(a['tu'])}» trong 💼 Tài sản. Thêm trước: «tài khoản {html.escape(a['tu'])} còn 10tr»"
+        f = field("chuyen_tk", "tu")  # chưa có tài khoản chính: hỏi tiền đi từ đâu
+        kho.put(chat_key(chat), {"viec": a, "hoi": "tu"}, STATE_SECONDS)
+        return question(a, f)
+    dst = ts.find_account(data, a["den"])
+    if dst is src:
+        return "Tài khoản đi và đến là một, không có gì để chuyển"
+    if dst and (dst.get("duphong") or dst.get("dautu")):  # vào quỹ dự phòng, quỹ chờ: làm như việc riêng
+        job = "du_phong" if dst.get("duphong") else "quy_cho"
+        if src.get("chinh"):
+            return run({"viec": job, "tien": a["tien"], "chieu": "nap"}, now, chat)
+        reply = run({"viec": job, "tien": a["tien"], "chieu": "nap", "san": True}, now, chat)
+        data = ts.load()
+        src = ts.find_account(data, a["tu"])
+        src["tien"] -= a["tien"]
+        ts.save(data)
+        text, rows = reply if isinstance(reply, tuple) else (reply, None)
+        return text + f"\n🏦 {html.escape(src['ten'])} còn {ct.vnd(src['tien'])}", rows
+    created = dst is None
+    if created:
+        dst = {"id": ts.new_id(data), "loai": "tien", "ten": a["den"][:30], "tien": 0, "ngay": day.isoformat()}
+        data["items"].append(dst)
+    lines = [f"✅ Đã chuyển {ct.vnd(a['tien'])} từ {html.escape(src['ten'])} sang {html.escape(dst['ten'])}"
+             + (" (tài khoản mới)" if created else "")]
+    for it, delta in ((src, -a["tien"]), (dst, a["tien"])):
+        if it.get("chinh"):
+            lines.append(ts.move_main(data, delta, f"{'sang ' + dst['ten'] if delta < 0 else 'từ ' + src['ten']}", day))
+        else:
+            it["tien"] += delta
+            it["ngay"] = day.isoformat()
+            lines.append(f"🏦 {html.escape(it['ten'])}: {ct.vnd(it['tien'])}")
+    ts.save(data)
+    return "\n".join(lines + ["<i>Chuyển giữa tài khoản của bạn, không tính là khoản chi</i>"]), [
+        [("💼 Tài sản", "m:ts"), ct.BACK]]
+
+
 def run_stock(a, now):
     ts = ct.taisan()
     code, qty, price = a["ma"].upper(), int(a["sl"]), int(round(price_dong(a["gia"])))
@@ -604,7 +774,7 @@ def run_stock(a, now):
             if not note or not note.startswith("✅"):
                 return note or f"⚠️ Chưa ghi được mã {html.escape(code)}"
             ts.save(data)
-    reply = ts.trade(f"{'bán' if a['chieu'] == 'ban' else 'mua'} {qty} {code} giá {price}", now)
+    reply = ts.trade(f"{'bán' if a['chieu'] == 'ban' else 'mua'} {qty} {code} giá {price}", now, pay_main=not a.get("san"))
     return reply or f"⚠️ Không thấy mã {html.escape(code)} trên sàn, kiểm tra lại mã cổ phiếu nhé"
 
 
@@ -831,6 +1001,9 @@ def on_button(arg, message, now):
         if job not in JOBS:
             return None, None
         extra = {"ma": preset.upper()} if preset and job == "sua_ccq" else {}
+        if preset == "chinh" and job == "tai_khoan":
+            main = ct.taisan().main_account()
+            extra = {"ten": main["ten"], "chinh": True} if main else {"chinh": True}
         return None, ("send", lambda: start(job, chat, now, **extra))
     if kind == "thoi":
         forget(chat)
@@ -860,6 +1033,9 @@ def on_button(arg, message, now):
     if kind == "chi" and a.get("viec") == "_chi":
         kho.delete(f"{K_CARD}{cid}")
         return "Đã ghi", ("edit", lambda: ct.record_text(a["cau"], now))
+    if kind == "nguon":
+        a["san"] = not a.get("san")
+        return None, ("edit", lambda: card(a, chat, cid))
     if kind == "sua":
         kho.put(chat_key(chat), {"viec": a, "sua": True, "the": cid}, STATE_SECONDS)
         return None, ("send", lambda: "✏️ Sửa chỗ nào? Nhắn phần đúng, ví dụ «giá 2tr5», «6 tháng» hay «ngày 9/11».")
