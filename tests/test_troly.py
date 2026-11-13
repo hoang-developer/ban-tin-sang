@@ -176,6 +176,32 @@ class TroLy(unittest.TestCase):
         self.assertIsNone(kho.get("vivang"))
         self.assertIn("ghi ngay như trước", troly.try_text("cà phê 35k", h.CLOCK["now"].date()))
 
+    def test_tra_no_ghi_nguyen_cau_va_tru_du_no(self):
+        sono.declare("chú Tư 20tr, trả 5tr/tháng, không lãi, tháng này chưa trả", h.CLOCK["now"].date())
+        h.AI.replies["trả nợ chú Tư 5tr"] = {"viec": "tra_no", "ten": "chú Tư", "tien": 5000000}
+        text, _ = h.say("trả nợ chú Tư 5tr")
+        self.assertIn("Đã ghi 5.000.000đ", text)
+        self.assertEqual(sono.active()[0]["tien"], 15_000_000)
+        h.AI.replies.clear()  # lần sau không cần AI
+        calls = len(h.AI.calls)
+        h.say("trả nợ chú Tư 5tr")
+        self.assertEqual((len(h.AI.calls), sono.active()[0]["tien"]), (calls, 10_000_000))
+
+    def test_tra_no_khi_ai_ban_van_ghi_nhu_truoc(self):
+        sono.declare("chú Tư 20tr, trả 5tr/tháng, không lãi, tháng này chưa trả", h.CLOCK["now"].date())
+        text, _ = h.say("trả nợ chú Tư 5tr")
+        self.assertIn("Đã ghi 5.000.000đ", text)
+        self.assertEqual(sono.active()[0]["tien"], 15_000_000)
+
+    def test_cau_thieu_thong_tin_van_nhan_dung_viec_roi_hoi_tiep(self):
+        h.AI.replies["chuyển 5tr vào tiết kiệm"] = {"viec": "tiet_kiem", "tien": 5000000}
+        text, _ = h.say("chuyển 5tr vào tiết kiệm")
+        self.assertIn("Sổ tiết kiệm: 5.000.000đ", text)
+        self.assertIn("Gửi ở ngân hàng nào", text)
+        h.AI.replies["hôm nay còn được tiêu bao nhiêu"] = {"viec": "xem", "man": "du_bao"}
+        text, _ = h.say("hôm nay còn được tiêu bao nhiêu")
+        self.assertNotIn("Không có khoản nào khớp", text)  # mở màn hình dự báo, không tra sổ chi tiêu
+
     def test_chua_bat_ai_thi_chay_nhu_truoc(self):
         os.environ.pop("GEMINI_API_KEY")
         text, _ = h.say("nạp 1tr vào quỹ dự phòng")

@@ -106,11 +106,12 @@ EXAMPLES = ("• mua 2 chỉ vàng nhẫn hết 27tr\n• gửi tiết kiệm VC
 # "bạn" khác "bán"); gõ không dấu thì so trên chữ đã bỏ dấu.
 TRIGGERS = ["chuyển", "nạp", "rút", "tiết kiệm", "vàng", "vay", "mượn", "quỹ", "ccq", "chứng chỉ", "cổ phiếu", "bán",
             "đầu tư", "tài khoản", "số dư", "ngân sách", "lương về", "nhận lương", "nhận tiền", "được thưởng",
-            "hoán đổi", "tất toán", "đáo hạn", "dự phòng", "vff", "vmeef", "không tiêu", "khớp lệnh", "đặt lệnh"]
+            "hoán đổi", "tất toán", "đáo hạn", "dự phòng", "vff", "vmeef", "không tiêu", "khớp lệnh", "đặt lệnh",
+            "nợ", "trả góp", "khoản vay"]
 # Câu hỏi về thứ ngoài sổ chi tiêu (nợ, tài sản, quỹ, kế hoạch): không trả lời bằng sổ chi tiêu
 BEYOND = ["nợ", "vay", "quỹ", "ccq", "vff", "vmeef", "tài sản", "tiết kiệm", "vàng", "cổ phiếu", "đầu tư", "dự phòng",
           "kế hoạch", "mục tiêu", "lãi", "lỗ", "ngân sách", "trả xong", "bao giờ", "khi nào", "tài khoản", "số dư",
-          "sức khỏe", "để dành"]
+          "sức khỏe", "để dành", "được tiêu", "nên tiêu"]
 
 
 def word_re(words):
@@ -218,12 +219,19 @@ def prompt(day, personal=True):
         '- "hoi": câu hỏi về các khoản chi, thu ĐÃ GHI (hết bao nhiêu, nhiều nhất, so sánh, liệt kê).\n'
         '- "khac": không thuộc việc nào ở trên (kể cả bán vàng, rút tiết kiệm), hoặc không hiểu.\n'
         "Quy tắc: số tiền là số nguyên đồng (35k = 35000; 1tr2 = 1200000; 2 củ = 2000000; 1 tỷ = 1000000000). Ngày viết "
-        "YYYY-MM-DD. Chỉ điền trường người dùng có nói, không tự đoán, không điền null. Không chắc thì \"khac\".\n"
+        "YYYY-MM-DD. Chỉ điền trường người dùng có nói, không tự đoán, không điền null. Câu thiếu thông tin (chưa nói "
+        "ngân hàng, lãi suất, số tiền...) thì VẪN chọn đúng việc và chỉ điền phần đã biết: bot sẽ hỏi phần còn thiếu. Chỉ "
+        "dùng \"khac\" khi câu không thuộc việc nào.\n"
         "Ví dụ:\n"
         'gửi tiết kiệm tcb 50tr lãi 4,7% kỳ 6 tháng → {"viec": "tiet_kiem", "ten": "TCB", "tien": 50000000, "lai": 4.7, '
         '"ky": 6}\n'
         'mua 2 vỉ vàng 0,1 chỉ hết 2tr476 → {"viec": "vang", "loai": "nhan", "chi": 0.2, "tien": 2476000}\n'
         'vay anh Nam 10tr không lãi → {"viec": "no_moi", "ten": "anh Nam", "tien": 10000000, "lai": 0}\n'
+        'chuyển 5tr vào tiết kiệm → {"viec": "tiet_kiem", "tien": 5000000}\n'
+        'trả góp tủ lạnh còn 8tr2 mỗi tháng 4tr1 không lãi → {"viec": "no_moi", "ten": "trả góp tủ lạnh", "tien": '
+        '8200000, "moi_thang": 4100000, "lai": 0}\n'
+        'trả nợ chú Tư 5tr → {"viec": "tra_no", "ten": "chú Tư", "tien": 5000000}\n'
+        'hôm nay còn được tiêu bao nhiêu → {"viec": "xem", "man": "du_bao"}\n'
         'chuyển khoản tiền nhà 5tr → {"viec": "chi"}\n'
         'nạp 1tr vào quỹ dự phòng → {"viec": "du_phong", "tien": 1000000, "chieu": "nap"}\n'
         'bán 1300 HAG giá 12 → {"viec": "co_phieu", "chieu": "ban", "ma": "HAG", "sl": 1300, "gia": 12}\n'
@@ -260,6 +268,8 @@ def value_of(f, value):
         return x if x is not None and 0 <= x < 1e9 else None
     if kind == "chu":
         s = " ".join(str(value).split())[:40]
+        if s.islower() and f["ten"] == "ten":
+            s = s[0].upper() + s[1:]  # "techcombank" -> "Techcombank"
         return s if s and ct.plain(s) not in ("null", "none", "khong ro") else None
     if kind == "ngay":
         try:
@@ -674,6 +684,9 @@ def handle(a, text, now, chat):
         if a.get("tien"):
             return ct.record_text(f"{a['tien']}đ {a.get('ghi_chu') or 'khoản chi'}", now)
         return unsure(text)
+    if job == "tra_no" and a.get("ten") and ct.parse_amount(text):
+        remember_plain(text)  # câu trả nợ đủ ý: ghi nguyên câu như trước (sổ nợ tự trừ), lần sau khỏi hỏi AI
+        return None
     if job == "hoi":
         return ct.phantich().hoi(text, now.date())
     if job == "xem":
@@ -709,6 +722,8 @@ def understand(text, now, chat, question=False):
         print(f"[lỗi] AI hiểu câu: {e!r}", file=sys.stderr)
         if question:
             return ct.phantich().hoi(text, now.date())
+        if ct.parse_amount(text) and re.match(r"tra (?:no|gop|tien)(?!\w)", ct.plain(text.strip())):
+            return None  # "trả nợ chú Tư 5tr": ghi như trước, sổ nợ tự trừ
         return unsure(text, down=True)
     return handle(a, text, now, chat)
 
