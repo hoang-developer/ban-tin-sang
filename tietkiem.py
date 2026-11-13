@@ -174,7 +174,7 @@ def home_line(day):
     if day < s["start"]:
         return None
     real = sum(s["real"].values())
-    return (f"💚 Từ {s['start']:%d/%m}: {saved_text(s['saved'])} so với trước"
+    return (f"💚 Từ {s['start']:%d/%m} {saved_text(s['saved'])}"
             + (f" · để dành thật {money(real)}" if real else "") + f" · 🔥 {s['streak']} ngày")
 
 
@@ -183,32 +183,27 @@ def view(day):
         return ct.NEED_STORE
     s = summary(day)
     base, start = s["base"], s["start"]
-    lines = [f"💚 <b>Tiết kiệm từ khi dùng bot</b> (từ {start:%d/%m/%Y})",
-             f"Mốc chi lặt vặt trước đây: <b>{money(base)}/ngày</b> (khoản dưới 1tr, từ sao kê trước khi dùng bot)"]
+    lines = [f"💚 <b>Tiết kiệm từ {start:%d/%m/%Y}</b> · mốc chi lặt vặt <b>{money(base)}/ngày</b>"]
     if s["days"]:
         diff = (s["avg"] - base) / base * 100 if base else 0
-        lines.append(f"📉 <b>{saved_text(s['saved']).capitalize()}</b> qua {s['days']} ngày có ghi · TB "
-                     f"{money(s['avg'])}/ngày ({diff:+.0f}% so với mốc)")
+        lines.append(f"{'🟢' if s['saved'] >= 0 else '🔴'} <b>{saved_text(s['saved']).capitalize()}</b> · "
+                     f"{s['days']} ngày, TB {money(s['avg'])}/ngày ({diff:+.0f}%)")
         if s["month_days"] and s["month_days"] != s["days"]:
             lines.append(f"   Tháng {day.month}: {saved_text(s['month_saved'])} ({s['month_days']} ngày)")
     else:
-        lines.append("Chưa có ngày nào trọn vẹn để tính. Ghi chi tiêu hằng ngày, hết ngày bot cộng số đã bớt")
-    lines.append(f"Hôm nay: {money(s['today'])}/{money(base)}" + ("" if s["today_logged"] else " (chưa ghi khoản nào)"))
-    missing = s["elapsed"] - s["days"]
-    lines.append(f"🔥 Chuỗi {s['streak']} ngày · kỷ lục {s['best']} · ghi {s['days']}/{s['elapsed']} ngày"
-                 + (f" ({missing} ngày không ghi chưa được tính)" if missing > 0 else ""))
+        lines.append("Chưa có ngày nào trọn vẹn: hết ngày bot mới cộng số đã bớt")
+    today_mark = "⬜" if not s["today_logged"] else "🟢" if s["today"] <= base else "🔴"
+    lines.append(f"{today_mark} Hôm nay {money(s['today'])}/{money(base)}")
+    lines.append(f"🔥 {s['streak']} ngày · 🏆 kỷ lục {s['best']} · ghi {s['days']}/{s['elapsed']} ngày")
     if s["weeks"]:
-        lines.append("Theo tuần: " + " · ".join(f"{m:%d/%m} {money(avg)}/ngày" for m, avg, _ in s["weeks"]))
+        lines.append("📅 " + " · ".join(f"{m:%d/%m} {money(avg)}/ngày" for m, avg, _ in s["weeks"]))
     r = s["real"]
     real = sum(r.values())
     parts = [f"{label} {money(r[k])}" for k, label in (("duphong", "quỹ dự phòng"), ("dautu", "góp đầu tư"),
                                                        ("tra_no", "trả nợ")) if r[k]]
-    lines.append(f"✅ <b>Đã để dành thật: {money(real)}</b>" + (f" ({' · '.join(parts)})" if parts else ""))
+    lines.append(f"✅ <b>Để dành thật {money(real)}</b>" + (f" ({' · '.join(parts)})" if parts else ""))
     if s["movable"]:
-        lines.append(f"💡 Còn {money(s['movable'])} chi ít hơn mốc chưa chuyển đi: chuyển vào quỹ thì mới thành tiền "
-                     "để dành thật, không thì dễ tiêu mất")
-    lines.append("<i>Mốc lấy từ sao kê ngân hàng nên không có tiền mặt; sổ ghi có cả tiền mặt, nên số đã bớt có thể thấp "
-                 "hơn thực tế một chút</i>")
+        lines.append(f"💡 {money(s['movable'])} đã bớt chưa chuyển đi")
     return "\n".join(lines), buttons(s, day)
 
 
@@ -260,8 +255,7 @@ def reminder(day):
         return None
     goal = (f"giữ chuỗi 🔥 {s['streak']} ngày" if s["streak"] else "bắt đầu chuỗi ngày ghi chép mới") + (
         f" · tháng này {saved_text(s['month_saved'])}" if s["month_days"] else "")
-    text = (f"📝 Hôm nay chưa ghi khoản chi nào. Ghi nốt để {goal}.\n"
-            "Nhắn kiểu: cà phê 35k · hoặc bấm nút nếu hôm nay không tiêu gì")
+    text = f"📝 Hôm nay chưa ghi khoản chi nào: ghi nốt để {goal}"
     return text, [[("🙅 Hôm nay không tiêu", f"tk:khong:{day.isoformat()}"), ("💚 Tiết kiệm", "tk:xem")]]
 
 

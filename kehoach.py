@@ -22,7 +22,6 @@ import sochitieu as ct
 import sono
 import taisan as ts
 
-NOT_ADVICE = "<i>Tham khảo, không phải lời khuyên tài chính</i>"
 INVEST = (("tietkiem", "tiết kiệm"), ("vang", "vàng"), ("etf", "ETF"), ("quy", "quỹ mở"), ("cp", "cổ phiếu"))
 
 
@@ -34,20 +33,20 @@ def spending_estimate(day, group, debt_need):
     """(chi tiêu dự kiến tháng này không tính trả nợ, cách tính) — None nếu chưa có dữ liệu."""
     budgets = kho.get(ct.K_BUDGET, {}) or {}
     if budgets.get("tong"):  # ngân sách tổng tính mọi khoản chi, kể cả trả nợ
-        return max(0, budgets["tong"] - debt_need), "theo ngân sách tổng, trừ phần trả nợ"
+        return max(0, budgets["tong"] - debt_need), "ngân sách tổng"
     items = [e for e in ct.between(day - timedelta(days=89), day)
              if e["nhom"] not in (ct.INCOME, group) and not e.get("no")]
     if not items:
         manual = duphong.config().get("chi")
-        return (manual, "chi thiết yếu bạn đặt ở /duphong") if manual else (0, None)
+        return (manual, "tự đặt") if manual else (0, None)
     days = (day - date.fromisoformat(min(e["ngay"] for e in items))).days + 1
     average = sum(e["tien"] for e in items) / days * 30.4
     if days < duphong.MIN_DAYS:
         manual = duphong.config().get("chi")
         if manual:
-            return manual, "chi thiết yếu bạn đặt ở /duphong"
-        return average, f"mới có {days} ngày ghi chép, số còn thô"
-    return average, f"trung bình {days} ngày qua, không tính trả nợ"
+            return manual, "tự đặt"
+        return average, f"TB {days} ngày"
+    return average, f"TB {days} ngày"
 
 
 def numbers(day):
@@ -110,73 +109,57 @@ def invest_part(day):
         return None
 
 
+def mark(done, need):
+    """✅ đủ · 🟡 một phần · ⬜ chưa."""
+    return "✅" if need and done >= need * 0.98 else "🟡" if done else "⬜"
+
+
 def plan(day):
     if not kho.ready():
         return ct.NEED_STORE
     n = numbers(day)
     f = n["fund"]
-    lines = [f"📋 <b>Chia lương tháng {day.month}/{day.year}</b>"]
+    head = f"📋 <b>Chia lương {day.month}/{day.year}</b>"
+    if n["income"]:
+        head += f" · 💰 <b>{short(n['income'])}</b>" + (f" ({n['income_basis']})" if n["income_basis"] else "")
+    lines = [head]
     try:
         lines.append(step_line(day, n))
     except Exception as e:
         print(f"[lỗi] bước lộ trình: {e!r}", file=sys.stderr)
-    if n["income"]:
-        lines.append(f"💰 Thu: <b>{short(n['income'])}</b>" + (f" ({n['income_basis']})" if n["income_basis"] else ""))
-    else:
-        lines.append("💰 Chưa có thu nhập tháng này: nhắn «+ lương 19tr», hoặc «lương về ngày 5, khoảng 19tr» để tới ngày "
-                     "bot hỏi")
-    step = 1
+    if not n["income"]:
+        lines.append("💰 Chưa có thu nhập: nhắn «+ lương 19tr», hoặc «lương về ngày 5, khoảng 19tr»")
     if n["debts"]:
-        parts = []
-        for d, need, paid in n["debts"]:
-            mark = "✅" if not sono.month_left(d, n["ym"]) else "🟡" if paid else "⬜"
-            parts.append(f"{html.escape(sono.short_name(d, 24))} {short(need)} {mark}")
-        lines.append(f"{step}. 💳 Trả nợ: <b>{short(n['debt_need'])}</b> — " + " · ".join(parts))
-        step += 1
+        names = " · ".join(f"{html.escape(sono.short_name(d, 24))} {mark(paid, need)}" for d, need, paid in n["debts"])
+        lines.append(f"💳 Trả nợ <b>{short(n['debt_need'])}</b>: {names}")
     if n["spend_basis"]:
-        lines.append(f"{step}. 🧾 Chi tiêu: <b>~{short(n['spend'])}</b> ({n['spend_basis']}) · đã chi {short(n['spent'])}")
-        step += 1
+        lines.append(f"🧾 Chi tiêu ~<b>{short(n['spend'])}</b> ({n['spend_basis']}) · đã chi {short(n['spent'])}")
     if n["fund_ideal"]:
-        lines.append(f"{step}. 🛟 Quỹ dự phòng: <b>{short(n['fund_target'])}</b> · đã nạp {short(n['fund_added'])}")
+        lines.append(f"🛟 Quỹ dự phòng <b>{short(n['fund_target'])}</b> {mark(n['fund_added'], n['fund_target'])}"
+                     + (f" đã nạp {short(n['fund_added'])}" if n["fund_added"] else ""))
         if n["fund_target"] < n["fund_ideal"]:
-            lines.append(f"   Để kịp hạn {f['deadline']:%m/%Y} cần {short(n['fund_ideal'])}/tháng; tháng này phần thu còn "
-                         "lại chỉ đủ mức trên (đổi hạn ở /duphong)")
+            lines.append(f"   ⏳ Kịp hạn {f['deadline']:%m/%Y} cần {short(n['fund_ideal'])}/tháng (đổi hạn: /duphong)")
         if n["freed"] and n["fund_target"] >= n["freed"]:
-            lines.append(f"   🔁 gồm {short(n['freed'])} trước đây trả {html.escape(', '.join(n['freed_names']))} "
-                         "(đã trả xong)")
-        step += 1
+            lines.append(f"   🔁 gồm {short(n['freed'])} trước trả {html.escape(', '.join(n['freed_names']))} ✅")
     elif f["monthly"]:
-        lines.append(f"{step}. 🛟 Quỹ dự phòng: đã đủ {f['months']} tháng chi ✅")
-        step += 1
+        lines.append(f"🛟 Quỹ dự phòng đủ {f['months']} tháng chi ✅")
     else:
-        lines.append(f"{step}. 🛟 Quỹ dự phòng: chưa tính được (cần {duphong.MIN_DAYS} ngày ghi chép, hoặc tự đặt "
-                     "chi thiết yếu: /duphong chi 10tr)")
-        step += 1
+        lines.append(f"🛟 Quỹ dự phòng: cần {duphong.MIN_DAYS} ngày ghi chép (hoặc /duphong chi 10tr)")
     inv = n["invest"]
     if inv:
         if inv["gop"]:
-            lines.append(f"{step}. 📈 Đầu tư {inv['ma']}: <b>{short(inv['gop'])}</b> vào quỹ chờ · đã để "
-                         f"{short(inv['added'])}" + (" ✅" if not n["invest_left"] else ""))
+            lines.append(f"📈 {inv['ma']} <b>{short(inv['gop'])}</b> {mark(inv['added'], inv['gop'])}"
+                         + (f" đã để {short(inv['added'])}" if inv["added"] else ""))
         else:
-            lines.append(f"{step}. 📈 Đầu tư {inv['ma']}: {inv['note']}")
-        step += 1
+            lines.append(f"📈 {inv['ma']}: {inv['note']}")
     if n["left"] is not None:
-        lines.append(f"{step}. 💰 Còn lại: <b>{short(n['left'])}</b>")
-        if n["left"] < 0:
-            lines.append(f"⚠️ Thiếu {short(-n['left'])}: bớt chi tiêu, hoặc tháng này nạp quỹ ít hơn")
-        elif n["fund_ideal"]:
-            lines.append("💡 Cuối tháng còn dư thì dồn thêm vào quỹ dự phòng để xong sớm")
-        elif f["monthly"]:
-            lines.append("💡 Quỹ đã đủ: phần còn lại để đầu tư đều (tiết kiệm, vàng, ETF, cổ phiếu)")
+        lines.append(f"{'🟢 Còn' if n['left'] >= 0 else '🔴 Thiếu'} <b>{short(abs(n['left']))}</b>")
     s = spendable_safe(day, n)
     if s:
-        lines.append(f"🧾 {spend_text(s, bold=True)}\n   <i>{basis_text(s)}</i>")
+        lines.append(f"{spend_text(s, bold=True)}\n   <i>{basis_text(s)}</i>")
     main = ts.main_account(n["data"])
     if main:
-        lines.append(f"🏦 {html.escape(main['ten'])} còn ~<b>{short(ts.main_balance(main, day))}</b>")
-    else:
-        lines.append("<i>💡 Chọn tài khoản chính (nơi lương về) để bot tự trừ khi trả nợ, nạp quỹ, góp đầu tư</i>")
-    lines.append(NOT_ADVICE)
+        lines.append(f"🏦 {html.escape(main['ten'])} ~<b>{short(ts.main_balance(main, day))}</b>")
     todo = steps(n)
     rows = [[(f"✅ Làm hết theo kế hoạch ({short(sum(x[2] for x in todo))})", "kh:het")]] if len(todo) > 1 else []
     rows += [[(f"✅ Trả {sono.short_name(d)} {sono.short(sono.month_left(d, n['ym']))}",
@@ -206,8 +189,9 @@ def salary_hint(entries, day):
         [f"{inv['ma']} {inv['note']}"] if inv and not inv["gop"] and inv["note"] else [])
     if not n["debt_left"] and not n["fund_left"] and not n["invest_left"]:
         return None
-    line = "📋 Lương về! Gợi ý chia: " + " → ".join(parts) + (
-        f" → còn {short(n['left'])}" if n["left"] is not None else "")
+    line = "📋 Lương về! " + " → ".join(parts) + (
+        (f" → 🟢 còn {short(n['left'])}" if n["left"] >= 0 else f" → 🔴 thiếu {short(-n['left'])}")
+        if n["left"] is not None else "")
     row = [("📋 Xem kế hoạch", "kh:chia")]
     todo = steps(n)
     if len(todo) > 1:
@@ -250,22 +234,27 @@ def spendable(day, n=None):
 
 
 def spend_text(s, bold=False):
-    """'Hôm nay còn được tiêu 180.000đ (mỗi ngày tối đa 250k)' hoặc báo đã quá."""
+    """'🟢 Hôm nay còn 180k · mức 250k/ngày' hoặc '🔴 Hôm nay quá 50k · mức 250k/ngày'."""
+    return room_text(s["per_day"], s["today_left"], bold,
+                     "ngân sách tổng" if s["basis"] == "tong" else "phần chi tiêu")
+
+
+def room_text(per_day, today_left, bold=False, what="phần chi tiêu"):
     b = (lambda x: f"<b>{x}</b>") if bold else (lambda x: x)
-    if s["per_day"] <= 0:
-        return "Đã tiêu hết " + ("ngân sách tổng" if s["basis"] == "tong" else "phần dành cho chi tiêu") + " tháng này"
-    if s["today_left"] >= 0:
-        return f"Hôm nay còn được tiêu {b(approx(s['today_left']))} (mỗi ngày tối đa {short(s['per_day'])})"
-    return f"Hôm nay đã tiêu quá {b(approx(-s['today_left']))} so với mức mỗi ngày {short(s['per_day'])}"
+    if per_day <= 0:
+        return f"🔴 Hết {what} tháng này"
+    if today_left >= 0:
+        return f"🟢 Hôm nay còn {b(short(today_left))} · mức {short(per_day)}/ngày"
+    return f"🔴 Hôm nay quá {b(short(-today_left))} · mức {short(per_day)}/ngày"
 
 
 def basis_text(s):
     """Con số trên tính từ đâu."""
     if s["basis"] == "tong":
-        return f"theo ngân sách tổng {short(s['limit'])}/tháng"
+        return f"ngân sách tổng {short(s['limit'])}/tháng"
     head, *rest = s["parts"]
-    return (f"theo kế hoạch chia lương: thu {short(head[1])}" + "".join(f" − {k} {short(v)}" for k, v in rest if v)
-            + f" = {short(s['limit'])} cho chi tiêu cả tháng")
+    return (f"thu {short(head[1])}" + "".join(f" − {k} {short(v)}" for k, v in rest if v)
+            + f" = {short(s['limit'])} chi tiêu/tháng")
 
 
 def approx(x):
@@ -297,11 +286,10 @@ def main_note(total):
     """Dòng tài khoản chính trước khi làm: tiền đi từ đâu, còn bao nhiêu."""
     main = ts.main_account()
     if not main:
-        return ("<i>Chưa chọn tài khoản chính nên bot chỉ ghi vào từng ngăn, không trừ số dư tài khoản nào. Chọn ở "
-                "💼 Tài sản → 🏦 Tài khoản chính.</i>")
+        return "<i>Chưa chọn tài khoản chính: không trừ số dư tài khoản nào</i>"
     left = ts.main_balance(main)
-    return (f"🏦 Tiền đi từ <b>{html.escape(main['ten'])}</b>: {short(left)} → còn ~<b>{short(left - total)}</b>"
-            + (" ⚠️ không đủ" if left < total else ""))
+    return (f"🏦 {html.escape(main['ten'])} {short(left)} → ~<b>{short(left - total)}</b>"
+            + (" 🔴 không đủ" if left < total else ""))
 
 
 def confirm_all(day):
@@ -312,10 +300,10 @@ def confirm_all(day):
     if not todo:
         return "✅ Kế hoạch tháng này đã làm hết rồi.", [[("📋 Chia lương", "kh:chia"), ct.BACK]]
     total = sum(x[2] for x in todo)
-    lines = [f"✅ <b>Làm hết theo kế hoạch tháng {day.month}</b>"] + [
-        f"• {html.escape(label)}: <b>{short(amount)}</b>" for _, label, amount, _ in todo]
-    lines += [f"Tổng: <b>{short(total)}</b>", main_note(total),
-              "<i>Trả nợ được ghi là khoản chi nhóm Trả nợ; nạp quỹ, góp đầu tư là để dành, không tính là chi.</i>"]
+    icons = {"no": "💳", "dp": "🛟", "dt": "📈"}
+    lines = [f"✅ <b>Làm hết kế hoạch tháng {day.month}?</b>"] + [
+        f"{icons[kind]} {html.escape(label)} <b>{short(amount)}</b>" for kind, label, amount, _ in todo]
+    lines += [f"Σ <b>{short(total)}</b>", main_note(total)]
     return "\n".join(lines), [[("✅ Làm ngay", "kh:het:ok"), ("↩️ Xem lại kế hoạch", "kh:chia")]]
 
 
@@ -363,13 +351,13 @@ def next_actions(day, n=None):
     month_income = any(e["nhom"] == ct.INCOME for e in ct.load(n["ym"]))
     topped = n["fund_added"] and n["fund_left"] < 0.3 * n["fund_target"]  # đã nạp gần đủ: số lệch nhỏ do trung bình chi đổi
     if n["fund_left"] >= 100_000 and month_income and not topped:
-        out.append(f"Nạp quỹ dự phòng {short(n['fund_left'])} tháng này")
+        out.append(f"Nạp quỹ dự phòng {short(n['fund_left'])}")
     if not n["fund"]["monthly"]:
-        out.append(f"Ghi chép đủ {duphong.MIN_DAYS} ngày để bot tính quỹ dự phòng (đang có {n['fund']['days']} ngày)")
+        out.append(f"Ghi chép đủ {duphong.MIN_DAYS} ngày ({n['fund']['days']}/{duphong.MIN_DAYS})")
     pending = sum(ct.pending(e) for e in ct.load(n["ym"]))
     if pending:
         out.append(f"Xếp nhóm {pending} khoản chưa rõ: /chuaxep")
-    return out[:3] or ["Không có việc gấp, cứ ghi chép đều nhé ✨"]
+    return out[:3] or ["Không có việc gấp ✨"]
 
 
 def invest_summary(day):
@@ -390,28 +378,28 @@ def roadmap_steps(day, n):
     bearing = [d for d in debts if sono.has_interest(d)]
     zero = [d for d in debts if not sono.has_interest(d)]
     steps = []
-    steps.append((days >= duphong.MIN_DAYS, "📒 Ghi chép chi tiêu ít nhất 2 tuần"
-                  + ("" if days >= duphong.MIN_DAYS else f" (đang có {days} ngày)")))
+    steps.append((days >= duphong.MIN_DAYS, "📒 Ghi chép ≥ 2 tuần"
+                  + ("" if days >= duphong.MIN_DAYS else f" ({days}/{duphong.MIN_DAYS} ngày)")))
     first = f["monthly"] and f["covered"] >= 1
-    steps.append((first, "🛟 Quỹ dự phòng mốc đầu: 1 tháng chi thiết yếu"
-                  + (f" ({short(f['monthly'])}) · đang có {short(f['balance'])}" if f["monthly"] else "")))
+    steps.append((first, "🛟 Quỹ dự phòng 1 tháng chi"
+                  + (f" ({short(f['balance'])}/{short(f['monthly'])})" if f["monthly"] else "")))
     if bearing:
         ends = [sono.schedule(d, day) for d in bearing]
         last = max(s[1] for s in ends) if all(ends) else None
         text = (f"💳 Trả hết nợ có lãi: còn {short(sum(d['tien'] for d in bearing))} ("
                 + html.escape(", ".join(d["ten"] for d in bearing)) + ")"
-                + (f", xong khoảng {sono.ym_text(last)}" if last else ""))
+                + (f" · xong ~{sono.ym_text(last)}" if last else ""))
     else:
         text = "💳 Trả hết nợ có lãi" + ("" if debts else " (không có nợ)")
     steps.append((not bearing, text))
     full = f["monthly"] and not f["missing"]
-    steps.append((full, f"🛟 Quỹ dự phòng đủ {f['months']} tháng chi"
+    steps.append((full, f"🛟 Quỹ dự phòng {f['months']} tháng chi"
                   + (f" ({short(f['target'])}): {f['balance'] / f['target'] * 100:.0f}%" if f["target"] else "")))
     held = invest_summary(day)
     inv = n["invest"]
-    plan_text = (f"{inv['ma']} {short(inv['gop'])}/tháng, mua theo Value Averaging" if inv and inv["gop"] else
+    plan_text = (f"{inv['ma']} {short(inv['gop'])}/tháng (Value Averaging)" if inv and inv["gop"] else
                  f"{inv['ma']} ({inv['note']})" if inv else "tiết kiệm, vàng, ETF, quỹ mở, cổ phiếu")
-    steps.append((False, f"📈 Đầu tư đều mỗi tháng: {plan_text}" + (f"\n      đang có: {held}" if held else "")))
+    steps.append((False, f"📈 Đầu tư đều: {plan_text}" + (f"\n      đang có: {held}" if held else "")))
     current = next((i for i, (done, _) in enumerate(steps) if not done), len(steps) - 1)
     return steps, current, zero
 
@@ -419,7 +407,7 @@ def roadmap_steps(day, n):
 def step_line(day, n):
     """'🎯 Bước 2/5: 🛟 Quỹ dự phòng mốc đầu…' cho màn hình Kế hoạch."""
     steps, current, _ = roadmap_steps(day, n)
-    return f"🎯 Lộ trình bước {current + 1}/{len(steps)}: {steps[current][1].split(chr(10))[0]}"
+    return f"🎯 Bước {current + 1}/{len(steps)}: {steps[current][1].split(chr(10))[0]}"
 
 
 def roadmap(day):
@@ -434,11 +422,10 @@ def roadmap(day):
     if zero:
         ym = n["ym"]
         status = ["✅" if not sono.month_left(d, ym) else "⬜" for d in zero if sono.is_due(d, ym)]
-        lines.append("🤝 Song song: trả đều nợ không lãi (" + html.escape(", ".join(d["ten"] for d in zero)) + ")"
-                     + (f" · tháng {day.month} {''.join(status)}" if status else " · kỳ trả đầu tháng sau"))
-    lines.append("\n👉 <b>Việc nên làm bây giờ</b>")
+        lines.append("🤝 Song song: nợ không lãi (" + html.escape(", ".join(d["ten"] for d in zero)) + ")"
+                     + (f" · tháng {day.month} {''.join(status)}" if status else " · trả từ tháng sau"))
+    lines.append("\n👉 <b>Việc nên làm</b>")
     lines += [f"• {a}" for a in next_actions(day, n)]
-    lines.append(NOT_ADVICE)
     rows = [[("📋 Chia lương tháng này", "kh:chia")],
             [("🛟 Quỹ dự phòng", "dp:xem"), ("💳 Sổ nợ", "no:xem")],
             [("📈 Đầu tư", "dt:xem"), ("🩺 Khám sức khỏe", "ts:sk"), ct.BACK]]

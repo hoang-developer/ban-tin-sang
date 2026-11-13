@@ -37,8 +37,8 @@ def set_main(amount=50_000_000, name="VCB"):
 
 
 def spend_number(text):
-    """Số "hôm nay còn được tiêu …" trong một tin."""
-    m = re.search(r"Hôm nay còn được tiêu ([\d.]+đ) \(mỗi ngày tối đa ([^)]+)\)", text)
+    """Số "🟢 Hôm nay còn … · mức …/ngày" trong một tin."""
+    m = re.search(r"🟢 Hôm nay còn (\S+) · mức (\S+)/ngày", text)
     return m.groups() if m else None
 
 
@@ -60,7 +60,7 @@ class TaiKhoanChinh(unittest.TestCase):
     def test_chon_bang_nut_va_tu_cong_thu_tru_chi(self):
         h.say("/taisan tien VCB 20tr")
         _, body, _ = h.press(f"ts:chinh:{item('VCB')['id']}")
-        self.assertIn("Tài khoản chính: VCB", body)
+        self.assertIn("VCB ~20.000.000đ (tài khoản chính)", body)
         h.say("cà phê 35k")
         self.assertEqual(main_balance(), 19_965_000)
         h.say("+ thưởng 1tr")
@@ -70,8 +70,8 @@ class TaiKhoanChinh(unittest.TestCase):
         h.say("12/11 ăn tối 200k")  # khoản của hôm qua: đã nằm trong số dư lúc chốt sáng nay
         self.assertEqual(main_balance(), 19_965_000)
         _, body, _ = h.press("ts:chinh")
-        self.assertIn("Số dư ước tính: 19.965.000đ", body)
-        self.assertIn("chi: −35k", body)
+        self.assertIn("VCB ~19.965.000đ", body)
+        self.assertIn("💸 chi −35k", body)
 
     def test_khai_bao_lai_so_du_thi_chot_lai(self):
         self.assertIn("Đã đặt làm tài khoản chính", set_main(30_000_000))
@@ -90,9 +90,9 @@ class TaiKhoanChinh(unittest.TestCase):
         before = net()
         h.AI.replies["nạp 3tr vào quỹ dự phòng"] = {"viec": "du_phong", "tien": 3_000_000, "chieu": "nap"}
         text, buttons = h.say("nạp 3tr vào quỹ dự phòng")
-        self.assertIn("Tiền từ VCB: còn ~47tr sau khi chuyển", text)
+        self.assertIn("Từ VCB → còn ~47tr", text)
         _, body, _ = h.press(h.button(buttons, "y:ok:"))
-        self.assertIn("Trừ 3tr từ VCB: còn ~47tr", body)
+        self.assertIn("VCB −3tr → ~47tr", body)
         self.assertEqual((main_balance(), item("Quỹ dự phòng")["tien"], net()), (47_000_000, 3_000_000, before))
 
         h.AI.replies["rút 1tr quỹ dự phòng"] = {"viec": "du_phong", "tien": 1_000_000, "chieu": "rut"}
@@ -106,12 +106,12 @@ class TaiKhoanChinh(unittest.TestCase):
         self.assertEqual((main_balance(), net()), (47_000_000, before))
 
         text, _ = h.say("mua 100 HAG giá 12")
-        self.assertIn("Trừ 1,2tr từ VCB", text)
+        self.assertIn("VCB −1,2tr →", text)
         self.assertEqual((main_balance(), net()), (45_800_000, before))
         h.STOCKS["HAG"] = 13000
         try:
             text, _ = h.say("bán 100 HAG giá 13")
-            self.assertIn("Cộng 1,3tr vào VCB", text)
+            self.assertIn("VCB +1,3tr →", text)
             # tiền bán 1.300.000 − thuế 1.300 về tài khoản; khoản lãi ghi thu nhập không cộng thêm lần nữa
             self.assertEqual(main_balance(), 45_800_000 + 1_298_700)
         finally:
@@ -123,7 +123,7 @@ class TaiKhoanChinh(unittest.TestCase):
         h.AI.replies["gửi tiết kiệm TCB 10tr lãi 5% 6 tháng"] = {"viec": "tiet_kiem", "ten": "TCB", "tien": 10_000_000,
                                                                  "lai": 5, "ky": 6}
         text, buttons = h.say("gửi tiết kiệm TCB 10tr lãi 5% 6 tháng")
-        self.assertIn("Tiền từ VCB: còn ~40tr", text)
+        self.assertIn("Từ VCB → còn ~40tr", text)
         _, card, buttons = h.press(h.button(buttons, "y:nguon:"))
         self.assertIn("Tiền có sẵn, không trừ VCB", card)
         h.press(h.button(buttons, "y:ok:"))
@@ -132,7 +132,7 @@ class TaiKhoanChinh(unittest.TestCase):
         h.AI.replies["mua 2 chỉ vàng nhẫn hết 27tr"] = {"viec": "vang", "loai": "nhan", "chi": 2, "tien": 27_000_000}
         _, buttons = h.say("mua 2 chỉ vàng nhẫn hết 27tr")
         _, body, _ = h.press(h.button(buttons, "y:ok:"))
-        self.assertIn("Trừ 27tr từ VCB", body)
+        self.assertIn("VCB −27tr →", body)
         self.assertEqual(main_balance(), 23_000_000)
 
     def test_tai_khoan_chung_khoan_thi_khong_dung_tai_khoan_chinh(self):
@@ -146,13 +146,13 @@ class TaiKhoanChinh(unittest.TestCase):
         h.say("/dautu batdau 4tr VMEEF")
         set_main(50_000_000)
         text, _ = h.say("/dautu nap 2tr")
-        self.assertIn("Trừ 2tr từ VCB", text)
+        self.assertIn("VCB −2tr →", text)
         text, _ = h.say("/dautu rut 500k")
-        self.assertIn("Cộng 500k vào VCB", text)
+        self.assertIn("VCB +500k →", text)
         self.assertEqual(main_balance(), 48_500_000)
         before = net()
         text, _ = h.say("/dautu dadat 3tr")  # quỹ chờ có 1,5tr: phần thiếu 1,5tr đi từ tài khoản chính
-        self.assertIn("Trừ 1,5tr từ VCB", text)
+        self.assertIn("VCB −1,5tr →", text)
         self.assertEqual(main_balance(), 47_000_000)
         self.assertEqual(net(), before)  # lệnh chờ khớp vẫn tính vào tài sản (theo số tiền) tới khi thành ccq
         _, body, _ = h.press("ts:xem")
@@ -188,16 +188,16 @@ class ChiaLuong(unittest.TestCase):
         self.assertEqual((n["debt_left"], invest), (2_000_000, 4_000_000))
         self.assertGreater(fund, 0)
         _, body, buttons = h.press("kh:het", text)
-        self.assertIn("Trả bác Vân: 2tr", body)
-        self.assertIn("Nạp quỹ dự phòng", body)
-        self.assertIn("Để vào quỹ chờ VMEEF: 4tr", body)
+        self.assertIn("💳 Trả bác Vân 2tr", body)
+        self.assertIn("🛟 Nạp quỹ dự phòng", body)
+        self.assertIn("📈 Để vào quỹ chờ VMEEF 4tr", body)
         total = 2_000_000 + fund + invest
-        self.assertIn(f"Tiền đi từ VCB: 49tr → còn ~{ts.short(49_000_000 - total)}", body)
+        self.assertIn(f"🏦 VCB 49tr → ~{ts.short(49_000_000 - total)}", body)
         before = net()
         toast, body, _ = h.press("kh:het:ok", body)
         self.assertEqual(toast, "Đã làm theo kế hoạch")
         self.assertIn("✅ Trả bác Vân 2tr", body)
-        self.assertIn("Chia lương tháng 11/2026", body)
+        self.assertIn("Chia lương 11/2026", body)
         self.assertEqual(main_balance(), 49_000_000 - total)
         self.assertEqual(net(), before)  # trả nợ: tài sản và nợ cùng giảm; nạp quỹ, góp đầu tư: chuyển ngăn
         self.assertEqual(sono.by_id(ts.load(), item("bác Vân")["id"])["tien"], 8_000_000)
@@ -214,7 +214,7 @@ class ChiaLuong(unittest.TestCase):
         h.at(2026, 11, 5, 10)
         h.say("+ lương 19tr")
         text, buttons = kehoach.plan(h.CLOCK["now"].date())
-        self.assertIn("Chọn tài khoản chính", text)
+        self.assertIn("🏦 Chọn tài khoản chính", [label for row in buttons for label, _ in row])
         self.assertIn("ts:chon", [d for row in buttons for _, d in row])
 
 
@@ -226,10 +226,10 @@ class MoiNgayDuocTieu(unittest.TestCase):
         setup_month()
         day = h.CLOCK["now"].date()
         text, _ = h.say("cơm trưa 50k")
-        after = spend_number(text)
-        self.assertIsNotNone(after, text)
-        self.assertNotIn("/324k", text)  # một con số mỗi ngày: không hiện thêm mốc tiết kiệm
-        self.assertIn("🔥 1 ngày", text)
+        self.assertIsNone(spend_number(text))  # chưa đặt ngân sách: tin "Đã ghi" giữ format cũ, không thêm dòng
+        self.assertIn("🔥 1 ngày · hôm nay 50k/324k", text)
+        after = spend_number(h.parts(menu.home(day))[0])
+        self.assertIsNotNone(after)
         s = kehoach.spendable(day)
         n = kehoach.numbers(day)
         self.assertEqual(s["limit"], 19_000_000 - 2_000_000 - n["fund_target"] - 4_000_000)
@@ -238,7 +238,7 @@ class MoiNgayDuocTieu(unittest.TestCase):
         self.assertEqual(round(s["today_left"]), round(s["limit"] / 26 - 50_000))
         dubao = h.parts(ct.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
         self.assertEqual(spend_number(dubao), after)
-        self.assertIn("theo kế hoạch chia lương: thu 19tr − trả nợ 2tr", dubao)
+        self.assertIn("thu 19tr − trả nợ 2tr", dubao)
         tatca = h.parts(ct.answer("/dubao tatca", h.CLOCK["now"], h.CHAT))[0]
         self.assertEqual(spend_number(tatca), after)
         home = h.parts(menu.home(day))[0]
@@ -256,21 +256,21 @@ class MoiNgayDuocTieu(unittest.TestCase):
         text, _ = h.say("cơm trưa 50k")
         s = kehoach.spendable(h.CLOCK["now"].date())
         self.assertEqual((s["basis"], s["limit"]), ("tong", 15_000_000))
-        self.assertEqual(spend_number(text)[0], kehoach.approx(s["today_left"]))
+        self.assertEqual(spend_number(text)[0], kehoach.short(s["today_left"]))  # có ngân sách tổng: hiện dưới tin
         dubao = h.parts(ct.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
-        self.assertIn("theo ngân sách tổng 15tr/tháng", dubao)
+        self.assertIn("ngân sách tổng 15tr/tháng", dubao)
 
     def test_ngan_sach_hang_ngay_van_rieng(self):
         setup_month()
         h.say("/ngansach hằng ngày 6tr")
         text, _ = h.say("cơm trưa 50k")
-        self.assertIn("Chi hằng ngày: hôm nay còn được tiêu", text)
+        self.assertIn("🟢 Chi hằng ngày còn", text)
 
     def test_chua_co_thu_nhap_thi_chi_goi_y(self):
         text, _ = h.say("cơm trưa 50k")
         self.assertNotIn("được tiêu", text)
         dubao = h.parts(ct.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
-        self.assertIn("Nhắn «+ lương 19tr» khi lương về", dubao)
+        self.assertIn("Nhắn «+ lương 19tr» hoặc «ngân sách tổng 15tr»", dubao)
 
     def test_hoi_bang_cau_thuong(self):
         setup_month()
@@ -317,7 +317,7 @@ class ChuyenTien(unittest.TestCase):
         before = net()
         h.AI.replies["để 4tr vào quỹ chờ"] = {"viec": "quy_cho", "tien": 4_000_000, "chieu": "nap"}
         text, buttons = h.say("để 4tr vào quỹ chờ")
-        self.assertIn("Tiền từ VCB: còn ~16tr", text)
+        self.assertIn("Từ VCB → còn ~16tr", text)
         _, body, _ = h.press(h.button(buttons, "y:ok:"))
         self.assertIn("Đã để 4.000.000đ vào quỹ chờ VMEEF", body)
         self.assertEqual((main_balance(), item("Quỹ chờ VMEEF")["tien"], net()), (16_000_000, 4_000_000, before))

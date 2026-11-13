@@ -464,23 +464,20 @@ def describe(a):
     money = ct.vnd(a["tien"]) if a.get("tien") else ""
     if job == "du_phong":
         out = a.get("chieu") == "rut"
-        return (f"🛟 {'Rút' if out else 'Chuyển'} <b>{money}</b> {'khỏi' if out else 'vào'} quỹ dự phòng"
-                + ("" if out else "\n<i>Là để dành, không tính là khoản chi</i>"))
+        return f"🛟 {'Rút' if out else 'Chuyển'} <b>{money}</b> {'khỏi' if out else 'vào'} quỹ dự phòng"
     if job == "tiet_kiem":
         start = f", gửi ngày {a['ngay'][8:]}/{a['ngay'][5:7]}/{a['ngay'][:4]}" if a.get("ngay") else ""
         return (f"🐷 Sổ tiết kiệm <b>{esc(a['ten'])}</b>: <b>{money}</b>, lãi {num(a['lai'])}%/năm, "
-                + (f"kỳ hạn {int(a['ky'])} tháng" if a.get("ky") else "không kỳ hạn") + start
-                + "\n<i>Là tài sản, không tính là khoản chi</i>")
+                + (f"kỳ hạn {int(a['ky'])} tháng" if a.get("ky") else "không kỳ hạn") + start)
     if job == "tai_khoan":
-        return f"🏦 Số dư <b>{esc(a['ten'])}</b> hiện là <b>{money}</b>" + (
-            "\n<i>Là tài khoản chính: từ giờ bot tự cộng thu, trừ chi vào đây</i>" if a.get("chinh") else "")
+        return f"🏦 Số dư <b>{esc(a['ten'])}</b> hiện là <b>{money}</b>" + (" (tài khoản chính)" if a.get("chinh") else "")
     if job == "vang":
         kind = "vàng miếng SJC" if a["loai"] == "sjc" else "vàng nhẫn 24k"
         paid = ""
         if a.get("tien"):
             per = a["tien"] / (a["chi"] / 10) / 1e6
             paid = f", trả <b>{money}</b> (≈ {vn_num(per, 2)} triệu/lượng)"
-        return f"🥇 Mua <b>{num(a['chi'])} chỉ</b> {kind}{paid}\n<i>Là tài sản, không tính là khoản chi</i>"
+        return f"🥇 Mua <b>{num(a['chi'])} chỉ</b> {kind}{paid}"
     if job == "co_phieu":
         cost = f", giá vốn {vn_num(price_dong(a['gia_von']), 0)}đ" if a.get("gia_von") else ""
         return (f"📈 {'Bán' if a['chieu'] == 'ban' else 'Mua'} <b>{vn_num(a['sl'], 0)} {esc(a['ma'].upper())}</b> giá "
@@ -500,14 +497,13 @@ def describe(a):
         out = a.get("chieu") == "rut"
         code = fund_code()
         return (f"📈 {'Rút' if out else 'Để'} <b>{money}</b> {'khỏi' if out else 'vào'} quỹ chờ đầu tư"
-                + (f" {esc(code)}" if code else "") + ("" if out else "\n<i>Là để dành, không tính là khoản chi</i>"))
+                + (f" {esc(code)}" if code else ""))
     if job == "chuyen_tk":
         main = main_name()
         src = a.get("tu") or main or "?"
-        return (f"🔁 Chuyển <b>{money}</b> từ <b>{esc(src)}</b> sang <b>{esc(a['den'])}</b>"
-                "\n<i>Chuyển giữa tài khoản của bạn, không tính là khoản chi</i>")
+        return f"🔁 Chuyển <b>{money}</b> từ <b>{esc(src)}</b> sang <b>{esc(a['den'])}</b>"
     if job == "cho_vay":
-        return f"🤝 Cho <b>{esc(a['ten'])}</b> vay <b>{money}</b>\n<i>Ghi là khoản phải thu (tài sản), không tính là chi</i>"
+        return f"🤝 Cho <b>{esc(a['ten'])}</b> vay <b>{money}</b>"
     if job == "ngan_sach":
         return f"🎯 Ngân sách <b>{esc(a['nhom'])}</b>: <b>{money}</b> mỗi tháng"
     if job == "ngay_luong":
@@ -571,8 +567,8 @@ def source(a):
     if a.get("san"):
         return (f"🏦 Tiền có sẵn, không {'cộng vào' if delta > 0 else 'trừ'} {name}",
                 f"🔁 {'Về' if delta > 0 else 'Lấy từ'} {main['ten'][:20]}")
-    line = (f"🏦 Tiền về <b>{name}</b>: còn ~{ts.short(left + delta)}" if delta > 0 else
-            f"🏦 Tiền từ <b>{name}</b>: còn ~{ts.short(left + delta)} sau khi chuyển")
+    line = (f"🏦 Về <b>{name}</b> → ~{ts.short(left + delta)}" if delta > 0 else
+            f"🏦 Từ <b>{name}</b> → còn ~{ts.short(left + delta)}")
     return line, ("🔁 Không cộng vào tài khoản nào" if delta > 0 else "🔁 Tiền có sẵn, không trừ")
 
 
@@ -670,8 +666,7 @@ def run(a, now, chat, option=None):
             item = next(it for it in data["items"] if it["loai"] == "tien" and ts.same_name(it["ten"], name[:30]))
             if ts.can_be_main(item) and not item.get("chinh"):
                 ts.set_main(data, item)
-                note += ("\n🏦 Đã đặt làm tài khoản chính: từ giờ bot tự cộng thu, trừ chi, trừ tiền nạp quỹ, góp đầu "
-                         "tư… vào đây")
+                note += "\n🏦 Đã đặt làm tài khoản chính"
         ts.save(data)
         return note, [[("🏦 Tài khoản chính", "ts:chinh"), ("💼 Tài sản", "m:ts"), ct.BACK]]
     if job == "vang":
@@ -759,7 +754,7 @@ def run_transfer(a, now, chat):
             it["ngay"] = day.isoformat()
             lines.append(f"🏦 {html.escape(it['ten'])}: {ct.vnd(it['tien'])}")
     ts.save(data)
-    return "\n".join(lines + ["<i>Chuyển giữa tài khoản của bạn, không tính là khoản chi</i>"]), [
+    return "\n".join(lines), [
         [("💼 Tài sản", "m:ts"), ct.BACK]]
 
 
@@ -964,7 +959,7 @@ def on_reply(text, now, chat):
         print(f"[lỗi] AI hiểu câu trả lời: {e!r}", file=sys.stderr)
         if f:
             text_q, rows = question(a, f)
-            return "⚠️ Mình chưa đọc được câu trả lời (AI đang bận), bạn trả lời ngắn giúp nhé.\n" + text_q, rows
+            return "⚠️ Chưa hiểu, trả lời ngắn giúp nhé.\n" + text_q, rows
         return "⚠️ AI đang bận nên chưa sửa được. Bấm ✅ trên thẻ nếu vẫn đúng, hoặc nhắn lại sau."
     if b["viec"] == a["viec"]:
         if st.get("the"):

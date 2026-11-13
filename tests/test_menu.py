@@ -27,7 +27,7 @@ class BonMuc(unittest.TestCase):
         self.assertEqual([b["text"] for row in keyboard for b in row],
                          ["🏠 Hôm nay", "💰 Tiền của tôi", "🎯 Kế hoạch", "💬 Hỏi"])
         for label, title in (("🏠 Hôm nay", "Hôm nay, thứ sáu 13/11"), ("💰 Tiền của tôi", "Tiền của tôi"),
-                             ("🎯 Kế hoạch", "Chia lương tháng 11/2026"), ("💬 Hỏi", "Hỏi")):
+                             ("🎯 Kế hoạch", "Chia lương 11/2026"), ("💬 Hỏi", "Hỏi")):
             text, _ = h.say(label)
             self.assertIn(title, text)
 
@@ -47,7 +47,7 @@ class BonMuc(unittest.TestCase):
         h.say("cơm trưa 50k")
         text, buttons = screen("home")
         self.assertIn("Đã chi 50k: cơm trưa 50k", text)
-        self.assertIn("Hôm nay còn được tiêu", text)
+        self.assertIn("🟢 Hôm nay còn", text)
         self.assertIn("VCB còn ~", text)
         self.assertIn("Lương đã về: trả bác Vân 2tr · nạp quỹ dự phòng", text)
         self.assertEqual(buttons[0], "kh:het")
@@ -84,7 +84,7 @@ class BonMuc(unittest.TestCase):
     def test_ke_hoach_cho_biet_buoc_lo_trinh(self):
         setup_month()
         text, buttons = screen("kh")
-        self.assertIn("🎯 Lộ trình bước", text)
+        self.assertIn("🎯 Bước 1/5", text)
         self.assertIn("kh:het", buttons)
         self.assertIn("kh:lt", buttons)
 
@@ -93,7 +93,7 @@ class BonMuc(unittest.TestCase):
         _, buttons = screen("hoi")
         self.assertIn("m:q:tieu", buttons)
         _, body, _ = h.press("m:q:tieu")
-        self.assertIn("Hôm nay còn được tiêu", body)
+        self.assertIn("🟢 Hôm nay còn", body)
         _, body, _ = h.press("m:q:no")
         self.assertIn("bác Vân", body)
 
@@ -161,7 +161,7 @@ class ThongBaoGop(unittest.TestCase):
         self.assertEqual(len(sent), 1)
         text, buttons = sent[0]
         self.assertIn("☀️ Sáng 07/11", text)
-        self.assertIn("Đã nhận chưa?", text)
+        self.assertIn("đã nhận chưa?", text)
         self.assertIn("Nhắc trả nợ tháng 11", text)
         self.assertIn("ts:luong:19000000", buttons)
         self.assertIn("no:tra:", " ".join(buttons))
