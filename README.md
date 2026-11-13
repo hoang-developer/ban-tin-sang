@@ -167,7 +167,7 @@ Từ khóa có sẵn của từng nhóm: phần "Nhóm chi tiêu" đầu [sochit
 ### Tự xếp nhóm, ít khoản rơi vào Khác
 
 Bot xếp mỗi khoản theo thứ tự: nhóm bạn đã tự chọn cho nội dung đó → từ khóa (bạn thêm, rồi có sẵn) →
-AI (nếu bật, khoản có dấu 🤖) → nếu vẫn chưa rõ thì **hỏi bạn ngay** bằng nút chọn nhóm dưới tin (bấm
+AI (nếu bật, khoản có dấu ✨) → nếu vẫn chưa rõ thì **hỏi bạn ngay** bằng nút chọn nhóm dưới tin (bấm
 "📦 Để ở Khác" nếu đúng là khoản lặt vặt). Chọn một lần là bot nhớ, các khoản cùng nội dung đang ở Khác
 cũng được xếp luôn; số và ngày tháng trong ghi chú được bỏ qua khi nhớ ("tiền rác tháng 11" nhớ thành
 "tiền rác", tháng sau vẫn nhận ra).
@@ -261,7 +261,7 @@ ngày, nội dung; bot ghi như tin nhắn thường, vẫn có nút ✏️ đ�
 - Hóa đơn có phần trả bằng voucher, Got It, điểm thưởng: bot hiện nút "➕ Ghi … vào Thu nhập" (điểm đổi từ
   chi tiêu thẻ là khoản thu; chi vẫn ghi đủ giá).
 - Chữ kèm ảnh là ghi chú, có `#nhóm` thì vào nhóm đó: gửi ảnh kèm `cà phê với khách #giải trí`.
-- Nhóm: cụm từ bạn đã dạy và từ khóa đi trước, không khớp mới dùng nhóm AI đoán (dấu 🤖).
+- Nhóm: cụm từ bạn đã dạy và từ khóa đi trước, không khớp mới dùng nhóm AI đoán (dấu ✨).
 - Ngày trên ảnh ở tương lai hoặc quá 1 năm thì lấy hôm nay. Gửi lại đúng ảnh cũ thì bot báo đã ghi rồi.
 - Thử ngày 04/11/2026 với Gemini 3.5 Flash-Lite: đúng số tiền 7/7 ảnh, gồm hóa đơn Highlands chụp thật (tổng
   29.000đ trả bằng Got It 20.000 + MoMo 9.000), hóa đơn chụp nghiêng mờ, màn hình chuyển/nhận tiền; ảnh
@@ -473,7 +473,7 @@ giúp bớt được bao nhiêu.
 
 ### AI (tùy chọn, miễn phí): Google Gemini, OpenRouter dự phòng
 
-AI giúp bot ở các việc: xếp nhóm khoản lạ (dấu 🤖), hiểu câu hỏi, viết nhận xét tháng và khám sức khỏe tài
+AI giúp bot ở các việc: xếp nhóm khoản lạ (dấu ✨), hiểu câu hỏi, viết nhận xét tháng và khám sức khỏe tài
 chính. Mọi con số vẫn do bot tự tính. Khoản nào từ khóa không nhận ra thì bot hỏi AI; AI được biết cả nhóm
 bạn tự tạo (kèm từ khóa) và những khoản bạn đã tự xếp để đoán theo thói quen của bạn; không chắc thì AI để
 Khác và bot hỏi bạn. Bot nhớ câu trả lời, cùng nội dung không hỏi lại. AI lỗi, bận hay hết lượt thì bot vẫn
