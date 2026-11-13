@@ -34,7 +34,7 @@ FMARKET = "https://api.fmarket.vn/res/products/filter"
 VCB_FX = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx"
 BUTTONS = [[("📊 Biểu đồ", "ts:bd"), ("🩺 Khám sức khỏe", "ts:sk")],
            [("🗂 Sửa, xóa", "ts:ds"), ("🔄 Cập nhật giá", "ts:xem")],
-           [("➕ Thêm", "y:them"), ct.BACK]]
+           [("🏦 Tài khoản chính", "ts:chinh"), ("➕ Thêm", "y:them"), ct.BACK]]
 NOT_ADVICE = "<i>Chỉ để tham khảo, không phải lời khuyên mua bán chứng khoán hay đầu tư.</i>"
 
 
@@ -211,7 +211,9 @@ def valuation(day, fresh=False):
         kind, rid = it["loai"], str(it["id"])
         if kind == "no" and it["tien"] <= 0:
             continue  # khoản nợ đã trả xong: chỉ còn trong sổ nợ (/no)
-        if kind in ("tien", "khac", "no"):
+        if kind == "tien" and it.get("chinh"):
+            rows.append((kind, rid, it["ten"], main_balance(it, day), None, "tài khoản chính, ước tính theo sổ"))
+        elif kind in ("tien", "khac", "no"):
             rows.append((kind, rid, it["ten"], it["tien"], None, ""))
         elif kind == "tietkiem":
             interest, maturity = accrued(it, day)
@@ -226,6 +228,9 @@ def valuation(day, fresh=False):
             unit = {"cp": "cp", "etf": "ccq", "quy": "ccq", "coin": it["ma"].upper(), "ngoaite": it["ma"]}[kind]
             detail = f"{qty_text(it['sl'])} {unit} × {vn_num(price, 0) + 'đ' if price else 'chưa có giá'}"
             rows.append((kind, rid, it["ma"].upper(), value, cost, detail))
+    for o in pending_orders():  # tiền đã chuyển đi mua quỹ, chưa có NAV để thành ccq: vẫn là tài sản
+        rows.append(("quy", f"lenh{o['id']}", f"{o['quy']} chờ khớp", o["tien"], o["tien"],
+                     f"lệnh {o['dat'][8:]}/{o['dat'][5:7]}, khớp phiên {o['phien'][8:]}/{o['phien'][5:7]}"))
     for i, g in enumerate(gold):
         price = quotes.get("vang", {}).get(g["loai"])
         value = g["luong"] * price if price else 0
@@ -235,6 +240,17 @@ def valuation(day, fresh=False):
     debts = sum(r[3] for r in rows if r[0] == "no")
     return {"rows": rows, "assets": assets, "debts": debts, "net": assets - debts, "notes": notes,
             "lailo": data.get("lailo", [])}
+
+
+def pending_orders():
+    """Lệnh mua quỹ (/dautu) đã đặt, chưa khớp."""
+    try:
+        cfg = kho.get("chitieu:dautu", {}) or {}
+    except Exception as e:
+        print(f"[lỗi] lệnh quỹ chờ khớp: {e!r}", file=sys.stderr)
+        return []
+    return [{**o, "quy": o.get("quy") or cfg.get("ma", "Quỹ")} for o in cfg.get("lenh", [])
+            if o.get("loai", "mua") == "mua" and o.get("trang_thai") == "cho"]
 
 
 def snapshot(day, v):
@@ -319,6 +335,8 @@ def add_simple(data, kind, args):
     for it in data["items"]:
         if it["loai"] == kind and same_name(it["ten"], name):  # cùng tên: cập nhật
             it.update(tien=amount, ngay=ct.today().isoformat())
+            if it.get("chinh"):
+                pin_balance(it, amount)
             return f"✅ Đã cập nhật {TYPES[kind]}: {html.escape(name)} {ct.vnd(amount)}"
     data["items"].append({"id": new_id(data), "loai": kind, "ten": name, "tien": amount,
                           "ngay": ct.today().isoformat()})
@@ -504,7 +522,7 @@ def edit_list():
         return USAGE
     lines = ["🗂 <b>Bấm ❌ để xóa</b> (sửa: khai báo lại cùng tên/mã là được cập nhật)"]
     buttons = []
-    for i, (kind, rid, name, value, _, _) in enumerate(v["rows"], 1):
+    for i, (kind, rid, name, value, _, _) in enumerate([r for r in v["rows"] if not r[1].startswith("lenh")], 1):
         lines.append(f"{i}. {TYPES[kind].split()[0]} {html.escape(name)}: {short(value)}")
         buttons.append((f"❌ {i}", f"ts:x:{rid}"))
     return "\n".join(lines), [buttons[i:i + 5] for i in range(0, len(buttons), 5)] + [[("↩️ Xong", "ts:xem")]]
@@ -592,8 +610,9 @@ def broker_cash(data):
     return next((it for it in data["items"] if it["loai"] == "tien" and "dnse" in ct.plain(it["ten"])), None)
 
 
-def trade(text, now):
-    """Xử lý tin mua/bán cổ phiếu; None nếu tin không phải mua bán cổ phiếu (để ghi như khoản chi thường)."""
+def trade(text, now, pay_main=True):
+    """Xử lý tin mua/bán cổ phiếu; None nếu tin không phải mua bán cổ phiếu (để ghi như khoản chi thường).
+    Tiền đi/về tài khoản DNSE nếu đã khai báo, không thì tài khoản chính (pay_main=False: tiền có sẵn, không trừ)."""
     found = parse_trade(text)
     if not found:
         return None
@@ -621,6 +640,10 @@ def trade(text, now):
         if cash:
             cash["tien"] -= round(paid)
             lines.append(f"🏦 Tiền tài khoản {html.escape(cash['ten'])}: còn {ct.vnd(cash['tien'])}")
+        elif pay_main:
+            moved = move_main(data, -paid, f"mua {vn_num(qty, 0)} {code}", now.date())
+            if moved:
+                lines.append(moved)
         save(data)
         return "\n".join(lines + ["<i>Mua cổ phiếu là đổi tiền sang tài sản, không tính là khoản chi</i>"])
     if not holding:
@@ -646,15 +669,156 @@ def trade(text, now):
              + f" ({gain / cost * 100:+.1f}%)".replace(".", ",")]
     if gain > 0:  # phần lãi là thu nhập đầu tư; phần vốn chỉ là đổi cổ phiếu ra tiền
         entry = {"id": kho.command("INCR", ct.K_COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
-                 "tien": round(gain), "ghichu": f"lãi bán {qty} {code}", "nhom": ct.INCOME}
+                 "tien": round(gain), "ghichu": f"lãi bán {qty} {code}", "nhom": ct.INCOME,
+                 "khong_tk": True}  # tiền bán đã cộng cả vào tài khoản bên dưới, không cộng lần nữa
         ct.save(entry)
         lines.append("Đã ghi phần lãi vào 💰 Thu nhập (đầu tư)")
     lines.append(f"Còn giữ {vn_num(holding['sl'], 0)} {code}" if holding["sl"] else f"Đã bán hết {code}")
     if cash:
         cash["tien"] += round(received)
         lines.append(f"🏦 Tiền tài khoản {html.escape(cash['ten'])}: {ct.vnd(cash['tien'])}")
+    elif pay_main:
+        moved = move_main(data, received, f"bán {vn_num(qty, 0)} {code}", now.date())
+        if moved:
+            lines.append(moved)
     save(data)
     return "\n".join(lines)
+
+
+# ---- Tài khoản chính: nơi lương về, tiền tiêu và tiền chuyển đi các ngăn khác ---------------
+# Số dư = số dư thật lúc chốt + thu − chi ghi sổ sau lúc chốt (khoản có số thứ tự lớn hơn mốc, ngày từ ngày chốt)
+# ± tiền chuyển qua lại với các ngăn khác (quỹ dự phòng, quỹ chờ đầu tư, sổ tiết kiệm, vàng, cổ phiếu...).
+# Tính lại mỗi lần xem nên sửa, xóa khoản chi cũng tự đúng. Chưa chọn tài khoản chính thì mọi thứ như trước.
+
+def main_account(data=None):
+    data = data if data is not None else load()
+    return next((it for it in data["items"] if it["loai"] == "tien" and it.get("chinh")), None)
+
+
+def can_be_main(it):
+    """Tài khoản tiền thường (không phải quỹ dự phòng, quỹ chờ đầu tư, tài khoản chứng khoán)."""
+    return it["loai"] == "tien" and not it.get("duphong") and not it.get("dautu") and "dnse" not in ct.plain(it["ten"])
+
+
+def pin_balance(it, amount):
+    """Chốt số dư thật: tính lại từ đây (các khoản ghi trước lúc này đã nằm trong số dư)."""
+    it.update(tien=int(amount), moc=int(kho.get(ct.K_COUNTER) or 0), moc_ngay=ct.today().isoformat(), chuyen=[])
+
+
+def main_flows(it, day=None):
+    """(thu, chi) ghi sổ từ lúc chốt số dư tài khoản chính."""
+    since = it.get("moc_ngay")
+    day = day or ct.today()
+    if not since or since > day.isoformat():
+        return 0, 0
+    income = spend = 0
+    for e in ct.between(date.fromisoformat(since), day):
+        if e["id"] <= it.get("moc", 0) or e.get("khong_tk"):
+            continue
+        if e["nhom"] == ct.INCOME:
+            income += e["tien"]
+        else:
+            spend += e["tien"]
+    return income, spend
+
+
+def main_balance(it, day=None):
+    income, spend = main_flows(it, day)
+    return it["tien"] + income - spend + sum(x["tien"] for x in it.get("chuyen", []))
+
+
+def move_main(data, delta, note, day=None):
+    """Tiền vào (delta > 0) hoặc ra (delta < 0) tài khoản chính vì chuyển sang ngăn khác (chưa lưu, người gọi lưu
+    data). Trả dòng báo, None nếu chưa chọn tài khoản chính."""
+    it = main_account(data)
+    delta = int(round(delta))
+    if not it or not delta:
+        return None
+    day = day or ct.today()
+    moves = it.setdefault("chuyen", [])
+    moves.append({"ngay": day.isoformat(), "tien": delta, "ghi": note[:40]})
+    if len(moves) > 150:  # gộp các lần cũ vào số chốt cho gọn
+        it["tien"] += sum(x["tien"] for x in moves[:-100])
+        it["chuyen"] = moves[-100:]
+    left = main_balance(it, day)
+    return (f"🏦 {'Trừ' if delta < 0 else 'Cộng'} {short(abs(delta))} {'từ' if delta < 0 else 'vào'} "
+            f"{html.escape(it['ten'])}: còn ~{short(left)}")
+
+
+def find_account(data, name):
+    """Tài khoản tiền theo tên: trùng tên, không thì tên này chứa tên kia ("VCB" và "Vietcombank VCB")."""
+    accounts = [it for it in data["items"] if it["loai"] == "tien"]
+    key = ct.plain(name or "").strip()
+    if not key:
+        return None
+    exact = next((it for it in accounts if same_name(it["ten"], name)), None)
+    if exact:
+        return exact
+    near = [it for it in accounts if key in ct.plain(it["ten"]) or ct.plain(it["ten"]).strip() in key]
+    return near[0] if len(near) == 1 else None
+
+
+def main_line(day=None):
+    """'🏦 VCB ~12,3tr' cho màn hình tổng quan; None nếu chưa chọn."""
+    it = main_account()
+    return f"🏦 {html.escape(it['ten'])} còn ~<b>{short(main_balance(it, day))}</b>" if it else None
+
+
+def set_main(data, it):
+    for other in data["items"]:
+        if other is not it and other.get("chinh"):
+            other["tien"] = main_balance(other)  # tài khoản cũ giữ số dư ước tính tới lúc này, thôi tự trừ
+            for key in ("chinh", "moc", "moc_ngay", "chuyen"):
+                other.pop(key, None)
+    it["chinh"] = True
+    pin_balance(it, it["tien"])
+
+
+def main_text(day):
+    it = main_account()
+    if not it:
+        return choose_main()
+    income, spend = main_flows(it, day)
+    moves = it.get("chuyen", [])
+    out = sum(-x["tien"] for x in moves if x["tien"] < 0)
+    back = sum(x["tien"] for x in moves if x["tien"] > 0)
+    since = date.fromisoformat(it["moc_ngay"])
+    lines = [f"🏦 <b>Tài khoản chính: {html.escape(it['ten'])}</b>",
+             f"Số dư ước tính: <b>{ct.vnd(round(main_balance(it, day)))}</b>",
+             f"• Chốt ngày {since:%d/%m}: {ct.vnd(it['tien'])}",
+             f"• Thu ghi sổ từ đó: +{short(income) if income else '0đ'} · chi: −{short(spend) if spend else '0đ'}"]
+    if out or back:
+        lines.append(f"• Chuyển sang ngăn khác: −{short(out)}" + (f" · nhận về +{short(back)}" if back else ""))
+        lines += [f"   {x['ngay'][8:]}/{x['ngay'][5:7]} {'−' if x['tien'] < 0 else '+'}{short(abs(x['tien']))} "
+                  f"{html.escape(x['ghi'])}" for x in moves[-5:][::-1]]
+    lines.append("<i>Lương, khoản chi, trả nợ, nạp quỹ, góp đầu tư… đều tự cộng trừ vào đây. Lệch với app ngân hàng "
+                 "thì bấm cập nhật số dư thật.</i>")
+    return "\n".join(lines), [[("✏️ Cập nhật số dư thật", "y:them:tai_khoan:chinh")],
+                              [("🔁 Đổi tài khoản chính", "ts:chon"), ("💼 Tài sản", "m:ts"), ct.BACK]]
+
+
+def choose_main():
+    data = load()
+    options = [it for it in data["items"] if can_be_main(it)]
+    lines = ["🏦 <b>Chọn tài khoản chính</b>",
+             "Là tài khoản lương về và hay tiêu nhất. Từ lúc chọn, bot tự cộng thu, trừ chi, trừ tiền khi bạn nạp quỹ "
+             "dự phòng, góp đầu tư, gửi tiết kiệm, trả nợ… nên luôn biết còn bao nhiêu."]
+    if not options:
+        lines.append("Chưa có tài khoản nào. Thêm trước: nhắn «tài khoản Techcombank còn 14tr» hoặc bấm nút.")
+        return "\n".join(lines), [[("➕ Thêm tài khoản", "y:them:tai_khoan"), ct.BACK]]
+    rows = [[(("✅ " if it.get("chinh") else "") + f"{it['ten']} ({short(main_balance(it) if it.get('chinh') else it['tien'])})",
+              f"ts:chinh:{it['id']}")] for it in options[:6]]
+    return "\n".join(lines), rows + [[("➕ Tài khoản khác", "y:them:tai_khoan"), ct.BACK]]
+
+
+def pick_main(item_id):
+    data = load()
+    it = next((x for x in data["items"] if str(x["id"]) == str(item_id) and can_be_main(x)), None)
+    if not it:
+        return None
+    set_main(data, it)
+    save(data)
+    return it
 
 
 # ---- Nhắc lương ------------------------------------------------------------------------
@@ -834,6 +998,15 @@ def on_button(arg, message, now):
         return None, ("edit", edit_list)
     if arg == "hd":
         return None, ("send", lambda: USAGE)
+    if arg == "chinh":
+        return None, ("edit", lambda: main_text(day))
+    if arg == "chon":
+        return None, ("edit", choose_main)
+    if arg.startswith("chinh:"):
+        it = pick_main(arg[6:])
+        if not it:
+            return "Tài khoản này không còn", ("edit", choose_main)
+        return f"Đã chọn {it['ten']}"[:190], ("edit", lambda: main_text(day))
     if arg.startswith("x:"):
         gone = remove(arg[2:])
         return ("Đã xóa" if gone else "Mục này đã xóa rồi"), ("edit", edit_list)

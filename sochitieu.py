@@ -1282,7 +1282,8 @@ def record_text(text, now):
         print(f"[lỗi] phân tích sau khi ghi: {e!r}", file=sys.stderr)
         extra = []
     try:
-        extra += tietkiem().after_record(entries, now.date())  # chuỗi ngày ghi, hôm nay so với mốc, đã bớt
+        # chuỗi ngày ghi, hôm nay so với mốc, đã bớt; đã có dòng "còn được tiêu" thì bỏ phần mốc mỗi ngày (một con số)
+        extra += tietkiem().after_record(entries, now.date(), brief=any(x.startswith("💡") for x in extra))
     except Exception as e:
         print(f"[lỗi] tiết kiệm sau khi ghi: {e!r}", file=sys.stderr)
     reply, rows = entries_message(entries, now.date(), extra=debt_lines + extra)

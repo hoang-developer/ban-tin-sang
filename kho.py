@@ -28,7 +28,39 @@ def ready():
     return config()[0] is not None
 
 
+_memo = None  # trong một lượt xử lý tin (memo()): nhớ kết quả GET/HGETALL, ghi khóa nào thì quên khóa đó
+READS = ("GET", "HGETALL")
+
+
+class memo:
+    """with kho.memo(): ... — trong khối này đọc lại một khóa thì dùng kết quả đã đọc (một tin nhắn có thể đọc sổ
+    tháng, tài sản... vài chục lần). Mọi lệnh ghi đi qua command nên kết quả nhớ luôn khớp với những gì lượt này đã
+    ghi; ra khỏi khối thì quên hết, lượt sau đọc mới."""
+
+    def __enter__(self):
+        global _memo
+        _memo = {}
+
+    def __exit__(self, *exc):
+        global _memo
+        _memo = None
+
+
 def command(*args):
+    if _memo is None or len(args) < 2:
+        return send(*args)
+    op, key = str(args[0]).upper(), str(args[1])
+    if op in READS:
+        if (op, key) not in _memo:
+            _memo[(op, key)] = send(*args)
+        value = _memo[(op, key)]
+        return list(value) if isinstance(value, list) else value
+    for read in READS:  # lệnh ghi (hay lệnh lạ): quên khóa này
+        _memo.pop((read, key), None)
+    return send(*args)
+
+
+def send(*args):
     url, token = config()
     if not url:
         raise KhoError("Chưa có kho dữ liệu: cài Upstash Redis theo README rồi Redeploy")

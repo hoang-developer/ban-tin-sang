@@ -32,7 +32,9 @@ HOW_TO = ("📝 <b>Cách ghi</b>\n"
           "• Hỏi: tháng này ăn uống hết bao nhiêu? · tôi còn nợ bao nhiêu? · quỹ lãi lỗ thế nào?\n"
           "• Việc khác nhắn câu thường, bot hỏi lại nếu thiếu và xin xác nhận trước khi ghi: mua 2 chỉ vàng nhẫn hết 27tr · "
           "gửi tiết kiệm VCB 50tr lãi 4,7% 6 tháng · vay anh Nam 10tr · nạp 2tr vào quỹ dự phòng · tài khoản Techcombank "
-          "còn 14tr · hôm nay không tiêu gì\n"
+          "còn 14tr · chuyển 5tr từ VCB sang MoMo · hôm nay không tiêu gì\n"
+          "• 🏦 Chọn tài khoản chính (💼 Tài sản → 🏦): bot tự cộng thu, trừ chi, trừ tiền nạp quỹ, góp đầu tư, trả nợ, "
+          "nên luôn biết còn bao nhiêu. Lương về thì bấm ✅ Làm hết theo kế hoạch\n"
           "• 📷 Ảnh lệnh mua quỹ, đơn mua vàng, kết quả bán cổ phiếu: bot đọc rồi hỏi lại trước khi ghi\n"
           "Xếp sai nhóm thì bấm ✏️ Đổi nhóm, lần sau bot tự nhớ. Khoản chưa rõ nhóm thì bot hỏi luôn.\n"
           "Khai báo nhiều thứ một lần: dán nhiều lệnh, mỗi lệnh một dòng.")
@@ -104,6 +106,12 @@ def home(day):
     else:
         lines.append("💸 Tháng này chưa ghi khoản nào. Nhắn kiểu: cà phê 35k")
     n = part("chia lương", lambda: kehoach.numbers(day))
+    s = part("mỗi ngày được tiêu", lambda: kehoach.spendable(day, n)) if n else None
+    if s:
+        lines.append(f"🧾 {kehoach.spend_text(s, bold=True)}")
+    main = part("tài khoản chính", lambda: ts.main_line(day))
+    if main:
+        lines.append(main)
     if n and n["fund"]["monthly"]:
         f = n["fund"]
         ratio = f["balance"] / f["target"] if f["target"] else 1

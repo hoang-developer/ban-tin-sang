@@ -151,17 +151,7 @@ def forecast_text(day):
         change = (f["projected"] - f["prev_total"]) / f["prev_total"] * 100
         compare = f" · tháng trước {short(f['prev_total'])} ({'↑' if change >= 0 else '↓'}{abs(change):.0f}%)"
     lines.append(f"➡️ Cả tháng khoảng <b>{approx(f['projected'])}</b>{compare}")
-    room = allowance(f)
-    if room:
-        per_day, today_left = room
-        if per_day <= 0:
-            lines.append("🚨 Đã tiêu hết ngân sách tổng tháng này")
-        else:
-            lines.append(f"💡 Để không vượt ngân sách: mỗi ngày tối đa <b>{approx(per_day)}</b>, hôm nay "
-                         + (f"còn được tiêu <b>{approx(today_left)}</b>" if today_left >= 0
-                            else f"đã quá <b>{approx(-today_left)}</b>"))
-    else:
-        lines.append("<i>Đặt ngân sách tổng để biết mỗi ngày được tiêu bao nhiêu: /ngansach tổng 15tr</i>")
+    lines += spend_lines(day)
     budgets = [budget_line(code, b) for code, b in f["budgets"].items()]
     if budgets:
         lines += ["", "<b>Ngân sách</b>"] + budgets
@@ -256,7 +246,7 @@ def daily_text(day):
                          + (f"còn được tiêu <b>{approx(today_left)}</b>" if today_left >= 0
                             else f"đã quá <b>{approx(-today_left)}</b>") + over)
     else:
-        lines.append("<i>Đặt ngân sách để biết mỗi ngày được tiêu bao nhiêu: /ngansach hằng ngày 9tr</i>")
+        lines += spend_lines(day)
     if f["spikes"]:
         lines.append(f"Không tính {len(f['spikes'])} khoản đột biến ({short(total(f['spikes']))}): " + ", ".join(
             f"{note_of(e)} {short(e['tien'])}" for e in sorted(f["spikes"], key=lambda e: -e["tien"])[:3]))
@@ -293,6 +283,23 @@ def dubao(args):
     return daily_text(ct.today())
 
 
+def spendable(day):
+    """Mỗi ngày được tiêu (một con số chung, xem kehoach.spendable); None nếu chưa tính được."""
+    import kehoach
+    return kehoach.spendable_safe(day)
+
+
+def spend_lines(day):
+    """Dòng "mỗi ngày được tiêu" cho /dubao: con số chung và cách tính, hoặc cách để có con số đó."""
+    import kehoach
+    s = spendable(day)
+    if not s:
+        return ["<i>Ghi lương tháng này (+ lương 19tr) hoặc đặt ngân sách tổng (/ngansach tổng 15tr) để biết mỗi ngày "
+                "được tiêu bao nhiêu</i>"]
+    icon = "🚨" if s["per_day"] <= 0 else "💡"
+    return [f"{icon} {kehoach.spend_text(s, bold=True)}", f"<i>{kehoach.basis_text(s)}</i>"]
+
+
 def daily_spent(day):
     """Đã chi hằng ngày (bỏ khoản đột biến) tháng này: cho dòng ngân sách "hằng ngày" ở sochitieu."""
     return daily_forecast(day)["spent"]
@@ -321,7 +328,8 @@ def unusual_lines(entries, day):
 
 def after_record(entries, day):
     """Dòng thêm dưới tin "Đã ghi": khoản lạ thường, hôm nay còn được tiêu bao nhiêu. Có ngân sách hằng ngày
-    (hoặc ngân sách các nhóm hằng ngày) thì tính theo chi tiêu hằng ngày, không thì theo ngân sách tổng."""
+    (hoặc ngân sách các nhóm hằng ngày) thì tính theo chi tiêu hằng ngày, không thì theo con số chung "mỗi ngày được
+    tiêu" (ngân sách tổng, hoặc kế hoạch chia lương)."""
     lines = unusual_lines(entries, day)
     codes = daily_groups()
     budgets = kho.get(ct.K_BUDGET, {})
@@ -333,13 +341,11 @@ def after_record(entries, day):
                          if today_left >= 0 else f"💡 Chi hằng ngày: hôm nay đã quá {approx(-today_left)} so với mức "
                          f"mỗi ngày {short(max(per_day, 0))}")
             return lines
-    if any(e["nhom"] != ct.INCOME for e in entries) and "tong" in budgets:
-        room = allowance(forecast(day))
-        if room:
-            per_day, today_left = room
-            lines.append(f"💡 Hôm nay còn được tiêu {approx(today_left)} (mỗi ngày tối đa {short(per_day)})"
-                         if today_left >= 0 else f"💡 Hôm nay đã tiêu quá {approx(-today_left)} so với mức mỗi ngày "
-                         f"{short(max(per_day, 0))}")
+    if any(e["nhom"] != ct.INCOME for e in entries):
+        s = spendable(day)  # ngân sách tổng nếu có, không thì theo kế hoạch chia lương
+        if s:
+            import kehoach
+            lines.append(f"💡 {kehoach.spend_text(s)}")
     return lines
 
 

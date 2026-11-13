@@ -58,7 +58,7 @@ def command(*args):
     raise NotImplementedError(op)
 
 
-kho.command = command
+kho.send = command  # lớp nhớ trong một lượt (kho.memo) vẫn chạy thật trên kho giả
 kho.ready = lambda: True
 
 import bantin  # noqa: E402
@@ -173,14 +173,16 @@ def parts(reply):
 
 
 def say(text):
-    """Người dùng nhắn một tin: (chữ bot trả lời, dữ liệu các nút)."""
-    return parts(ct.answer(text, CLOCK["now"], CHAT))
+    """Người dùng nhắn một tin: (chữ bot trả lời, dữ liệu các nút). Chạy trong một lượt nhớ như webhook thật."""
+    with kho.memo():
+        return parts(ct.answer(text, CLOCK["now"], CHAT))
 
 
 def press(data, text=""):
     """Người dùng bấm một nút: (thông báo nhỏ, chữ sau khi bấm, dữ liệu các nút)."""
-    toast, action = ct.on_button(data, {"chat": {"id": CHAT}, "text": text}, CLOCK["now"])
-    body, buttons = parts(action[1]()) if action else ("", [])
+    with kho.memo():
+        toast, action = ct.on_button(data, {"chat": {"id": CHAT}, "text": text}, CLOCK["now"])
+        body, buttons = parts(action[1]()) if action else ("", [])
     return toast, body, buttons
 
 

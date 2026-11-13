@@ -586,17 +586,34 @@ def chart_reply():
 
 # ---- Ghi lệnh, góp tiền, khớp lệnh -----------------------------------------------------
 
-def add_money(cfg, amount, ym, data=None):
-    """Góp thêm vào quỹ chờ (tính là góp của tháng ym)."""
+def add_money(cfg, amount, ym, data=None, from_main=True, notes=None):
+    """Góp thêm vào quỹ chờ (tính là góp của tháng ym). Có tài khoản chính thì tiền đi từ đó (dòng báo thêm vào
+    notes nếu đưa vào); from_main=False: tiền có sẵn."""
     own = data is None
     data = data or ts.load()
     item = wait_item(data, cfg)
     item["tien"] += amount
     item["ngay"] = ct.today().isoformat()
     cfg.setdefault("nap", {})[ym] = cfg.get("nap", {}).get(ym, 0) + amount
+    moved = ts.move_main(data, -amount, f"quỹ chờ {cfg['ma']}") if from_main else None
+    if moved and notes is not None:
+        notes.append(moved)
     if own:
         ts.save(data)
     return item["tien"]
+
+
+def take_money(cfg, amount, to_main=True, notes=None):
+    """Rút tiền khỏi quỹ chờ (tối đa số đang có), về tài khoản chính nếu có. Trả (số đã rút, quỹ chờ còn)."""
+    data = ts.load()
+    item = wait_item(data, cfg)
+    taken = min(item["tien"], amount)
+    item["tien"] -= taken
+    moved = ts.move_main(data, taken, f"rút quỹ chờ {cfg['ma']}") if to_main else None
+    if moved and notes is not None:
+        notes.append(moved)
+    ts.save(data)
+    return taken, item["tien"]
 
 
 def cutoff_day(trading):
@@ -636,9 +653,11 @@ def order_spec(cfg, text, now, fund=None):
     return day, next_trading(fund or cfg, cutoff), ym_of(cutoff)  # fund: quỹ chờ có lịch giao dịch riêng
 
 
-def record_order(amount, trading_day=None, now=None, period=None, order_day=None, fund=None, quiet=False, lump=False):
+def record_order(amount, trading_day=None, now=None, period=None, order_day=None, fund=None, quiet=False, lump=False,
+                 from_main=True):
     """Đã đặt lệnh mua `amount`: trừ quỹ chờ (thiếu thì phần thiếu tính là góp thêm của tháng), ghi lệnh chờ khớp.
-    period: kỳ của lệnh (nút bấm mang theo); không có thì suy từ ngày đóng sổ của phiên khớp. fund: mua quỹ chờ (VFF)."""
+    period: kỳ của lệnh (nút bấm mang theo); không có thì suy từ ngày đóng sổ của phiên khớp. fund: mua quỹ chờ (VFF).
+    Phần không lấy từ quỹ chờ (phần thiếu, khoản góp một lần) đi từ tài khoản chính nếu có (from_main=False: không)."""
     now = now or now_vn()
     order_day = order_day or now.date()
     cfg = config()
@@ -651,14 +670,18 @@ def record_order(amount, trading_day=None, now=None, period=None, order_day=None
         ym = cfg["bat_dau"]
     data = ts.load()
     item = wait_item(data, cfg)
+    outside = 0  # phần tiền không lấy từ quỹ chờ
     if lump:  # khoản góp một lần (tiền bán cổ phiếu...): không trừ vào tiền góp hằng tháng
         cfg.setdefault("ngoai", {})[ym] = cfg.get("ngoai", {}).get(ym, 0) + amount
+        outside = amount
     elif item["tien"] < amount:
         extra = amount - item["tien"]
         cfg.setdefault("nap", {})[ym] = cfg.get("nap", {}).get(ym, 0) + extra
         item["tien"] = 0
+        outside = extra
     else:
         item["tien"] -= amount
+    moved = ts.move_main(data, -outside, f"mua {code}", order_day) if from_main and outside else None
     order = {"id": max([o["id"] for o in cfg.get("lenh", [])] + [0]) + 1, "ky": ym, "tien": amount, "quy": code,
              "loai": "mua", "dat": order_day.isoformat(), "phien": trading.isoformat(), "trang_thai": "cho",
              **({"ngoai": True} if lump else {})}
@@ -666,7 +689,8 @@ def record_order(amount, trading_day=None, now=None, period=None, order_day=None
     ts.save(data)
     save(cfg)
     note = (f"✅ Đã ghi lệnh mua {code} {ct.vnd(amount)}: đặt {order_day:%d/%m} → khớp NAV phiên "
-            f"<b>{trading:%d/%m}</b>." + ("" if side(cfg) else f" Quỹ chờ còn {money(item['tien'])}."))
+            f"<b>{trading:%d/%m}</b>." + ("" if side(cfg) else f" Quỹ chờ còn {money(item['tien'])}.")
+            + (f"\n{moved}" if moved else ""))
     if quiet:
         return note
     matched = match_orders(now)
@@ -951,17 +975,16 @@ def dautu(args):
     if word in ("nap", "them", "de"):
         if not found:
             return USAGE
-        left = add_money(cfg, found[0], current_period(cfg))
+        notes = []
+        left = add_money(cfg, found[0], current_period(cfg), notes=notes)
         save(cfg)
-        return f"✅ Đã thêm {money(found[0])} vào quỹ chờ {cfg['ma']}: {money(left)}"
+        return "\n".join([f"✅ Đã thêm {money(found[0])} vào quỹ chờ {cfg['ma']}: {money(left)}"] + notes)
     if word == "rut":
         if not found:
             return USAGE
-        data = ts.load()
-        item = wait_item(data, cfg)
-        item["tien"] = max(0, item["tien"] - found[0])
-        ts.save(data)
-        return f"Đã rút {money(found[0])} khỏi quỹ chờ, còn {money(item['tien'])}"
+        notes = []
+        taken, left = take_money(cfg, found[0], notes=notes)
+        return "\n".join([f"Đã rút {money(taken)} khỏi quỹ chờ, còn {money(left)}"] + notes)
     sd = side(cfg)
     if word == "quycho" and not found:
         return set_side(cfg, rest)
@@ -1133,9 +1156,11 @@ def on_button(arg, message, now):
         return note[:190], ("edit", lambda: view())
     if kind == "nap" and value.isdigit():
         cfg = config()
-        left = add_money(cfg, int(value), current_period(cfg))
+        notes = []
+        left = add_money(cfg, int(value), current_period(cfg), notes=notes)
         save(cfg)
-        toast = f"Đã để {money(int(value))} vào quỹ chờ ({money(left)})"
+        toast = f"Đã để {money(int(value))} vào quỹ chờ ({money(left)})" + "".join(
+            f" · {x[2:].replace('<b>', '').replace('</b>', '')}" for x in notes)
         if (message.get("text") or "").startswith("📋"):  # nút trên tin chia lương: vẽ lại tin đó
             import kehoach
             return toast, ("edit", lambda: kehoach.plan(now.date()))
