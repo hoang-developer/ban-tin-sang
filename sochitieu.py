@@ -687,7 +687,7 @@ def entry_text(e, day):
     when = "" if e["ngay"] == day.isoformat() else (
         " · hôm qua" if e["ngay"] == (day - timedelta(days=1)).isoformat() else f" · {e['ngay'][8:]}/{e['ngay'][5:7]}")
     note = html.escape(e["ghichu"]) if e["ghichu"] else "<i>không ghi chú</i>"
-    robot = " 🤖" if e.get("ai") else ""  # nhóm do AI đoán
+    robot = " ✨" if e.get("ai") else ""  # ✨ nhóm do AI đoán
     return f"<b>{vnd(e['tien'])}</b> · {name(e['nhom'])}{robot} — {note}{when}"
 
 
@@ -1107,8 +1107,8 @@ def nhom_cmd(args):
     accuracy = f"; đã đoán {guessed} khoản, bạn sửa {fixed}" + (
         f" (đúng {100 - fixed / guessed * 100:.0f}%)" if guessed else "") if guessed or fixed else ""
     quota = quota_text() if ai_key() else ""
-    lines.append(f"🤖 AI xếp nhóm cho khoản lạ: {'bật' if ai_key() else 'tắt'}{accuracy}"
-                 + (f"\n🤖 AI {html.escape(quota)}" if quota else ""))
+    lines.append(f"✨ AI xếp nhóm cho khoản lạ: {'bật' if ai_key() else 'tắt'}{accuracy}"
+                 + (f"\n✨ AI {html.escape(quota)}" if quota else ""))
     return "\n".join(lines + ["", NHOM_USAGE])
 
 

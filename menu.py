@@ -182,7 +182,7 @@ def home(day, now=None):
         lines += ["", "👉 <b>Việc cần làm</b>"] + [f"• {t}" for t, _ in tasks]
         rows = [[b] for _, b in tasks if b][:4]
     elif month:
-        lines += ["", "👉 Không có việc gấp ✨"]
+        lines += ["", "👉 Không có việc gấp 👌"]
     if not today and now.hour >= 18:
         rows.append([("🙅 Hôm nay không tiêu", f"tk:khong:{day.isoformat()}")])
     rows += [[("📊 Chi tiêu tháng", "m:chi"), ("🔮 Dự báo", "db"), ("🧾 Vừa ghi", "m:ls")],

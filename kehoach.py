@@ -357,7 +357,7 @@ def next_actions(day, n=None):
     pending = sum(ct.pending(e) for e in ct.load(n["ym"]))
     if pending:
         out.append(f"Xếp nhóm {pending} khoản chưa rõ: /chuaxep")
-    return out[:3] or ["Không có việc gấp ✨"]
+    return out[:3] or ["Không có việc gấp 👌"]
 
 
 def invest_summary(day):
