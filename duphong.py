@@ -25,7 +25,6 @@ FUND_NAME = "Quỹ dự phòng"
 ESSENTIAL = ["an", "cho", "xe", "nha", "khoe", "hoc", "giadinh"]  # cộng nhóm tự tạo tên "Trả nợ" nếu có
 MONTHS_CHOICES, DEADLINE_CHOICES = (3, 6, 9, 12), (6, 12, 18, 24)
 MIN_DAYS = 14  # ít nhất 2 tuần ghi chép mới tự tính chi thiết yếu (ít hơn thì một khoản lớn làm sai lệch cả tháng)
-NOT_ADVICE = "<i>Tham khảo, không phải lời khuyên tài chính</i>"
 
 
 def config():
@@ -112,40 +111,37 @@ def text(day):
     s = status(day)
     if not s["monthly"]:
         return ("🛟 <b>Quỹ dự phòng</b>\n"
-                f"Sổ mới có {s['days']} ngày, cần ít nhất {MIN_DAYS} ngày ghi chép để tự tính chi thiết yếu mỗi tháng. "
-                "Trong lúc chờ, tự đặt luôn: /duphong chi 12tr (tiền ăn, đi chợ, đi lại, tiền nhà, điện nước, trả nợ… "
-                "mỗi tháng)"), None
+                f"📒 {s['days']}/{MIN_DAYS} ngày ghi chép để tự tính chi thiết yếu mỗi tháng. "
+                "Tự đặt luôn: /duphong chi 12tr (ăn, đi lại, nhà, điện nước, trả nợ…)"), None
     ratio = s["balance"] / s["target"] if s["target"] else 0
-    lines = [f"🛟 <b>Quỹ dự phòng: {money(s['balance'])} / {money(s['target'])}</b> ({s['months']} tháng chi thiết yếu)",
-             f"{bar(ratio)} {ratio * 100:.0f}% · đủ {vn_num(s['covered'], 1)} tháng chi"]
+    lines = [f"🛟 <b>Quỹ dự phòng {money(s['balance'])}/{money(s['target'])}</b> · {s['months']} tháng chi",
+             f"{bar(ratio)} {ratio * 100:.0f}% · đủ {vn_num(s['covered'], 1)} tháng"]
     if s["covered"] < 1:
-        lines.append(f"🚩 Mốc đầu tiên: đủ 1 tháng chi ({money(s['monthly'])}), còn thiếu {money(s['monthly'] - s['balance'])}")
+        lines.append(f"🚩 Mốc 1 tháng ({money(s['monthly'])}): thiếu {money(s['monthly'] - s['balance'])}")
     elif s["covered"] < 3 <= s["months"]:
-        lines.append(f"✅ Đã qua mốc 1 tháng · mốc tiếp theo 3 tháng ({money(3 * s['monthly'])})")
-    basis = "bạn tự đặt" if s["manual"] else f"từ sổ {s['days']} ngày qua"
+        lines.append(f"✅ Mốc 1 tháng · 🚩 tiếp: 3 tháng ({money(3 * s['monthly'])})")
+    basis = "tự đặt" if s["manual"] else f"{s['days']} ngày qua"
     parts = " · ".join(f"{ct.name(c).split()[0]} {money(v)}" for c, v in list(s["by_group"].items())[:6])
-    lines.append(f"Chi thiết yếu: <b>{money(s['monthly'])}/tháng</b> ({basis})" + (f"\n   {parts}" if parts and not s["manual"] else ""))
+    lines.append(f"🧾 Chi thiết yếu <b>{money(s['monthly'])}/tháng</b> ({basis})" + (f"\n   {parts}" if parts and not s["manual"] else ""))
     if s["missing"]:
-        plan = (f"📅 Để đủ trong {s['months_left']} tháng tới (hạn {s['deadline']:%m/%Y}): để <b>{money(s['per_month'])}/tháng</b>"
-                if not s["overdue"] else f"📅 Đã quá hạn {s['deadline']:%m/%Y}: đặt hạn mới bằng nút bên dưới")
+        plan = (f"📅 <b>{money(s['per_month'])}/tháng</b> để đủ trước {s['deadline']:%m/%Y}"
+                if not s["overdue"] else f"🔴 Quá hạn {s['deadline']:%m/%Y}: chọn hạn mới bên dưới")
         lines.append(plan)
         if s["surplus"] is not None:
             if s["surplus"] <= 0:
-                lines.append(f"⚠️ 3 tháng qua chi nhiều hơn thu ({money(-s['surplus'])}/tháng): cần bớt chi trước")
+                lines.append(f"🔴 3 tháng qua chi > thu {money(-s['surplus'])}/tháng")
             else:
                 share = s["per_month"] / s["surplus"] * 100
-                lines.append(f"💰 Dư TB mỗi tháng {money(s['surplus'])}: mức trên bằng {share:.0f}% số dư"
-                             + (" · vừa sức" if share <= 70 else
-                                f" · hơi căng: để 70% phần dư ({money(0.7 * s['surplus'])}) thì cần khoảng "
-                                f"{math.ceil(s['missing'] / (0.7 * s['surplus']))} tháng, đổi hạn bằng nút bên dưới"))
+                lines.append(f"💰 Dư TB {money(s['surplus'])}/tháng · mức trên = {share:.0f}%"
+                             + (" 🟢" if share <= 70 else
+                                f" 🟡 · để 70% ({money(0.7 * s['surplus'])}) thì ~"
+                                f"{math.ceil(s['missing'] / (0.7 * s['surplus']))} tháng"))
     else:
-        lines.append("🎉 Quỹ dự phòng đã đủ! Bước tiếp theo: trả nợ lãi cao, rồi đầu tư (tiết kiệm, vàng, ETF...)")
-    if s["rows"]:
-        lines.append("Đang tính vào quỹ: " + " · ".join(f"{html.escape(n)} {money(v)}" for n, v in s["rows"]))
+        lines.append("🎉 Quỹ dự phòng đã đủ!")
+    if s["rows"] and any(not ts.same_name(n, FUND_NAME) for n, _ in s["rows"]):  # có sổ, quỹ khác tính vào quỹ
+        lines.append("🏦 " + " · ".join(f"{html.escape(n)} {money(v)}" for n, v in s["rows"]))
     else:
-        lines.append("<i>Chưa có tài sản nào trong quỹ: bấm ➕ hoặc nhắn «nạp 2tr vào quỹ dự phòng»; đã có sổ tiết kiệm thì /duphong tinh "
-                     "tên sổ</i>")
-    lines.append(NOT_ADVICE)
+        lines.append("<i>Chưa có tiền trong quỹ: bấm ➕ hoặc nhắn «nạp 2tr vào quỹ dự phòng»</i>")
     return "\n".join(lines), buttons(s)
 
 
@@ -191,15 +187,15 @@ def change(amount, day, from_main=True):
     save(cfg)
     after = status(day)
     if amount >= 0:
-        note = f"✅ Đã thêm {money(amount)} vào quỹ dự phòng: {money(after['balance'])} / {money(after['target'])}"
+        note = f"✅ +{money(amount)} quỹ dự phòng: {money(after['balance'])}" + (
+            f"/{money(after['target'])}" if after["target"] else "")
         for mark, label in ((1, "đủ 1 tháng chi"), (3, "đủ 3 tháng chi"), (after["months"], "ĐẠT MỤC TIÊU")):
             if after["monthly"] and before["covered"] < mark <= after["covered"]:
                 note += f"\n🎉 Chúc mừng: quỹ đã {label}!"
                 break
     else:
-        note = (f"Đã rút {money(-amount)} khỏi quỹ dự phòng, còn {money(after['balance'])}. Dùng xong nhớ bù lại dần: "
-                f"/duphong")
-    return note + (f"\n{moved}" if moved else "") + "\n<i>Đây là chuyển tiền vào quỹ, không tính là khoản chi</i>"
+        note = f"✅ −{money(-amount)} quỹ dự phòng: còn {money(after['balance'])}"
+    return note + (f"\n{moved}" if moved else "")
 
 
 def toggle(name):
@@ -230,7 +226,7 @@ def where_text(day):
     lines.append("• Không để quỹ dự phòng ở cổ phiếu, ETF, vàng (giá lên xuống, lúc cần có thể đang lỗ); các khoản này "
                  "dành cho bước đầu tư sau khi quỹ đủ")
     lines.append("Tính sổ tiết kiệm có sẵn vào quỹ dự phòng: /duphong tinh <tên sổ>")
-    return "\n".join(lines + [NOT_ADVICE])
+    return "\n".join(lines)
 
 
 def month_added(ym):

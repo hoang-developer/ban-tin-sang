@@ -35,7 +35,6 @@ VCB_FX = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.asp
 BUTTONS = [[("📊 Biểu đồ", "ts:bd"), ("🩺 Khám sức khỏe", "ts:sk")],
            [("🗂 Sửa, xóa", "ts:ds"), ("🔄 Cập nhật giá", "ts:xem")],
            [("🏦 Tài khoản chính", "ts:chinh"), ("➕ Thêm", "y:them"), ct.BACK]]
-NOT_ADVICE = "<i>Chỉ để tham khảo, không phải lời khuyên mua bán chứng khoán hay đầu tư.</i>"
 
 
 def qty_text(x):
@@ -212,7 +211,7 @@ def valuation(day, fresh=False):
         if kind == "no" and it["tien"] <= 0:
             continue  # khoản nợ đã trả xong: chỉ còn trong sổ nợ (/no)
         if kind == "tien" and it.get("chinh"):
-            rows.append((kind, rid, it["ten"], main_balance(it, day), None, "tài khoản chính, ước tính theo sổ"))
+            rows.append((kind, rid, it["ten"], main_balance(it, day), None, "chính, ước tính"))
         elif kind in ("tien", "khac", "no"):
             rows.append((kind, rid, it["ten"], it["tien"], None, ""))
         elif kind == "tietkiem":
@@ -492,8 +491,8 @@ def overview(day, fresh=False):
         if costs and kind != "tietkiem":
             gain = sum(r[3] - r[4] for r in costs)
             base = sum(r[4] for r in costs)
-            head += f" · {'lãi' if gain >= 0 else 'lỗ'} {short(abs(gain))}" + (
-                f" ({gain / base * 100:+.1f}%)".replace(".", ",") if base else "")
+            head += f" · {'🟢 lãi' if gain >= 0 else '🔴 lỗ'} {short(abs(gain))}" + (
+                f" ({gain / base * 100:+.1f}%)".replace(".", ",").replace("-", "−") if base else "")
         elif kind == "tietkiem":
             head += f" · lãi tới nay {short(sum(r[3] - r[4] for r in rows))}"
         lines.append(head)
@@ -502,7 +501,8 @@ def overview(day, fresh=False):
             if detail:
                 line += f" · {html.escape(detail)}"
             if cost and kind != "tietkiem" and "chưa có giá" not in detail:
-                line += f" ({(value - cost) / cost * 100:+.0f}%)"
+                change = (value - cost) / cost * 100
+                line += f" {'🟢' if change >= 0 else '🔴'}{change:+.0f}%".replace("-", "−")
             lines.append(line)
     realized = [x for x in v["lailo"] if x["ngay"][:4] == str(day.year)]
     if realized:
@@ -510,8 +510,6 @@ def overview(day, fresh=False):
         lines.append(f"\n💰 Lãi/lỗ đã chốt năm {day.year}: <b>{'+' if total >= 0 else '−'}{ct.vnd(round(abs(total)))}</b>"
                      f" ({len(realized)} lần bán)")
     lines += [f"<i>⚠️ {html.escape(n)}</i>" for n in v["notes"]]
-    lines.append("<i>Cổ phiếu theo giá khớp gần nhất, vàng theo giá cửa hàng mua vào, ngoại tệ theo giá Vietcombank "
-                 "mua chuyển khoản</i>")
     snapshot(day, v)
     return "\n".join(lines), BUTTONS
 
@@ -634,9 +632,8 @@ def trade(text, now, pay_main=True):
         else:
             holding = {"id": new_id(data), "loai": kind, "ma": code, "sl": qty, "gia_von": paid / qty}
             data["items"].append(holding)
-        lines = [f"📈 Đã mua {vn_num(qty, 0)} {code} giá {ct.vnd(price)}: <b>{ct.vnd(round(paid))}</b>"
-                 + (" (DNSE miễn phí giao dịch)" if not BROKER_FEE else ""),
-                 f"Đang giữ {vn_num(holding['sl'], 0)} {code}, giá vốn {ct.vnd(round(holding['gia_von']))}"]
+        lines = [f"📈 Mua {vn_num(qty, 0)} {code} × {ct.vnd(price)} = <b>{ct.vnd(round(paid))}</b>",
+                 f"Giữ {vn_num(holding['sl'], 0)} {code} · giá vốn {ct.vnd(round(holding['gia_von']))}"]
         if cash:
             cash["tien"] -= round(paid)
             lines.append(f"🏦 Tiền tài khoản {html.escape(cash['ten'])}: còn {ct.vnd(cash['tien'])}")
@@ -645,7 +642,7 @@ def trade(text, now, pay_main=True):
             if moved:
                 lines.append(moved)
         save(data)
-        return "\n".join(lines + ["<i>Mua cổ phiếu là đổi tiền sang tài sản, không tính là khoản chi</i>"])
+        return "\n".join(lines)
     if not holding:
         return (f"Chưa có {code} trong danh mục nên chưa tính được lãi/lỗ. Khai báo trước: "
                 f"/taisan cp {code} số_lượng giá_vốn (ví dụ /taisan cp {code} 1000 95)")
@@ -661,19 +658,19 @@ def trade(text, now, pay_main=True):
     data.setdefault("lailo", []).append({"ngay": now.date().isoformat(), "ma": code, "sl": qty, "gia": price,
                                          "lai": round(gain)})
     data["lailo"] = data["lailo"][-200:]
-    lines = [f"💰 Đã bán {vn_num(qty, 0)} {code} giá {ct.vnd(price)}: {ct.vnd(round(value))}",
-             f"Thuế 0,1%: −{ct.vnd(round(tax))}" + (f" · phí: −{ct.vnd(round(fee))}" if fee else "")
-             + f" → tiền về <b>{ct.vnd(round(received))}</b>",
+    lines = [f"💰 Bán {vn_num(qty, 0)} {code} × {ct.vnd(price)} = {ct.vnd(round(value))}",
+             f"Thuế 0,1% −{ct.vnd(round(tax))}" + (f" · phí −{ct.vnd(round(fee))}" if fee else "")
+             + f" → về <b>{ct.vnd(round(received))}</b>",
              f"Giá vốn {ct.vnd(round(holding.get('gia_von') or price))} → "
-             + (f"<b>lãi {ct.vnd(round(gain))}</b>" if gain >= 0 else f"<b>lỗ {ct.vnd(round(-gain))}</b>")
+             + (f"🟢 <b>lãi {ct.vnd(round(gain))}</b>" if gain >= 0 else f"🔴 <b>lỗ {ct.vnd(round(-gain))}</b>")
              + f" ({gain / cost * 100:+.1f}%)".replace(".", ",")]
     if gain > 0:  # phần lãi là thu nhập đầu tư; phần vốn chỉ là đổi cổ phiếu ra tiền
         entry = {"id": kho.command("INCR", ct.K_COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
                  "tien": round(gain), "ghichu": f"lãi bán {qty} {code}", "nhom": ct.INCOME,
                  "khong_tk": True}  # tiền bán đã cộng cả vào tài khoản bên dưới, không cộng lần nữa
         ct.save(entry)
-        lines.append("Đã ghi phần lãi vào 💰 Thu nhập (đầu tư)")
-    lines.append(f"Còn giữ {vn_num(holding['sl'], 0)} {code}" if holding["sl"] else f"Đã bán hết {code}")
+        lines.append("💰 Lãi đã ghi vào Thu nhập")
+    lines.append(f"Còn {vn_num(holding['sl'], 0)} {code}" if holding["sl"] else f"Hết {code}")
     if cash:
         cash["tien"] += round(received)
         lines.append(f"🏦 Tiền tài khoản {html.escape(cash['ten'])}: {ct.vnd(cash['tien'])}")
@@ -741,8 +738,7 @@ def move_main(data, delta, note, day=None):
         it["tien"] += sum(x["tien"] for x in moves[:-100])
         it["chuyen"] = moves[-100:]
     left = main_balance(it, day)
-    return (f"🏦 {'Trừ' if delta < 0 else 'Cộng'} {short(abs(delta))} {'từ' if delta < 0 else 'vào'} "
-            f"{html.escape(it['ten'])}: còn ~{short(left)}")
+    return f"🏦 {html.escape(it['ten'])} {'−' if delta < 0 else '+'}{short(abs(delta))} → ~{short(left)}"
 
 
 def find_account(data, name):
@@ -783,16 +779,14 @@ def main_text(day):
     out = sum(-x["tien"] for x in moves if x["tien"] < 0)
     back = sum(x["tien"] for x in moves if x["tien"] > 0)
     since = date.fromisoformat(it["moc_ngay"])
-    lines = [f"🏦 <b>Tài khoản chính: {html.escape(it['ten'])}</b>",
-             f"Số dư ước tính: <b>{ct.vnd(round(main_balance(it, day)))}</b>",
-             f"• Chốt ngày {since:%d/%m}: {ct.vnd(it['tien'])}",
-             f"• Thu ghi sổ từ đó: +{short(income) if income else '0đ'} · chi: −{short(spend) if spend else '0đ'}"]
+    lines = [f"🏦 <b>{html.escape(it['ten'])} ~{ct.vnd(round(main_balance(it, day)))}</b> (tài khoản chính)",
+             f"📌 Chốt {since:%d/%m}: {ct.vnd(it['tien'])}",
+             f"💰 Thu +{short(income) if income else '0đ'} · 💸 chi −{short(spend) if spend else '0đ'}"]
     if out or back:
-        lines.append(f"• Chuyển sang ngăn khác: −{short(out)}" + (f" · nhận về +{short(back)}" if back else ""))
+        lines.append(f"🔁 Chuyển đi −{short(out)}" + (f" · về +{short(back)}" if back else ""))
         lines += [f"   {x['ngay'][8:]}/{x['ngay'][5:7]} {'−' if x['tien'] < 0 else '+'}{short(abs(x['tien']))} "
                   f"{html.escape(x['ghi'])}" for x in moves[-5:][::-1]]
-    lines.append("<i>Lương, khoản chi, trả nợ, nạp quỹ, góp đầu tư… đều tự cộng trừ vào đây. Lệch với app ngân hàng "
-                 "thì bấm cập nhật số dư thật.</i>")
+    lines.append("<i>Lệch với app ngân hàng thì bấm cập nhật số dư thật</i>")
     return "\n".join(lines), [[("✏️ Cập nhật số dư thật", "y:them:tai_khoan:chinh")],
                               [("🔁 Đổi tài khoản chính", "ts:chon"), ("💼 Tài sản", "m:ts"), ct.BACK]]
 
@@ -800,11 +794,10 @@ def main_text(day):
 def choose_main():
     data = load()
     options = [it for it in data["items"] if can_be_main(it)]
-    lines = ["🏦 <b>Chọn tài khoản chính</b>",
-             "Là tài khoản lương về và hay tiêu nhất. Từ lúc chọn, bot tự cộng thu, trừ chi, trừ tiền khi bạn nạp quỹ "
-             "dự phòng, góp đầu tư, gửi tiết kiệm, trả nợ… nên luôn biết còn bao nhiêu."]
+    lines = ["🏦 <b>Chọn tài khoản chính</b> (lương về, hay tiêu)",
+             "Bot tự cộng thu, trừ chi, trừ tiền chuyển sang quỹ, đầu tư, tiết kiệm, trả nợ."]
     if not options:
-        lines.append("Chưa có tài khoản nào. Thêm trước: nhắn «tài khoản Techcombank còn 14tr» hoặc bấm nút.")
+        lines.append("Chưa có tài khoản: nhắn «tài khoản Techcombank còn 14tr» hoặc bấm nút.")
         return "\n".join(lines), [[("➕ Thêm tài khoản", "y:them:tai_khoan"), ct.BACK]]
     rows = [[(("✅ " if it.get("chinh") else "") + f"{it['ten']} ({short(main_balance(it) if it.get('chinh') else it['tien'])})",
               f"ts:chinh:{it['id']}")] for it in options[:6]]
@@ -852,7 +845,7 @@ def salary_due(day):
     month = ct.between(day.replace(day=1), day)
     if any(e["nhom"] == ct.INCOME and "luong" in ct.plain(e["ghichu"]) for e in month):
         return None
-    return (f"💼 Hôm nay {'là ngày nhận lương' if day.day == payday else f'đã qua ngày lương {payday}'}. Đã nhận chưa?",
+    return (f"💼 {'Hôm nay ngày lương' if day.day == payday else f'Đã qua ngày lương {payday}'}: đã nhận chưa?",
             [[(f"✅ Đã nhận {pt.short(s['tien'])}", f"ts:luong:{s['tien']}"), ("Chưa", "ts:chua")]])
 
 
@@ -864,8 +857,8 @@ def maturity_notes(day):
             interest, maturity = accrued(it, day)
             if 0 <= (maturity - day).days <= 3 and kho.put_new(f"chitieu:nhac:daohan:{it['id']}:{maturity}", True,
                                                                10 * 86400):
-                notes.append(f"🐷 Sổ {html.escape(it['ten'])} {short(it['tien'])} đáo hạn ngày {maturity:%d/%m}"
-                             f" (lãi khoảng {short(interest)}): nhớ tất toán hoặc gửi tiếp, rồi cập nhật /taisan")
+                notes.append(f"🐷 Sổ {html.escape(it['ten'])} {short(it['tien'])} đáo hạn {maturity:%d/%m}"
+                             f" (lãi ~{short(interest)})")
     return notes
 
 
@@ -902,25 +895,21 @@ def health_checks(day):
         months = fund["covered"]
         score = 20 if months >= 6 else 15 if months >= 3 else 8 if months >= 1 else 0
         checks.append((score, "✅" if months >= 3 else "⚠️" if months >= 1 else "🚨",
-                       f"Quỹ dự phòng: {vn_num(months, 1)} tháng chi thiết yếu (quỹ {short(fund['balance'])}, chi thiết "
-                       f"yếu {short(fund['monthly'])}/tháng) · mục tiêu {fund['months']} tháng: /duphong"))
+                       f"Quỹ dự phòng {vn_num(months, 1)}/{fund['months']} tháng chi ({short(fund['balance'])})"))
     elif spend and v["rows"] and days >= 14:  # ít ngày quá thì một khoản lớn làm sai cả tháng
         months = liquid / spend
         score = 20 if months >= 6 else 15 if months >= 3 else 8 if months >= 1 else 0
         checks.append((score, "✅" if months >= 3 else "⚠️" if months >= 1 else "🚨",
-                       f"Quỹ dự phòng: {vn_num(months, 1)} tháng chi tiêu (tiền + tiết kiệm {short(liquid)}, chi TB "
-                       f"{short(spend)}/tháng) · nên 3–6 tháng"))
+                       f"Quỹ dự phòng ~{vn_num(months, 1)} tháng chi (tiền + tiết kiệm {short(liquid)}) · nên 3–6"))
     else:
-        checks.append((None, "❔", "Quỹ dự phòng: chưa tính được (cần khai báo tiền, tiết kiệm bằng /taisan và ghi chi tiêu "
-                                  "ít nhất 2 tuần)"))
+        checks.append((None, "❔", "Quỹ dự phòng: cần khai báo tiền và ghi chi ≥ 2 tuần"))
     if income and days >= 20:
         rate = (income - spend) / income * 100
         score = 20 if rate >= 30 else 16 if rate >= 20 else 10 if rate >= 10 else 5 if rate >= 0 else 0
         checks.append((score, "✅" if rate >= 20 else "⚠️" if rate >= 0 else "🚨",
-                       f"Để dành: {rate:.0f}% thu nhập ({days} ngày qua: thu TB {short(income)}/tháng, chi "
-                       f"{short(spend)}/tháng) · nên từ 20%"))
+                       f"Để dành {rate:.0f}% thu (thu {short(income)}, chi {short(spend)}/tháng) · nên ≥ 20%"))
     else:
-        checks.append((None, "❔", "Để dành: chưa tính được (cần ghi thu nhập, ví dụ + lương 20tr, và ít nhất 20 ngày dữ liệu)"))
+        checks.append((None, "❔", "Để dành: cần ghi thu nhập và ≥ 20 ngày dữ liệu"))
     if v["assets"]:
         import sono  # nợ: chấm theo tiền trả mỗi tháng so với thu nhập, tách nợ không lãi
         checks.append(sono.health_check(day, v, income if income and days >= 20 else None))
@@ -934,17 +923,17 @@ def health_checks(day):
         if top and top[1] / v["assets"] > 0.7 and len(v["rows"]) > 1:
             warnings.append(f"{TYPES[top[0]].split(' ', 1)[1].lower()} chiếm {top[1] / v['assets'] * 100:.0f}% tài sản")
         score = 20 if not warnings else 12 if len(warnings) == 1 else 5
-        checks.append((score, "✅" if not warnings else "⚠️", "Phân bổ: " + ("không dồn quá nhiều vào một chỗ"
+        checks.append((score, "✅" if not warnings else "⚠️", "Phân bổ: " + ("ổn"
                                                                           if not warnings else "; ".join(warnings))))
         losers = [f"{html.escape(name)} {(value - cost) / cost * 100:.0f}%" for kind, _, name, value, cost, _ in v["rows"]
                   if kind in ("cp", "etf", "quy", "coin", "vang") and cost and value and (value - cost) / cost <= -0.2]
         trend = compare_line(day, v["net"])
         score = 20 if not losers else 10
         checks.append((score, "✅" if not losers else "⚠️",
-                       ("Lỗ sâu (từ 20%): " + ", ".join(losers) if losers else "Không khoản đầu tư nào lỗ sâu")
+                       ("Lỗ ≥ 20%: " + ", ".join(losers) if losers else "Không khoản nào lỗ ≥ 20%")
                        + (f" · tài sản ròng{trend}" if trend else "")))
     else:
-        checks.append((None, "❔", "Nợ, phân bổ tài sản: chưa có dữ liệu (khai báo bằng /taisan)"))
+        checks.append((None, "❔", "Nợ, phân bổ: chưa khai báo tài sản"))
     return checks, v, (spend, income, days)
 
 
@@ -957,7 +946,9 @@ def health(day):
         return "🩺 Chưa đủ dữ liệu để khám. " + USAGE
     score = round(sum(c[0] for c in scored) / (20 * len(scored)) * 100)
     label = "Tốt" if score >= 80 else "Khá" if score >= 60 else "Cần chú ý" if score >= 40 else "Yếu"
-    lines = [f"🩺 <b>Khám sức khỏe tài chính: {score}/100 ({label})</b>"] + [f"{mark} {text}" for _, mark, text in checks]
+    color = {"✅": "🟢", "⚠️": "🟡", "🚨": "🔴"}
+    lines = [f"🩺 <b>Sức khỏe tài chính {score}/100</b> ({label})"] + [f"{color.get(mark, mark)} {text}"
+                                                                        for _, mark, text in checks]
     if v["rows"]:
         lines.insert(1, f"Tài sản ròng {short(v['net'])}" + (f" · nợ {short(v['debts'])}" if v["debts"] else ""))
     advice = []
@@ -977,10 +968,8 @@ def health(day):
         except Exception as e:
             print(f"[lỗi] AI khám sức khỏe: {e!r}", file=sys.stderr)
     if advice:
-        lines += ["", "🤖 <b>Nhận xét và việc nên làm</b>"] + advice
-    elif ct.ai_key():
-        lines += ["", "<i>AI đang bận nên chưa có nhận xét, thử lại sau: /suckhoe</i>"]
-    return "\n".join(lines + [NOT_ADVICE])
+        lines += ["", "💡 <b>Việc nên làm</b>"] + advice
+    return "\n".join(lines)
 
 
 # ---- Nút bấm ---------------------------------------------------------------------------

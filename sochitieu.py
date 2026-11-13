@@ -671,6 +671,14 @@ def tidy(day):
 
 # ---- Hiển thị ---------------------------------------------------------------------
 
+def short(x):
+    """Số tiền gọn: 1.250.000 -> '1,25tr', 35.000 -> '35k' (âm thì có dấu −)."""
+    sign, x = ("−" if x < 0 else ""), abs(x)
+    if x >= 999_500:
+        return sign + f"{x / 1e6:.2f}".rstrip("0").rstrip(".").replace(".", ",") + "tr"
+    return sign + (f"{round(x / 1000)}k" if x >= 1000 else f"{round(x)}đ")
+
+
 def vnd(x):
     return f"{vn_num(x, 0)}đ"
 
@@ -704,9 +712,9 @@ def budget_lines(codes, day):
         limit = budgets[code]
         pct = spent / limit * 100
         label = budget_label(code)
-        mark = "🚨" if pct >= 100 else "⚠️" if pct >= 80 else "🎯"
-        extra = f", vượt {vnd(spent - limit)}" if pct > 100 else ""
-        lines.append(f"{mark} {label} tháng {day.month}: {vnd(spent)} / {vnd(limit)} ({pct:.0f}%{extra})")
+        mark = "🔴" if pct >= 100 else "🟡" if pct >= 80 else "🟢"
+        extra = f" · vượt {short(spent - limit)}" if pct > 100 else ""
+        lines.append(f"{mark} {label}: {short(spent)}/{short(limit)} ({pct:.0f}%{extra})")
     return lines
 
 
@@ -721,15 +729,13 @@ def entries_message(entries, day, sorting=False, focus=None, extra=()):
     ask = next((e for e in entries if ref(e) == focus), None) or next((e for e in entries if pending(e)), None)
     notes = [] if sorting else budget_lines([e["nhom"] for e in entries if e["nhom"] != INCOME], day)
     for tag in dict.fromkeys(e["_tag"] for e in entries if e.get("_tag")):
-        notes.append(f"⚠️ Chưa có nhóm «{html.escape(tag)}», tạo bằng: /nhom them {html.escape(tag)}")
+        notes.append(f"⚠️ Chưa có nhóm «{html.escape(tag)}»: /nhom them {html.escape(tag)}")
     what = html.escape((ask["ghichu"] or vnd(ask["tien"])) if ask else "")
     if ask and pending(ask):
-        notes.append(f"❓ Chưa rõ nhóm của «{what}»: chọn nhóm bên dưới, lần sau bot tự xếp")
+        notes.append(f"❓ «{what}» thuộc nhóm nào?")
     elif ask:
         notes.append(f"✏️ Chọn nhóm đúng cho «{what}»")
     notes += list(extra)
-    if any(e.get("ai") for e in entries):
-        notes.append("<i>🤖 nhóm do AI đoán, sai thì bấm ✏️ để sửa, lần sau bot tự nhớ</i>")
     if sorting:
         left = sum(pending(e) for e in entries)
         lines = [f"{SORT_TITLE} <b>{'Còn ' + str(left) + ' khoản chưa rõ nhóm' if left else 'Đã xếp xong'}</b>"]
@@ -826,32 +832,33 @@ def report(kind, day):
     if not items:
         return "\n".join(lines + ["Chưa có khoản nào. Nhắn kiểu: cà phê 35k"]), 0
     days = (end - start).days + 1
-    lines.append(f"Chi: <b>{vnd(total)}</b> · {len(spend)} khoản" + (f" · TB {vnd(total / days)}/ngày" if days > 1 else ""))
+    lines.append(f"💸 Chi <b>{vnd(total)}</b> · {len(spend)} khoản" + (f" · ~{short(total / days)}/ngày" if days > 1 else ""))
     by_cat = {}
     for e in spend:
         by_cat[e["nhom"]] = by_cat.get(e["nhom"], 0) + e["tien"]
     top = max(by_cat.values(), default=0)
     for code, amount in sorted(by_cat.items(), key=lambda x: -x[1]):
-        lines.append(f"{name(code)}: <b>{vnd(amount)}</b> ({amount / total * 100:.0f}%)\n"
+        lines.append(f"{name(code)} <b>{short(amount)}</b> · {amount / total * 100:.0f}%\n"
                      + "▇" * max(1, round(amount / top * 10)))
     prev_total = sum(e["tien"] for e in between(prev_start, prev_end) if e["nhom"] != INCOME)
     if prev_total:
         change = (total - prev_total) / prev_total * 100
-        lines.append(f"So với {prev_label}: {'↑' if change >= 0 else '↓'} {abs(change):.0f}% ({vnd(prev_total)})")
+        lines.append(f"{'🔺' if change >= 0 else '🔻'}{abs(change):.0f}% so với {prev_label} ({short(prev_total)})")
     if income:
         kinds = income_kinds([e for e in items if e["nhom"] == INCOME])
-        detail = f" ({' · '.join(f'{k} {vnd(v)}' for k, v in kinds)})" if len(kinds) > 1 else ""
-        lines.append(f"💰 Thu: {vnd(income)}{detail} · còn lại <b>{vnd(income - total)}</b>")
+        detail = f" ({' · '.join(f'{k} {short(v)}' for k, v in kinds)})" if len(kinds) > 1 else ""
+        left = income - total
+        lines.append(f"💰 Thu {short(income)}{detail} → {'🟢' if left >= 0 else '🔴'} còn <b>{short(left)}</b>")
     biggest = sorted(spend, key=lambda e: -e["tien"])[:3]
     if biggest and len(spend) > 3:
-        lines.append("Khoản lớn nhất: " + " · ".join(
-            f"{html.escape(e['ghichu'] or name(e['nhom']))} {vnd(e['tien'])}" for e in biggest))
+        lines.append("🏆 " + " · ".join(f"{html.escape(e['ghichu'] or name(e['nhom']))} {short(e['tien'])}"
+                                       for e in biggest))
     unsorted = sum(pending(e) for e in spend)
     if unsorted:
-        lines.append(f"❓ {unsorted} khoản chưa rõ nhóm, gõ /chuaxep để xếp")
+        lines.append(f"❓ {unsorted} khoản chưa rõ nhóm: /chuaxep")
     status = budget_status(day) if kind == "thang" else []
     if status:
-        lines += ["", "<b>Ngân sách</b>"] + status
+        lines += ["", "<b>🎯 Ngân sách</b>"] + status
     return "\n".join(lines), len(spend)
 
 
@@ -1290,8 +1297,7 @@ def record_text(text, now):
         print(f"[lỗi] phân tích sau khi ghi: {e!r}", file=sys.stderr)
         extra = []
     try:
-        # chuỗi ngày ghi, hôm nay so với mốc, đã bớt; đã có dòng "còn được tiêu" thì bỏ phần mốc mỗi ngày (một con số)
-        extra += tietkiem().after_record(entries, now.date(), brief=any(x.startswith("💡") for x in extra))
+        extra += tietkiem().after_record(entries, now.date())  # 🔥 chuỗi ngày ghi · hôm nay so với mốc · đã bớt
     except Exception as e:
         print(f"[lỗi] tiết kiệm sau khi ghi: {e!r}", file=sys.stderr)
     reply, rows = entries_message(entries, now.date(), extra=debt_lines + extra)

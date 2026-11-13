@@ -39,10 +39,7 @@ SHORT_NAMES = {"Dịch vụ Đầu tư Bất Động Sản": "Bất động sả
                "Dụng cụ điện & Điện tử": "Thiết bị điện", "Sản xuất dầu khí": "Dầu khí"}
 BUTTONS = [[("🔥 Ngành", "nd:nganh"), ("🎯 Khuyến nghị", "nd:kn"), ("📰 Tin", "nd:tin")],
            [("🔄 Cập nhật nhận định", "nd:moi")]]
-NOT_ADVICE = ("<i>Tổng hợp tự động từ khuyến nghị của các CTCK (qua VNDirect), giá Vietcap, tin CafeF/Vietstock/"
-              "VnExpress; AI có thể sai. Chỉ để tham khảo, không phải lời khuyên đầu tư.</i>")
-SHORT_NOTE = "<i>🤖 AI tổng hợp từ khuyến nghị CTCK, giá, tin · tham khảo, không phải lời khuyên đầu tư</i>"
-SHORT_REF = "<i>Nguồn VNDirect · tham khảo, không phải lời khuyên đầu tư</i>"
+SHORT_REF = "<i>Nguồn VNDirect</i>"
 OFF = "nhandinh:tat"  # có khóa này thì không tự gửi nhận định trong phiên
 TICKER = re.compile(r"(?<![A-Za-z0-9])[A-Z][A-Z0-9]{2}(?![A-Za-z0-9])")
 
@@ -280,7 +277,7 @@ def nganh_text(data=None):
     data = data or gather()
     return "\n".join([f"🔥 <b>Ngành trên HOSE</b> · {now_vn():%H:%M %d/%m}", market_line(data),
                       "<i>% theo vốn hóa · giá trị giao dịch · khối ngoại ròng · số mã tăng/giảm</i>"]
-                     + sector_lines(data) + [NOT_ADVICE])
+                     + sector_lines(data))
 
 
 def khuyennghi(args):
@@ -452,12 +449,9 @@ def brief(now=None, data=None):
     lines = [headline(now, data)]
     smart = ai_lines(data)
     if smart:
-        lines += smart + [SHORT_NOTE]
+        lines += smart
     else:
-        import sochitieu as ct
         lines += short_fallback(data)
-        lines.append("<i>" + ("AI đang bận, chỉ có số liệu" if ct.ai_key() else "Bật AI (GEMINI_API_KEY) để có nhận định")
-                     + " · tham khảo, không phải lời khuyên đầu tư</i>")
     return "\n".join(lines), BUTTONS
 
 

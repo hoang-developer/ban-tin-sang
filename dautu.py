@@ -32,7 +32,6 @@ FMARKET = "https://api.fmarket.vn/res"
 DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG = "VMEEF", 4_000_000, 0.01
 MIN_ORDER, STEP = 100_000, 10_000
 WATCH = ("VIC", "VHM", "VRE", "VPL")  # nhóm Vingroup: báo nếu vào top 10 của quỹ
-NOT_ADVICE = "<i>Tham khảo, không phải lời khuyên đầu tư</i>"
 USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
          "/dautu: tình trạng, tháng này nên mua bao nhiêu\n"
          "/dautu batdau 4tr VMEEF: bật (số góp mỗi tháng, mã quỹ trên Fmarket)\n"
@@ -371,6 +370,11 @@ def pct(x):
     return "0,0%" if abs(x) < 0.0005 else f"{x * 100:+.1f}%".replace(".", ",")
 
 
+def arrow(x):
+    """+1,2% -> '🔺1,2%', −0,8% -> '🔻0,8%'."""
+    return "0,0%" if abs(x) < 0.0005 else f"{'🔺' if x > 0 else '🔻'}{abs(x) * 100:.1f}%".replace(".", ",")
+
+
 def gain_text(gain, cost):
     """'🟢 +22k (+0,6%)', '🔴 −22k (−0,6%)' hoặc '⚪ hòa vốn' (chênh dưới 1.000đ)."""
     if abs(gain) < 1000:
@@ -383,47 +387,43 @@ def gain_text(gain, cost):
 def nav_line(cfg, s):
     if not s["nav"]:
         return f"Chưa lấy được NAV {cfg['ma']}"
-    line = f"NAV {vn_num(s['nav'], 2)}đ ({s['nav_day']:%d/%m})"
+    line = f"📊 NAV {vn_num(s['nav'], 2)}đ ({s['nav_day']:%d/%m})"
     if s["month_change"] is not None:
-        line += f" · tháng này {pct(s['month_change'])}"
+        line += f" · tháng {arrow(s['month_change'])}"
     if s["drawdown"] is not None:
-        line += f" · cách đỉnh 52 tuần {pct(s['drawdown'])}"
+        line += f" · đỉnh 52 tuần {pct(s['drawdown']).replace('-', '−')}"
     return line
 
 
 def decision_lines(cfg, s, final=True):
     """Các dòng "kế hoạch / đang có / nên mua" của kỳ đang mở. final=False (chưa tới hạn): chỉ là con số dự kiến."""
-    lines = [f"Kế hoạch {ym_text(s['ym'])}: <b>{money(s['plan'])}</b> · đang có {money(s['value'])}"
-             + (f" (gồm {money(s['pending'])} chờ khớp)" if s["pending"] else "")]
+    lines = [f"🎯 Kế hoạch {ym_text(s['ym'])} <b>{money(s['plan'])}</b> · có {money(s['value'])}"
+             + (f" (⏳ {money(s['pending'])} chờ khớp)" if s["pending"] else "")]
     if s["skip"]:
-        lines.append("⏸ Tháng này tạm dừng góp" + (f": quỹ chờ còn {money(s['cash'])}, nếu muốn vẫn mua được tới "
-                                                  f"{money(s['buy'])}" if s["buy"] else ""))
+        lines.append("⏸ Tháng này tạm dừng" + (f" · quỹ chờ {money(s['cash'])}, vẫn mua được tới {money(s['buy'])}"
+                                              if s["buy"] else ""))
         return lines
     if not final:
-        lines.append(f"📅 Nếu NAV giữ như hiện tại, cuối tháng mua khoảng <b>{money(s['buy'])}</b>" if s["buy"] else
-                     "📅 Nếu NAV giữ như hiện tại, cuối tháng không mua (quỹ đang cao hơn kế hoạch)")
-        lines.append("   Số chính xác bot tính và nhắc vào sáng ngày hạn đặt lệnh")
+        lines.append(f"📅 NAV giữ nguyên thì cuối tháng mua ~<b>{money(s['buy'])}</b>" if s["buy"] else
+                     "📅 NAV giữ nguyên thì cuối tháng không mua (quỹ cao hơn kế hoạch)")
     elif s["side"]:
         lines += order_lines(cfg, s)
     elif s["buy"]:
         lines.append(f"👉 <b>Mua {ct.vnd(s['buy'])}</b>" + (
-            f" (hết tiền đang có; còn thiếu {money(s['need'] - s['buy'])} so với kế hoạch, tháng sau tự bù)"
-            if s["short"] else ""))
+            f" (hết tiền; thiếu {money(s['need'] - s['buy'])}, tháng sau tự bù)" if s["short"] else ""))
     elif s["need"] > 0:
-        lines.append(f"👉 Không mua: cần thêm {money(s['need'])} nhưng chưa có tiền (quỹ chờ {money(s['cash'])})")
+        lines.append(f"👉 Không mua: cần {money(s['need'])} nhưng quỹ chờ có {money(s['cash'])}")
     else:
-        lines.append(f"👉 <b>Tháng này không mua</b>: quỹ đang cao hơn kế hoạch {money(-s['need'])}; "
-                     f"để {money(gop_of(cfg, s['ym']))} vào quỹ chờ (gửi tiết kiệm), chờ lúc quỹ giảm thì mua nhiều hơn")
+        lines.append(f"👉 <b>Không mua</b>: quỹ cao hơn kế hoạch {money(-s['need'])} · để "
+                     f"{money(gop_of(cfg, s['ym']))} vào quỹ chờ")
     if s["side"]:
-        lines.append(f"💰 Tiền góp chưa đặt lệnh {money(s['money_now'])} · {s['side']['ma']} đang có "
-                     f"{money(s['side_value'] or 0)}")
+        lines.append(f"💰 Chưa đặt lệnh {money(s['money_now'])} · {s['side']['ma']} {money(s['side_value'] or 0)}")
     else:
-        lines.append(f"💰 Tiền đang có: quỹ chờ {money(s['cash'])}"
-                     + (f" + góp tháng này chưa để {money(s['unpaid'])}" if s["unpaid"] else ""))
+        lines.append(f"💰 Quỹ chờ {money(s['cash'])}" + (f" + chưa để {money(s['unpaid'])}" if s["unpaid"] else ""))
     if s["below_milestone"]:
         f = s["fund"]
-        lines.append(f"⚠️ Quỹ dự phòng mới đủ {vn_num(f['covered'], 1)} tháng chi (mốc đầu: 1 tháng, còn thiếu "
-                     f"{money(f['monthly'] - f['balance'])}): nên ưu tiên nạp quỹ dự phòng, tạm dừng góp tháng này")
+        lines.append(f"⚠️ Quỹ dự phòng mới {vn_num(f['covered'], 1)}/1 tháng chi (thiếu "
+                     f"{money(f['monthly'] - f['balance'])}): ưu tiên quỹ dự phòng trước")
     return lines
 
 
@@ -440,9 +440,9 @@ def order_lines(cfg, s):
                      "miễn phí hoán đổi)")
     if not steps:
         return ["👉 Tháng này không cần đặt lệnh"]
-    head = (f"👉 {cfg['ma']} đang cao hơn kế hoạch {money(-s['need'])}: chưa mua thêm, tiền góp vào {sd}"
+    head = (f"👉 {cfg['ma']} cao hơn kế hoạch {money(-s['need'])}: chưa mua thêm, tiền góp vào {sd}"
             if s["need"] <= 0 else f"👉 Mua thêm {cfg['ma']} {money(s['buy'])}" + (
-                f" (hết tiền; còn thiếu {money(s['need'] - s['buy'])} so với kế hoạch, tháng sau tự bù)" if s["short"] else ""))
+                f" (hết tiền; thiếu {money(s['need'] - s['buy'])}, tháng sau tự bù)" if s["short"] else ""))
     return [head] + [f"   {i}. {t}" for i, t in enumerate(steps, 1)]
 
 
@@ -451,14 +451,13 @@ def summary_line(s):
         total = s["value"] + (s["side_value"] or 0) + s["cash"]
         gain = total - s["contributed"]
         share = s["value"] / total * 100 if total else 0
-        return (f"Danh mục {money(total)}: cổ phiếu {money(s['value'])} ({share:.0f}%) · "
+        return (f"💼 {money(total)}: cổ phiếu {money(s['value'])} ({share:.0f}%) · "
                 f"{s['side']['ma']} {money(s['side_value'] or 0)} ({100 - share:.0f}%)"
-                + (f" · đã góp {money(s['contributed'])}, lãi/lỗ {money(gain)} ({pct(gain / s['contributed'])})"
-                   if s["contributed"] else ""))
+                + (f" · góp {money(s['contributed'])} → {gain_text(gain, s['contributed'])}" if s["contributed"] else ""))
     gain = s["value"] - s["invested"] if s["invested"] else 0
-    line = f"Đã mua {money(s['invested'])}"
+    line = f"💼 Đã mua {money(s['invested'])}"
     if s["invested"] and s["nav"]:
-        line += f" · lãi/lỗ {money(gain)} ({pct(gain / s['invested'])})"
+        line += f" → {gain_text(gain, s['invested'])}"
     return line + f" · {units_text(s['units'])} ccq"
 
 
@@ -477,19 +476,18 @@ def view(day=None, fresh=False):
              + (f" + {money(extra)} {s['side']['ma']}" if extra else "")
              + (" (đang tắt: /dautu bat)" if cfg.get("tat") else ""),
              nav_line(cfg, s), *decision_lines(cfg, s, final),
-             f"⏰ Hạn đặt lệnh tháng này: trước {deadline_text(cfg, s['ym'], sess)}",
+             f"⏰ Hạn đặt lệnh: {deadline_text(cfg, s['ym'], sess)}",
              summary_line(s)]
     info = fund_info(cfg) or {}
     if info.get("top"):
         top = ", ".join(h["ma"] for h in info["top"])
         flagged = [h["ma"] for h in info["top"] if h["ma"] in WATCH]
-        lines.append(f"Top 10 ({info.get('top_luc') or '—'}): {top}"
-                     + (f"\n⚠️ Có cổ phiếu nhóm Vingroup: {', '.join(flagged)}" if flagged else ""))
+        lines.append(f"🔟 Top 10 ({info.get('top_luc') or '—'}): {top}"
+                     + (f"\n⚠️ Có nhóm Vingroup: {', '.join(flagged)}" if flagged else ""))
     left = {k: v for k, v in cfg.get("ke_hoach_them", {}).items() if k >= s["ym"]}
     if left:
-        lines.append(f"🔁 Đang rải thêm vào {cfg['ma']}: {money(sum(left.values()))} còn lại, tới tháng "
-                     f"{ym_text(max(left))} (/dautu taicocau xoa để bỏ)")
-    lines.append(NOT_ADVICE)
+        lines.append(f"🔁 Đang rải vào {cfg['ma']}: còn {money(sum(left.values()))}, tới {ym_text(max(left))}"
+                     " (bỏ: /dautu taicocau xoa)")
     return "\n".join(lines), buttons(cfg, s, sess, final)
 
 
@@ -497,7 +495,7 @@ def deadline_text(cfg, ym, sess):
     if ym_of(sess["dong"].date()) == ym and ym_of(sess["phien"]) != ym:
         return f"14:40 hôm nay {sess['dong']:%d/%m}" if sess["dong"].date() == ct.today() else f"14:40 {sess['dong']:%d/%m}"
     last = last_weekday(ym)
-    return f"14:40 phiên cuối tháng (khoảng {last:%d/%m}, Fmarket báo chính xác vào hôm đó)"
+    return f"14:40 ~{last:%d/%m}"
 
 
 def last_weekday(ym):
@@ -533,10 +531,10 @@ def reminder(now, second=False):
     sess = session(cfg, now)
     title = (f"📈 <b>{cfg['ma']}: hôm nay là hạn đặt lệnh tháng {int(s['ym'][5:])}</b>" if not second else
              f"⏰ <b>{cfg['ma']}: còn tới 14:40 để đặt lệnh tháng {int(s['ym'][5:])}</b>")
-    when = f"Đặt trên Fmarket trước <b>14:40 {sess['dong']:%d/%m}</b> → {cfg['ma']} khớp NAV phiên {sess['phien']:%d/%m}"
+    when = f"⏰ Fmarket trước <b>14:40 {sess['dong']:%d/%m}</b> → {cfg['ma']} khớp phiên {sess['phien']:%d/%m}"
     if s["side"]:
         when += f", {s['side']['ma']} phiên {session(s['side'], now)['phien']:%d/%m}"
-    lines = [title, when, nav_line(cfg, s), *decision_lines(cfg, s), summary_line(s), NOT_ADVICE]
+    lines = [title, when, nav_line(cfg, s), *decision_lines(cfg, s), summary_line(s)]
     return "\n".join(lines), buttons(cfg, s, sess)
 
 

@@ -166,7 +166,7 @@ def home(day, now=None):
     n = part("chia lương", lambda: kehoach.numbers(day))
     s = part("mỗi ngày được tiêu", lambda: kehoach.spendable(day, n)) if n else None
     if s:
-        lines.append(f"🧾 {kehoach.spend_text(s, bold=True)}")
+        lines.append(kehoach.spend_text(s, bold=True))
     income = sum(e["tien"] for e in month if e["nhom"] == ct.INCOME)
     lines.append(f"📅 Tháng {day.month}: đã chi {short(sum(e['tien'] for e in spend))}"
                  + (f" · đã thu {short(income)}" if income else ""))
@@ -182,7 +182,7 @@ def home(day, now=None):
         lines += ["", "👉 <b>Việc cần làm</b>"] + [f"• {t}" for t, _ in tasks]
         rows = [[b] for _, b in tasks if b][:4]
     elif month:
-        lines += ["", "👉 Không có việc gấp, cứ ghi chép đều nhé ✨"]
+        lines += ["", "👉 Không có việc gấp ✨"]
     if not today and now.hour >= 18:
         rows.append([("🙅 Hôm nay không tiêu", f"tk:khong:{day.isoformat()}")])
     rows += [[("📊 Chi tiêu tháng", "m:chi"), ("🔮 Dự báo", "db"), ("🧾 Vừa ghi", "m:ls")],
@@ -204,8 +204,10 @@ def gain(rows):
     cost = sum(r[4] for r in priced)
     if not cost:
         return ""
-    change = sum(r[3] for r in priced) - cost
-    return f" ({change / cost * 100:+.1f}%)".replace(".", ",")
+    change = (sum(r[3] for r in priced) - cost) / cost * 100
+    if abs(change) < 0.05:
+        return " ⚪"
+    return f" {'🟢' if change > 0 else '🔴'}{change:+.1f}%".replace(".", ",").replace("-", "−")
 
 
 def money(day):
@@ -254,7 +256,7 @@ def money(day):
     elif v["debts"]:
         lines.append(f"💳 Nợ <b>{short(v['debts'])}</b>")
     if not main:
-        lines.append("<i>💡 Chọn tài khoản chính (nơi lương về) để bot tự cộng thu, trừ chi và tiền chuyển đi</i>")
+        lines.append("<i>💡 Chưa chọn tài khoản chính: bấm 🏦</i>")
     return "\n".join(lines), MONEY_ROWS
 
 

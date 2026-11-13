@@ -123,11 +123,11 @@ def budget_line(code, b):
     label = "Tổng chi" if code == "tong" else ct.name(code)
     projected, limit = b["projected"], b["limit"]
     if b["spent"] >= limit:
-        return f"🚨 {label}: đã vượt, {vnd(b['spent'])} / {vnd(limit)}"
+        return f"🔴 {label}: đã vượt, {short(b['spent'])}/{short(limit)}"
     if projected > limit:
-        when = f", vượt khoảng ngày {b['over_day']}" if b["over_day"] else ""
-        return f"⚠️ {label}: dự báo {short(projected)} / {short(limit)}{when}"
-    return f"✅ {label}: dự báo {short(projected)} / {short(limit)}"
+        when = f" · vượt ~ngày {b['over_day']}" if b["over_day"] else ""
+        return f"🟡 {label}: ~{short(projected)}/{short(limit)}{when}"
+    return f"🟢 {label}: ~{short(projected)}/{short(limit)}"
 
 
 def vnd(x):
@@ -138,27 +138,28 @@ def forecast_text(day):
     if not kho.ready():
         return ct.NEED_STORE
     f = forecast(day)
-    lines = [f"🔮 <b>Dự báo chi tiêu tháng {day.month}</b> (hôm nay {dmy(day)}, còn {f['left']} ngày)"]
+    lines = [f"🔮 <b>Dự báo tháng {day.month}</b> · còn {f['left']} ngày"]
     if not f["spent"] and not f["rate"]:
-        return "\n".join(lines + ["Chưa có khoản nào để dự báo. Nhắn kiểu: cà phê 35k"] + spend_lines(day))
-    lines.append(f"Đã chi: <b>{vnd(f['spent'])}</b>")
-    lines.append(f"Mỗi ngày đang tiêu khoảng <b>{approx(f['rate'])}</b> (không tính khoản từ {short(LARGE)})")
+        return "\n".join(lines + ["Chưa có khoản nào. Nhắn kiểu: cà phê 35k"] + spend_lines(day))
+    lines.append(f"💸 Đã chi <b>{short(f['spent'])}</b> · ~{short(f['rate'])}/ngày (bỏ khoản từ {short(LARGE)})")
     if f["upcoming"]:
-        lines.append("Có thể sắp tới (tháng trước có, tháng này chưa thấy): " + " · ".join(
-            f"{note_of(e)} {short(e['tien'])} (ngày {e['ngay'][8:]})" for e in f["upcoming"][:4]))
+        lines.append("⏳ Sắp tới (tháng trước có): " + " · ".join(
+            f"{note_of(e)} {short(e['tien'])} ({e['ngay'][8:]})" for e in f["upcoming"][:4]))
     compare = ""
     if f["prev_total"]:
         change = (f["projected"] - f["prev_total"]) / f["prev_total"] * 100
-        compare = f" · tháng trước {short(f['prev_total'])} ({'↑' if change >= 0 else '↓'}{abs(change):.0f}%)"
-    lines.append(f"➡️ Cả tháng khoảng <b>{approx(f['projected'])}</b>{compare}")
+        compare = f" · tháng trước {short(f['prev_total'])} {trend(change)}"
+    lines.append(f"➡️ Cả tháng ~<b>{short(f['projected'])}</b>{compare}")
     lines += spend_lines(day)
     budgets = [budget_line(code, b) for code, b in f["budgets"].items()]
     if budgets:
-        lines += ["", "<b>Ngân sách</b>"] + budgets
-    if f["history"] < 7:
-        lines.append(f"<i>{'Mới có ' + str(f['history']) + ' ngày' if f['history'] else 'Mới bắt đầu có'} dữ liệu, "
-                     "dự báo còn thô, ghi đều vài tuần sẽ sát hơn</i>")
+        lines += ["", "<b>🎯 Ngân sách</b>"] + budgets
     return "\n".join(lines)
+
+
+def trend(change):
+    """+12% -> '🔺12%' (tiêu nhiều hơn), −8% -> '🔻8%'."""
+    return f"{'🔺' if change >= 0 else '🔻'}{abs(change):.0f}%"
 
 
 # ---- Dự báo chi tiêu hằng ngày (ăn uống, sinh hoạt; không tính khoản đột biến) -----------------
@@ -223,38 +224,28 @@ def daily_text(day):
     if not kho.ready():
         return ct.NEED_STORE
     f = daily_forecast(day)
-    lines = [f"🔮 <b>Dự báo chi tiêu hằng ngày tháng {day.month}</b>",
-             f"<i>{html.escape(daily_label(f['codes']))} · hôm nay {dmy(day)}, còn {f['left']} ngày</i>"]
+    lines = [f"🔮 <b>Chi hằng ngày tháng {day.month}</b> · còn {f['left']} ngày",
+             f"<i>{html.escape(daily_label(f['codes']))}</i>"]
     if not f["spent"] and not f["rate"]:
-        return "\n".join(lines + ["Chưa có khoản nào để dự báo. Nhắn kiểu: cà phê 35k"] + spend_lines(day))
-    lines.append(f"Đã chi: <b>{vnd(f['spent'])}</b> ({f['elapsed']} ngày, TB {approx(f['spent'] / f['elapsed'])}/ngày)"
-                 f" · hôm nay {vnd(f['today'])}")
+        return "\n".join(lines + ["Chưa có khoản nào. Nhắn kiểu: cà phê 35k"] + spend_lines(day))
     parts = " · ".join(f"{ct.name(c).split()[0]} {short(r)}" for c, r in f["rates"].items() if r)
-    lines.append(f"Mỗi ngày đang tiêu khoảng <b>{approx(f['rate'])}</b>" + (f" ({parts})" if parts else ""))
+    lines.append(f"💸 Đã chi <b>{short(f['spent'])}</b> · hôm nay {short(f['today'])}")
+    lines.append(f"📈 ~<b>{short(f['rate'])}</b>/ngày" + (f" ({parts})" if parts else ""))
     compare = ""
     if f["prev_total"]:
         change = (f["projected"] - f["prev_total"]) / f["prev_total"] * 100
-        compare = f" · tháng trước {short(f['prev_total'])} ({'↑' if change >= 0 else '↓'}{abs(change):.0f}%)"
-    lines.append(f"➡️ Cả tháng khoảng <b>{approx(f['projected'])}</b>{compare}")
+        compare = f" · tháng trước {short(f['prev_total'])} {trend(change)}"
+    lines.append(f"➡️ Cả tháng ~<b>{short(f['projected'])}</b>{compare}")
     if f["room"]:
-        per_day, today_left = f["room"]
-        if per_day <= 0:
-            lines.append(f"🚨 Đã tiêu hết ngân sách hằng ngày {short(f['budget'])} tháng này")
-        else:
-            over = f" · dự báo vượt {short(f['projected'] - f['budget'])}" if f["projected"] > f["budget"] else ""
-            lines.append(f"💡 Ngân sách {short(f['budget'])}: mỗi ngày còn lại tối đa <b>{approx(per_day)}</b>, hôm nay "
-                         + (f"còn được tiêu <b>{approx(today_left)}</b>" if today_left >= 0
-                            else f"đã quá <b>{approx(-today_left)}</b>") + over)
+        import kehoach
+        over = f" · 🔴 dự báo vượt {short(f['projected'] - f['budget'])}" if f["projected"] > f["budget"] else ""
+        lines.append(kehoach.room_text(*f["room"], bold=True, what=f"ngân sách {short(f['budget'])}") + over)
     else:
         lines += spend_lines(day)
     if f["spikes"]:
-        lines.append(f"Không tính {len(f['spikes'])} khoản đột biến ({short(total(f['spikes']))}): " + ", ".join(
-            f"{note_of(e)} {short(e['tien'])}" for e in sorted(f["spikes"], key=lambda e: -e["tien"])[:3]))
-    if f["history"] < 7:
-        lines.append(f"<i>{'Mới có ' + str(f['history']) + ' ngày' if f['history'] else 'Mới bắt đầu có'} dữ liệu, "
-                     "dự báo còn thô, ghi đều vài tuần sẽ sát hơn</i>")
-    lines.append("<i>Không tính mua sắm, tiền nhà, giải trí… và khoản gấp 3 lần mức thường của nhóm. "
-                 "Đổi nhóm: /dubao nhom ăn uống, đi chợ · Mọi khoản: /dubao tatca</i>")
+        lines.append(f"<i>Bỏ {len(f['spikes'])} khoản đột biến: " + ", ".join(
+            f"{note_of(e)} {short(e['tien'])}" for e in sorted(f["spikes"], key=lambda e: -e["tien"])[:3]) + "</i>")
+    lines.append("<i>Mọi khoản: /dubao tatca</i>")
     return "\n".join(lines)
 
 
@@ -294,10 +285,8 @@ def spend_lines(day):
     import kehoach
     s = spendable(day)
     if not s:
-        return ["<i>Nhắn «+ lương 19tr» khi lương về, hoặc «ngân sách tổng 15tr», để biết mỗi ngày được tiêu bao "
-                "nhiêu</i>"]
-    icon = "🚨" if s["per_day"] <= 0 else "💡"
-    return [f"{icon} {kehoach.spend_text(s, bold=True)}", f"<i>{kehoach.basis_text(s)}</i>"]
+        return ["<i>Nhắn «+ lương 19tr» hoặc «ngân sách tổng 15tr» để biết mỗi ngày được tiêu bao nhiêu</i>"]
+    return [kehoach.spend_text(s, bold=True), f"<i>{kehoach.basis_text(s)}</i>"]
 
 
 def daily_spent(day):
@@ -321,31 +310,29 @@ def unusual_lines(entries, day):
             continue
         typical = statistics.median(same)
         if e["tien"] >= UNUSUAL_RATIO * typical and e["tien"] - typical >= UNUSUAL_MIN:
-            lines.append(f"👀 «{note_of(e)}» gấp {times(e['tien'] / typical)} lần mức thường của {ct.name(e['nhom'])}"
-                         f" (thường khoảng {short(typical)})")
+            lines.append(f"👀 «{note_of(e)}» gấp {times(e['tien'] / typical)} lần thường ({ct.name(e['nhom'])} "
+                         f"~{short(typical)})")
     return lines
 
 
 def after_record(entries, day):
-    """Dòng thêm dưới tin "Đã ghi": khoản lạ thường, hôm nay còn được tiêu bao nhiêu. Có ngân sách hằng ngày
-    (hoặc ngân sách các nhóm hằng ngày) thì tính theo chi tiêu hằng ngày, không thì theo con số chung "mỗi ngày được
-    tiêu" (ngân sách tổng, hoặc kế hoạch chia lương)."""
+    """Dòng thêm dưới tin "Đã ghi": khoản lạ thường; đã đặt ngân sách hằng ngày (hoặc ngân sách các nhóm hằng ngày)
+    thì hôm nay còn bao nhiêu theo chi tiêu hằng ngày, đã đặt ngân sách tổng thì theo con số chung. Không đặt ngân
+    sách thì không thêm dòng (con số theo kế hoạch xem ở 🏠 Hôm nay)."""
     lines = unusual_lines(entries, day)
     codes = daily_groups()
     budgets = kho.get(ct.K_BUDGET, {})
     if any(e["nhom"] in codes for e in entries) and ("hangngay" in budgets or all(c in budgets for c in codes)):
         f = daily_forecast(day)
         if f["room"]:
-            per_day, today_left = f["room"]
-            lines.append(f"💡 Chi hằng ngày: hôm nay còn được tiêu {approx(today_left)} (mỗi ngày tối đa {short(per_day)})"
-                         if today_left >= 0 else f"💡 Chi hằng ngày: hôm nay đã quá {approx(-today_left)} so với mức "
-                         f"mỗi ngày {short(max(per_day, 0))}")
+            import kehoach
+            lines.append(kehoach.room_text(*f["room"], what="ngân sách hằng ngày").replace("Hôm nay", "Chi hằng ngày"))
             return lines
-    if any(e["nhom"] != ct.INCOME for e in entries):
-        s = spendable(day)  # ngân sách tổng nếu có, không thì theo kế hoạch chia lương
+    if any(e["nhom"] != ct.INCOME for e in entries) and budgets.get("tong"):  # có ngân sách tổng mới hiện
+        s = spendable(day)
         if s:
             import kehoach
-            lines.append(f"💡 {kehoach.spend_text(s)}")
+            lines.append(kehoach.spend_text(s))
     return lines
 
 
@@ -656,15 +643,14 @@ def hoi(question, day):
     question = question.strip()
     if not question:
         return HOI_HELP
-    spec, note = None, ""
+    spec = None
     if ct.ai_key():
         try:
             spec = ai_spec(question, day)
         except Exception as e:
             print(f"[lỗi] AI hiểu câu hỏi: {e!r}", file=sys.stderr)
-            note = "\n<i>(AI đang bận, bot hiểu câu hỏi theo cách đơn giản; sai thì hỏi lại rõ hơn)</i>"
     spec = spec or rule_spec(question, day)
-    return run_query(spec, day) + note
+    return run_query(spec, day)
 
 
 # ---- Biểu đồ ------------------------------------------------------------------------
@@ -751,7 +737,7 @@ def facts(kind, day):
     lines = [f"Chi {label}: {vnd(whole)} · {len(spend)} khoản · TB {approx(whole / days)}/ngày"]
     if prev:
         change = (whole - total(prev)) / total(prev) * 100
-        lines.append(f"So với {prev_label}: {'↑' if change >= 0 else '↓'}{abs(change):.0f}% ({vnd(total(prev))})")
+        lines.append(f"So với {prev_label}: {trend(change)} ({short(total(prev))})")
     if start.day == 1 and kind != "thang":  # cả tháng: so trung bình 3 tháng trước
         olds, d = [], start
         for _ in range(3):
@@ -774,9 +760,9 @@ def facts(kind, day):
         up = [f"{ct.name(c)} +{short(d)}" for c, d in moves if d >= 100_000][:3]
         down = [f"{ct.name(c)} −{short(-d)}" for c, d in moves if d <= -100_000][:2]
         if up:
-            lines.append("Tăng nhiều: " + " · ".join(up))
+            lines.append("🔺 " + " · ".join(up))
         if down:
-            lines.append("Giảm: " + " · ".join(down))
+            lines.append("🔻 " + " · ".join(down))
     repeat = [h for h in habits([e for e in spend if e["ghichu"]]) if h[1] >= 3][:5]
     if repeat:
         lines.append("Lặp lại nhiều: " + " · ".join(f"{html.escape(k)} {c} lần {short(a)}" for k, c, a in repeat))
@@ -791,8 +777,8 @@ def facts(kind, day):
     income = total(e for e in items if e["nhom"] == ct.INCOME)
     if income:
         saved = income - whole
-        lines.append(f"Thu {vnd(income)} → " + (f"để dành được {vnd(saved)} ({saved / income * 100:.0f}% thu nhập)"
-                                                 if saved >= 0 else f"chi vượt thu {vnd(-saved)}"))
+        lines.append(f"Thu {short(income)} → " + (f"🟢 dư {short(saved)} ({saved / income * 100:.0f}% thu)"
+                                                   if saved >= 0 else f"🔴 chi vượt thu {short(-saved)}"))
     return label, lines
 
 
@@ -805,7 +791,7 @@ def commentary(kind, day):
         return f"Chưa có khoản chi nào trong {label} để nhận xét"
     text = [f"📌 <b>Số liệu {label}</b>"] + [f"• {line}" for line in lines]
     if not ct.ai_key():
-        return "\n".join(text + ["", "<i>Bật AI (biến GEMINI_API_KEY) để có thêm nhận xét và gợi ý tiết kiệm</i>"])
+        return "\n".join(text)
     plain_facts = re.sub(r"<[^>]+>", "", html.unescape("\n".join(lines)))
     system = ("Bạn là trợ lý tài chính cá nhân, viết tiếng Việt có dấu, ngắn gọn, thân thiện, xưng \"bạn\". "
               "Chỉ dùng số liệu được cho, không bịa thêm số. Trả lời đúng 4 dòng, không markdown: 3 dòng đầu mỗi "
@@ -823,5 +809,5 @@ def commentary(kind, day):
         print(f"[lỗi] AI nhận xét: {e!r}", file=sys.stderr)
         notes = []
     if not notes:
-        return "\n".join(text + ["", "<i>AI đang bận nên chưa có nhận xét, thử lại sau: /nhanxet</i>"])
-    return "\n".join(text + ["", "🤖 <b>Nhận xét</b>"] + [html.escape(n) for n in notes])
+        return "\n".join(text)
+    return "\n".join(text + ["", "💬 <b>Nhận xét</b>"] + [html.escape(n) for n in notes])

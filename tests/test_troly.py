@@ -29,7 +29,7 @@ class TroLy(unittest.TestCase):
         self.assertEqual(h.month_entries(), [])  # chưa ghi gì, không thành khoản chi
         self.assertEqual(duphong.status(h.CLOCK["now"].date())["balance"], 0)
         _, done, _ = h.press(h.button(buttons, "y:ok"))
-        self.assertIn("Đã thêm 1tr vào quỹ dự phòng", done)
+        self.assertIn("✅ +1tr quỹ dự phòng", done)
         self.assertEqual(duphong.status(h.CLOCK["now"].date())["balance"], 1_000_000)
         self.assertEqual(h.month_entries(), [])
         self.assertEqual(h.press(h.button(buttons, "y:ok"))[0], "Thẻ này đã xử lý hoặc hết hạn")  # bấm lại không ghi trùng
@@ -142,7 +142,7 @@ class TroLy(unittest.TestCase):
         self.assertIn("Đọc từ ảnh", text)
         self.assertIn("Bán 1.300 HAG giá 12.000đ, giá vốn 22.816đ", text)
         _, done, _ = h.press(h.button(buttons, "y:ok"))
-        self.assertIn("Đã bán 1.300 HAG", done)
+        self.assertIn("💰 Bán 1.300 HAG", done)
         data = ts.load()
         self.assertEqual([it for it in data["items"] if it["loai"] == "cp"], [])
         self.assertEqual(data["lailo"][-1]["lai"], round(1300 * 12000 * 0.999 - 1300 * 22816))  # lỗ, đã trừ thuế 0,1%
@@ -166,7 +166,7 @@ class TroLy(unittest.TestCase):
 
     def test_cau_hoi_ngoai_so_chi_tieu_ma_ai_ban_thi_tra_loi_nhu_truoc(self):
         text, _ = h.say("tháng này tiết kiệm được bao nhiêu?")
-        self.assertIn("bot hiểu câu hỏi theo cách đơn giản", text)  # trả lời như trước, không báo lỗi
+        self.assertIn("🔎 Thu 01/11–13/11/2026", text)  # trả lời bằng cách hiểu đơn giản, không báo lỗi AI
 
     def test_trang_thu_cau_khong_ghi_gi(self):
         ask = "mua 2 chỉ vàng nhẫn hết 27tr"

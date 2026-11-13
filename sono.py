@@ -221,7 +221,7 @@ def plan_line(d, day):
     if not s:
         return f"Chưa đặt mỗi tháng trả bao nhiêu: /no {html.escape(d['ten'])} trả 5tr/tháng"
     n, last = s
-    return f"{short(d['thang'])}/tháng · xong khoảng {ym_text(last)} ({n} tháng)"
+    return f"{short(d['thang'])}/tháng · xong ~{ym_text(last)} ({n} tháng)"
 
 
 def declare(text, day):
@@ -266,7 +266,7 @@ def declare_info(info, day):
         lines.append(f"   Kỳ trả {'đầu' if created else 'tới'}: tháng {ym_text(first)}"
                      + (f", hạn ngày {d['ngay_tra']}" if d.get("ngay_tra") else ""))
     if d.get("lai") is None:
-        lines.append("<i>Có lãi không? Thêm «không lãi» hoặc «lãi 12%» để bot chấm sức khỏe tài chính đúng</i>")
+        lines.append("<i>Có lãi không? Nhắn thêm «không lãi» hoặc «lãi 12%»</i>")
     if group_note:
         lines.append(group_note)
     lines.append("Xem sổ nợ: /no")
@@ -397,8 +397,8 @@ def month_status(d, day):
     paid, left = paid_in(d, ym), month_left(d, ym)
     if not left:
         return f"✅ Tháng {day.month} đã trả {short(paid)}"
-    due = f", hạn ngày {d['ngay_tra']}" if d.get("ngay_tra") else ""
-    return (f"🟡 Tháng {day.month} đã trả {short(paid)}, còn {short(left)}{due}" if paid
+    due = f" · hạn ngày {d['ngay_tra']}" if d.get("ngay_tra") else ""
+    return (f"🟡 Tháng {day.month} đã trả {short(paid)}, thiếu {short(left)}{due}" if paid
             else f"⬜ Tháng {day.month} chưa trả {short(left)}{due}")
 
 
@@ -445,8 +445,7 @@ def view(day):
     upcoming = sorted(((s[1], d) for d in items for s in [schedule(d, day)] if s), key=lambda x: x[0])
     if upcoming and len(items) > 1:
         last, d = upcoming[0]
-        lines.append(f"\n💡 {ym_text(last)} trả xong {html.escape(d['ten'])}: từ tháng sau mỗi tháng dư ra "
-                     f"{short(d['thang'])}, dồn vào quỹ dự phòng (quỹ đủ rồi thì để đầu tư)")
+        lines.append(f"\n🔁 {ym_text(last)} xong {html.escape(d['ten'])}: dư {short(d['thang'])}/tháng")
     rows = [[(f"✅ Trả {short_name(d)} {short(left)}", f"no:tra:{d['id']}:{int(left)}")] for d, left in due_now(day, data)]
     return "\n".join(lines), rows + [back]
 
@@ -495,7 +494,6 @@ def reminders(day):
     lines = [f"💳 <b>Nhắc trả nợ tháng {day.month}</b>"]
     lines += [f"• {html.escape(d['ten'])}: {short(left)}" + (f" (hạn ngày {d['ngay_tra']})" if d.get("ngay_tra") else "")
               for d, left in due]
-    lines.append("Trả rồi thì bấm nút để ghi khoản chi và trừ dư nợ")
     rows = [[(f"✅ Đã trả {short_name(d)} {short(left)}", f"no:tra:{d['id']}:{int(left)}")] for d, left in due]
     return "\n".join(lines), rows + [[("💳 Sổ nợ", "no:xem")]]
 
@@ -515,26 +513,26 @@ def health_check(day, v, income):
         share = monthly / income * 100
         score = 20 if share <= 20 else 16 if share <= 30 else 10 if share <= 40 else 5 if share <= 50 else 0
         mark = "✅" if share <= 30 else "⚠️" if share <= 50 else "🚨"
-        parts.append(f"trả {short(monthly)}/tháng, bằng {share:.0f}% thu nhập (nên dưới 30%)")
+        parts.append(f"trả {short(monthly)}/tháng = {share:.0f}% thu (nên < 30%)")
     else:
         owed = sum(d["tien"] for d in bearing)
         ratio = owed / v["assets"] * 100 if v["assets"] else (100 if owed else 0)
         score = 20 if not owed else 16 if ratio < 30 else 8 if ratio < 50 else 0
         mark = "✅" if ratio < 30 else "⚠️" if ratio < 50 else "🚨"
         if owed:
-            parts.append(f"nợ có lãi bằng {ratio:.0f}% tài sản (nên dưới 30%)")
+            parts.append(f"nợ có lãi = {ratio:.0f}% tài sản (nên < 30%)")
     if bearing:
         ends = [schedule(d, day) for d in bearing]
         last = max(s[1] for s in ends) if all(ends) else None
-        parts.append(f"nợ có lãi {short(sum(d['tien'] for d in bearing))}" + (f", xong khoảng {ym_text(last)}" if last else ""))
+        parts.append(f"nợ có lãi {short(sum(d['tien'] for d in bearing))}" + (f" · xong ~{ym_text(last)}" if last else ""))
     if zero:
         parts.append(f"nợ không lãi {short(sum(d['tien'] for d in zero))}")
     late = [d for d, _ in due_now(day, data) if day.day >= pay_day(d, day) + 5]
     if late:
         score = max(0, score - 5)
         mark = "⚠️" if mark == "✅" else mark
-        parts.append("tháng này chưa trả: " + ", ".join(html.escape(d["ten"]) for d in late))
-    return score, mark, "Nợ: " + " · ".join(parts) + " · /no"
+        parts.append("⬜ tháng này: " + ", ".join(html.escape(d["ten"]) for d in late))
+    return score, mark, "Nợ: " + " · ".join(parts)
 
 
 # ---- Lệnh, nút ------------------------------------------------------------------------
