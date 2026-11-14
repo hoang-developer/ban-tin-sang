@@ -165,7 +165,8 @@ def weekdays_after(d, n):
 
 def session(cfg, now=None):
     """Phiên kế tiếp: {"phien": ngày khớp lệnh, "dong": lúc đóng sổ lệnh, "du_phong": True nếu tự đoán (không có
-    dữ liệu Fmarket: thứ Hai–thứ Sáu, đóng sổ 14:40 ngày giao dịch trước, chưa tính ngày lễ)}."""
+    dữ liệu Fmarket: theo các thứ quỹ có NAV gần đây, VMEEF mọi ngày làm việc, VFF thứ Ba và thứ Năm; đóng sổ 14:40
+    ngày làm việc trước phiên; chưa tính ngày lễ)}."""
     now = now or now_vn()
     info = fund_info(cfg) or {}
     s = info.get("phien") or {}
@@ -182,10 +183,12 @@ def session(cfg, now=None):
                 return {"phien": trading, "dong": closing, "du_phong": False}
     except (KeyError, TypeError, ValueError):
         pass
-    day = now.date()
+    day = now.date()  # ngày đóng sổ sớm nhất còn kịp: hôm nay trước 14:40, cuối tuần thì thứ Hai
     if day.weekday() >= 5 or (now.hour, now.minute) >= (14, 40):
         day = weekdays_after(day, 1)
-    return {"phien": weekdays_after(day, 1), "dong": datetime(day.year, day.month, day.day, 14, 40, tzinfo=VN_TZ),
+    trading = next_trading(cfg, day)  # phiên kế tiếp theo lịch của quỹ này (VFF chỉ thứ Ba, thứ Năm)
+    close = cutoff_day(trading)
+    return {"phien": trading, "dong": datetime(close.year, close.month, close.day, 14, 40, tzinfo=VN_TZ),
             "du_phong": True}
 
 
