@@ -36,7 +36,8 @@ def morning(day):
     notes = part("đáo hạn", lambda: ts.maturity_notes(day)) or []
     debts = part("nhắc nợ", lambda: sono.reminders(day))
     switches = part("hoán đổi quỹ", lambda: ct.dautu().switch_prompts(day)) or []
-    parts = [salary, ("\n".join(notes), [[("💰 Tiền của tôi", "m:tien")]]) if notes else None, debts, *switches]
+    check = part("đối chiếu", lambda: __import__("doichieu").morning_part(day))
+    parts = [salary, ("\n".join(notes), [[("💰 Tiền của tôi", "m:tien")]]) if notes else None, debts, *switches, check]
     return join(f"☀️ <b>Sáng {day:%d/%m}</b>", parts)
 
 

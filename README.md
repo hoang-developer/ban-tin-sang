@@ -334,6 +334,22 @@ vàng, cổ phiếu, khoản nợ. Bot nối các ngăn thành một dòng tiề
   riêng cho ăn uống, đi chợ, đi lại. Khi có con số này, dòng tiết kiệm dưới tin chỉ còn chuỗi ngày và số đã bớt.
 - Chưa chọn tài khoản chính thì mọi thứ như trước (bot chỉ ghi vào từng ngăn, không trừ số dư tài khoản nào).
 
+### Đối chiếu tài sản tháng
+
+Code ở [doichieu.py](doichieu.py). Ngày **15** hằng tháng (lương ngày 5, trả nợ quanh ngày 10, lệnh quỹ cuối tháng và
+hoán đổi ~ngày 8 đã xong), tin ☀️ sáng nhắc một lần, 🏠 Hôm nay có việc "Đối chiếu tài sản" tới khi xong; mở bất cứ lúc
+nào bằng 💰 Tiền của tôi → 🔄 Đối chiếu tháng hoặc `/doichieu`.
+
+- Mỗi ngăn một dòng: tài khoản, quỹ dự phòng, quỹ chờ, sổ tiết kiệm, khoản phải thu (tiền), cổ phiếu, ETF, quỹ mở, tiền
+  số, ngoại tệ (số lượng), khoản nợ. Khớp bấm ✅ (hoặc ✅ Khớp hết phần còn lại), lệch bấm ✏️ rồi nhắn số thật.
+- Bot ghi đè số thật và lưu khoản lệch: `🔴 −465k VCB (chính): 29,5tr`, `🟢 +200k TCB: 50,2tr`, cuối màn hình Σ lệch
+  tiền (không tính nợ). Nợ thì ngược màu: nợ thật nhiều hơn là 🔴.
+- **Tài khoản chính lệch**: chốt lại số dư, rồi hỏi «🧾 Ghi 465k là chi chưa ghi» (hoặc «💰 thu chưa ghi») hay «Chỉ sửa số
+  dư». Ghi thì vào báo cáo chi tiêu (nhóm Khác / Thu nhập) nhưng không trừ số dư lần nữa.
+- **Quỹ mở còn lệnh chờ khớp hoặc hoán đổi đang chuyển**: chưa cho đối chiếu (⏳), vì khớp xong bot tự cộng ccq.
+- Vàng không có trong danh sách (mỗi lần mua có giá riêng, ít khi đổi): sửa ở 💼 Tài sản. Khai báo lại sổ tiết kiệm cùng
+  tên thì cập nhật, không tạo sổ trùng.
+
 ### Quỹ dự phòng (bước đầu xây dựng tài chính)
 
 Code ở [duphong.py](duphong.py). `/duphong` cho xem:
