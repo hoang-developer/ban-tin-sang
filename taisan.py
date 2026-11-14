@@ -227,9 +227,13 @@ def valuation(day, fresh=False):
             unit = {"cp": "cp", "etf": "ccq", "quy": "ccq", "coin": it["ma"].upper(), "ngoaite": it["ma"]}[kind]
             detail = f"{qty_text(it['sl'])} {unit} × {vn_num(price, 0) + 'đ' if price else 'chưa có giá'}"
             rows.append((kind, rid, it["ma"].upper(), value, cost, detail))
-    for o in pending_orders():  # tiền đã chuyển đi mua quỹ, chưa có NAV để thành ccq: vẫn là tài sản
-        rows.append(("quy", f"lenh{o['id']}", f"{o['quy']} chờ khớp", o["tien"], o["tien"],
-                     f"lệnh {o['dat'][8:]}/{o['dat'][5:7]}, khớp phiên {o['phien'][8:]}/{o['phien'][5:7]}"))
+    for o in pending_orders():  # tiền đã chuyển đi mua quỹ, chưa thành ccq: vẫn là tài sản
+        if o.get("tu"):
+            rows.append(("quy", f"lenh{o['id']}", f"{o['quy']} đang chuyển", o["tien"], o["tien"],
+                         f"đã bán {o['tu']} {o['ban'][8:]}/{o['ban'][5:7]}, chờ mua"))
+        else:
+            rows.append(("quy", f"lenh{o['id']}", f"{o['quy']} chờ khớp", o["tien"], o["tien"],
+                         f"lệnh {o['dat'][8:]}/{o['dat'][5:7]}, khớp phiên {o['phien'][8:]}/{o['phien'][5:7]}"))
     for i, g in enumerate(gold):
         price = quotes.get("vang", {}).get(g["loai"])
         value = g["luong"] * price if price else 0
@@ -248,8 +252,14 @@ def pending_orders():
     except Exception as e:
         print(f"[lỗi] lệnh quỹ chờ khớp: {e!r}", file=sys.stderr)
         return []
-    return [{**o, "quy": o.get("quy") or cfg.get("ma", "Quỹ")} for o in cfg.get("lenh", [])
-            if o.get("loai", "mua") == "mua" and o.get("trang_thai") == "cho"]
+    main = cfg.get("ma", "Quỹ")
+    out = []
+    for o in cfg.get("lenh", []):
+        if o.get("loai", "mua") == "mua" and o.get("trang_thai") == "cho":
+            out.append({**o, "quy": o.get("quy") or main})
+        elif o.get("loai") == "doi" and o.get("trang_thai") == "chuyen":  # đã bán quỹ chờ, chưa mua quỹ chính
+            out.append({**o, "quy": main, "tu": o.get("quy")})
+    return out
 
 
 def snapshot(day, v):

@@ -3,8 +3,11 @@ import unittest
 
 from tests import harness as h
 
+from datetime import date
+
 import dautu
 import taisan as ts
+import thongbao
 
 
 def setup_plan():
@@ -98,6 +101,76 @@ class DauTu(unittest.TestCase):
         _, done, _ = h.press(next(b for b in buttons if b.endswith(":rai")))  # nút "Ghi và rải 80% sang VMEEF"
         self.assertIn("Rải 12,4tr (80%) từ VFF vào VMEEF trong 3 tháng", done)
         self.assertEqual(sum(dautu.config()["ke_hoach_them"].values()), 12_400_000)
+
+    def test_hoan_doi_hai_buoc_roi_hoi_ngay_cap_nhat_gia(self):
+        setup_plan()
+        h.at(2026, 9, 14, 20)
+        h.say("/dautu taicocau 15,5tr")  # mua VFF 15,5tr, khớp 17/09
+        h.at(2026, 9, 17, 17, 30)
+        h.run_jobs()
+        vff_before, vmeef_before = units("VFF"), units("VMEEF")
+        h.at(2026, 9, 22, 10)
+        note = dautu.record_switch(100)
+        self.assertIn("bán VFF phiên <b>24/09</b>, tiền về mới mua VMEEF", note)
+        h.at(2026, 9, 24, 17, 30)
+        text, _ = h.run_jobs()[0]
+        nav_sell = dict(h.NAV["VFF"])[date(2026, 9, 24)]
+        self.assertIn("Đã bán 100 ccq VFF phiên 24/09", text)
+        self.assertIn("đang chuyển sang VMEEF", text)
+        self.assertEqual((units("VFF"), units("VMEEF")), (round(vff_before - 100, 2), vmeef_before))  # chưa mua VMEEF
+        value = ts.valuation(h.CLOCK["now"].date())
+        moving = [r for r in value["rows"] if r[2] == "VMEEF đang chuyển"]
+        self.assertEqual([r[3] for r in moving], [round(100 * nav_sell)])  # tiền đang chuyển vẫn là tài sản
+        h.at(2026, 9, 28, 9, 5)
+        self.assertNotIn("Hoán đổi", (thongbao.morning(h.CLOCK["now"].date()) or ("",))[0])  # chưa đủ 1 tuần
+        h.at(2026, 9, 29, 9, 5)
+        text, buttons = h.parts(thongbao.morning(h.CLOCK["now"].date()))
+        self.assertIn("Hoán đổi 100 ccq VFF → VMEEF (đặt 22/09) xong chưa?", text)
+        toast, _, _ = h.press(h.button(buttons, "dt:chua:"))
+        self.assertIn("2 ngày", toast)
+        h.at(2026, 9, 30, 9, 5)
+        self.assertIsNone(thongbao.morning(h.CLOCK["now"].date()))  # đã bấm Chưa: chưa hỏi lại
+        h.at(2026, 10, 2, 9, 5)
+        text, buttons = h.parts(thongbao.morning(h.CLOCK["now"].date()))
+        _, ask, _ = h.press(h.button(buttons, "y:them:doi_xong:"))
+        self.assertIn("Mua VMEEF khớp ngày nào?", ask)  # ngày bán đã biết (24/09), chỉ hỏi ngày mua
+        text, buttons = h.say("1/10")
+        self.assertIn("bao nhiêu ccq VMEEF", text)
+        _, card, buttons = h.press("y:bo:ccq")
+        nav_buy = dict(h.NAV["VMEEF"])[date(2026, 10, 1)]
+        got = round(100 * nav_sell / nav_buy, 2)
+        self.assertIn("Bán VFF 24/09", card)
+        self.assertIn(f"Mua VMEEF 01/10", card)
+        _, done, _ = h.press(h.button(buttons, "y:ok:"))
+        self.assertIn("Hoán đổi xong", done)
+        self.assertEqual(units("VMEEF"), round(vmeef_before + got, 2))
+        self.assertEqual(dautu.open_switches(), [])
+        self.assertIsNone(thongbao.morning(date(2026, 10, 3)))  # xong rồi: không hỏi nữa
+        # báo lại số ccq theo Fmarket: sửa đúng lệnh đó, không cộng hai lần
+        order = dautu.config()["lenh"][-1]
+        dautu.finish_switch(order["id"], date(2026, 9, 24), date(2026, 10, 1), 210.5)
+        self.assertEqual(units("VMEEF"), round(vmeef_before + 210.5, 2))
+
+    def test_nhan_cau_thuong_sua_hoan_doi_cu(self):
+        setup_plan()
+        h.at(2026, 9, 14, 20)
+        h.say("/dautu taicocau 15,5tr")
+        h.at(2026, 9, 17, 17, 30)
+        h.run_jobs()
+        h.at(2026, 9, 22, 10)
+        dautu.record_switch(100)
+        vmeef_before, vff_before = units("VMEEF"), units("VFF")
+        h.at(2026, 10, 2, 10)
+        ask = "hoán đổi vff xong rồi, bán 24/9 mua 1/10"
+        h.AI.replies[ask] = {"viec": "doi_xong", "ngay_ban": "2026-09-24", "ngay_mua": "2026-10-01"}
+        text, _ = h.say(ask)
+        self.assertIn("bao nhiêu ccq VMEEF", text)  # hỏi một lần số ccq Fmarket báo (bỏ qua được)
+        text, buttons = h.say("212,3")
+        self.assertIn("212,3 ccq", text)
+        h.press(h.button(buttons, "y:ok:"))
+        self.assertEqual(units("VMEEF"), round(vmeef_before + 212.3, 2))
+        self.assertEqual(units("VFF"), round(vff_before - 100, 2))  # chưa chạy việc tối bán VFF: trừ lúc báo xong
+        self.assertEqual(dautu.open_switches(), [])
 
 
 if __name__ == "__main__":
