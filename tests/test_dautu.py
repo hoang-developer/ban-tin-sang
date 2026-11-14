@@ -173,5 +173,69 @@ class DauTu(unittest.TestCase):
         self.assertEqual(dautu.open_switches(), [])
 
 
+WD = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
+
+
+def next_session(fund, y, m, d, hh, mm, text=""):
+    """(phiên của session(), phiên của order_spec) cho lệnh đặt lúc đó (dạng '20/10 T3')."""
+    h.at(y, m, d, hh, mm)
+    cfg = dautu.config()
+    f = dautu.side(cfg) if fund == "VFF" else None
+    s = dautu.session(f or cfg, h.CLOCK["now"])["phien"]
+    spec = dautu.order_spec(cfg, text, h.CLOCK["now"], f)[1]
+    return tuple(f"{x:%d/%m} {WD[x.weekday()]}" for x in (s, spec))
+
+
+class LichKhopLenh(unittest.TestCase):
+    """VMEEF khớp mọi ngày làm việc, VFF thứ Ba và thứ Năm; đóng sổ 14:40 ngày làm việc trước phiên."""
+
+    def setUp(self):
+        setup_plan()
+
+    def test_vmeef_dat_cuoi_tuan_hoac_sau_gio_khop_thu_ba(self):
+        self.assertEqual(next_session("VMEEF", 2026, 10, 16, 10, 0), ("19/10 T2", "19/10 T2"))  # thứ Sáu trước 14:40
+        self.assertEqual(next_session("VMEEF", 2026, 10, 16, 15, 0), ("20/10 T3", "20/10 T3"))  # thứ Sáu sau 14:40
+        self.assertEqual(next_session("VMEEF", 2026, 10, 17, 10, 0), ("20/10 T3", "20/10 T3"))  # thứ Bảy
+        self.assertEqual(next_session("VMEEF", 2026, 10, 18, 20, 0), ("20/10 T3", "20/10 T3"))  # Chủ nhật
+        self.assertEqual(next_session("VMEEF", 2026, 10, 19, 9, 0, "17/10")[1], "20/10 T3")  # thứ Hai ghi ngày thứ Bảy
+
+    def test_vff_chi_khop_thu_ba_thu_nam(self):
+        got = [next_session("VFF", 2026, 10, d, 10, 0) for d in (19, 20, 21, 22, 23, 24)]
+        self.assertEqual(got, [("20/10 T3",) * 2, ("22/10 T5",) * 2, ("22/10 T5",) * 2, ("27/10 T3",) * 2,
+                               ("27/10 T3",) * 2, ("27/10 T3",) * 2])
+        self.assertEqual(next_session("VFF", 2026, 10, 28, 15, 0), ("03/11 T3", "03/11 T3"))  # thứ Tư sau 14:40
+
+    def test_khong_lay_duoc_lich_fmarket_van_dung_lich_tung_quy(self):
+        orig = dautu.fund_info
+        dautu.fund_info = lambda cfg, fresh=False: None
+        try:
+            self.assertEqual(next_session("VMEEF", 2026, 10, 17, 10, 0)[0], "20/10 T3")
+            self.assertEqual(next_session("VMEEF", 2026, 10, 19, 10, 0)[0], "20/10 T3")
+            self.assertEqual([next_session("VFF", 2026, 10, d, 10, 0)[0] for d in (20, 21, 22, 24)],
+                             ["22/10 T5", "22/10 T5", "27/10 T3", "27/10 T3"])
+            self.assertTrue(dautu.session(dautu.side(dautu.config()))["du_phong"])
+        finally:
+            dautu.fund_info = orig
+
+    def test_lenh_dat_thu_bay_khop_dung_nav_thu_ba(self):
+        h.at(2026, 10, 17, 10)
+        text, _ = h.say("/dautu dadat 1tr")
+        self.assertIn("đặt 17/10 → khớp NAV phiên 20/10", text)  # h.say đã bỏ thẻ <b>
+        h.at(2026, 10, 19, 17, 30)
+        self.assertEqual(h.run_jobs(), [])  # thứ Hai: chưa tới phiên
+        h.at(2026, 10, 20, 17, 30)
+        text, _ = h.run_jobs()[0]
+        nav = dict(h.NAV["VMEEF"])[date(2026, 10, 20)]
+        self.assertIn(f"Lệnh VMEEF 1.000.000đ đã khớp phiên 20/10: NAV {dautu.vn_num(nav, 2)}đ", text)
+
+    def test_hoan_doi_dat_cuoi_tuan_ban_vff_thu_ba(self):
+        h.at(2026, 9, 14, 20)
+        h.say("/dautu taicocau 15,5tr")
+        h.at(2026, 9, 17, 17, 30)
+        h.run_jobs()
+        h.at(2026, 10, 24, 10)  # thứ Bảy
+        self.assertIn("bán VFF phiên <b>27/10</b>", dautu.record_switch(50))
+
+
 if __name__ == "__main__":
     unittest.main()
