@@ -1,6 +1,7 @@
 """Gộp thông báo của bot chi tiêu: mỗi buổi một tin thay vì nhiều tin rời.
 
-- ☀️ Sáng (từ 9h, lich.tai_chinh_sang): đã nhận lương chưa, sổ tiết kiệm sắp đáo hạn, khoản nợ tới hạn chưa trả.
+- ☀️ Sáng (từ 9h, lich.tai_chinh_sang): đã nhận lương chưa, sổ tiết kiệm sắp đáo hạn, khoản nợ tới hạn chưa trả,
+  hoán đổi quỹ chờ → quỹ chính đặt từ 1 tuần trước đã xong chưa (xong thì hỏi ngày bán, ngày mua để cập nhật giá).
 - 🌙 Tối (từ 21h, lich.tong_ket_toi): hôm nay chưa ghi gì thì nhắc (kèm nút "không tiêu"), nhóm tiêu tăng vọt hay sắp vượt
   ngân sách, lãi/lỗ các quỹ ngày có NAV mới. Không có gì đáng nói thì không gửi.
 Tin theo sự kiện vẫn gửi riêng vì cần làm ngay: nhắc hạn đặt lệnh quỹ (8:30, 13:00), lệnh quỹ vừa khớp (sau 17h).
@@ -34,7 +35,8 @@ def morning(day):
     salary = part("nhắc lương", lambda: ts.salary_due(day))
     notes = part("đáo hạn", lambda: ts.maturity_notes(day)) or []
     debts = part("nhắc nợ", lambda: sono.reminders(day))
-    parts = [salary, ("\n".join(notes), [[("💰 Tiền của tôi", "m:tien")]]) if notes else None, debts]
+    switches = part("hoán đổi quỹ", lambda: ct.dautu().switch_prompts(day)) or []
+    parts = [salary, ("\n".join(notes), [[("💰 Tiền của tôi", "m:tien")]]) if notes else None, debts, *switches]
     return join(f"☀️ <b>Sáng {day:%d/%m}</b>", parts)
 
 

@@ -77,6 +77,12 @@ JOBS = {
     "chuyen_tk": {"nhan": "🔁 Chuyển tiền", "xac_nhan": True, "truong": [
         F("tien", "tien", "Chuyển bao nhiêu?"), F("den", "chu", "Chuyển sang tài khoản, ví nào?"),
         F("tu", "chu", "Chuyển từ tài khoản, ví nào?", can=False)]},
+    "doi_xong": {"nhan": "🔁 Hoán đổi xong", "xac_nhan": True, "truong": [
+        F("ngay_ban", "ngay", "Bán {cho} khớp ngày nào? (lịch sử giao dịch Fmarket)"),
+        F("ngay_mua", "ngay", "Mua {chinh} khớp ngày nào?"),
+        F("ccq", "so", "Fmarket báo nhận bao nhiêu ccq {chinh}? (bỏ qua: bot tính theo NAV ngày mua)", can=False,
+          goi=True),
+        F("lenh", "so", can=False)]},
     "sua_ccq": {"nhan": "✏️ Sửa số ccq", "xac_nhan": False, "truong": [
         F("ccq", "so", "Fmarket báo lệnh vừa khớp được bao nhiêu ccq?"), F("ma", "chu", can=False)]},
     "no_moi": {"nhan": "💳 Khoản nợ", "xac_nhan": True, "truong": [
@@ -213,6 +219,8 @@ def prompt(day, personal=True):
         'mua; hoán đổi thì không cần), "tien" (số tiền mua), "ccq" (số ccq đem hoán đổi), "ngay" (ngày đặt lệnh, chỉ khi '
         'người dùng nói rõ ngày hay buổi), "sau_gio": true nếu nói đặt sau 14h40.\n'
         '- "sua_ccq": báo số ccq thực tế của lệnh quỹ vừa khớp. "ccq", "ma".\n'
+        '- "doi_xong": báo lệnh hoán đổi quỹ chờ sang quỹ chính (bán VFF rồi mua VMEEF) đã xong. "ngay_ban" (ngày bán '
+        'khớp), "ngay_mua" (ngày mua khớp), "ccq" (số ccq quỹ chính nhận được, nếu có nói).\n'
         '- "quy_cho": để tiền vào, hoặc rút ra khỏi, quỹ chờ đầu tư (tiền chờ mua quỹ mở theo kế hoạch). "tien", "chieu": '
         '"nap" | "rut".\n'
         '- "chuyen_tk": chuyển tiền giữa hai tài khoản, ví của CHÍNH MÌNH (ngân hàng sang ví MoMo, rút tiền mặt ở ATM). '
@@ -447,15 +455,26 @@ def show(f, v):
 def known(a):
     """'🐷 Sổ tiết kiệm: VCB · 100.000.000đ' từ các trường đã có."""
     spec = JOBS[a["viec"]]
-    parts = [show(f, a[f["ten"]]) for f in spec["truong"] if a.get(f["ten"]) is not None]
+    parts = [show(f, a[f["ten"]]) for f in spec["truong"] if a.get(f["ten"]) is not None and f["ten"] != "lenh"]
     return spec["nhan"] + (": " + " · ".join(parts) if parts else "")
+
+
+def fund_names():
+    """{"cho": mã quỹ chờ, "chinh": mã quỹ chính} để điền vào câu hỏi."""
+    try:
+        cfg = ct.dautu().config()
+        return {"cho": (ct.dautu().side(cfg) or {}).get("ma") or "quỹ chờ", "chinh": cfg.get("ma") or "quỹ chính"}
+    except Exception as e:
+        print(f"[lỗi] tên quỹ: {e!r}", file=sys.stderr)
+        return {"cho": "quỹ chờ", "chinh": "quỹ chính"}
 
 
 def question(a, f):
     opts = choices(f)
     rows = [[(label, f"y:tl:{f['ten']}:{i}") for i, (_, label) in enumerate(opts)][j:j + 3] for j in range(0, len(opts), 3)]
     last = ([("⏭ Bỏ qua", f"y:bo:{f['ten']}")] if not f["can"] else []) + [("❌ Thôi", "y:thoi")]
-    return f"{known(a)}\n❓ <b>{f['hoi']}</b>", rows + [last]
+    ask = f["hoi"].format(**fund_names()) if "{" in f["hoi"] else f["hoi"]
+    return f"{known(a)}\n❓ <b>{ask}</b>", rows + [last]
 
 
 def describe(a):
@@ -493,6 +512,12 @@ def describe(a):
             "" if a.get("lai") is None else ", không lãi" if not a["lai"] else f", lãi {num(a['lai'])}%/năm") + (
             f", hạn ngày {int(a['ngay_tra'])}" if a.get("ngay_tra") else "")
         return f"💳 Khoản nợ <b>{esc(a['ten'])}</b>: còn nợ <b>{money}</b>{extra}"
+    if job == "doi_xong":
+        order = switch_order(a)
+        if not order:
+            return "🔁 Không thấy lệnh hoán đổi nào đang chờ"
+        return ct.dautu().switch_preview(order["id"], date.fromisoformat(a["ngay_ban"]), date.fromisoformat(a["ngay_mua"]),
+                                         a.get("ccq"))
     if job == "quy_cho":
         out = a.get("chieu") == "rut"
         code = fund_code()
@@ -589,6 +614,21 @@ def card(a, chat, cid=None):
         rows.insert(1, [("✅ Ghi, là tài khoản chính (lương về, hay tiêu)", f"y:ok:{cid}:chinh")])
     head = "📷 Đọc từ ảnh, kiểm tra lại giúp mình:" if a.get("_anh") else "Mình hiểu là:"
     return f"{head}\n{text}", rows
+
+
+def switch_order(a):
+    """Lệnh hoán đổi của việc doi_xong: theo mã lệnh (nút bấm), không có thì lệnh đang chờ gần nhất, không có nữa thì
+    lệnh hoán đổi gần nhất (sửa lại lệnh bản cũ đã tính khớp cùng một ngày)."""
+    try:
+        dt = ct.dautu()
+        cfg = dt.config()
+        if a.get("lenh"):
+            return next((o for o in cfg.get("lenh", []) if o["id"] == int(a["lenh"]) and o.get("loai") == "doi"), None)
+        pending = dt.open_switches(cfg) or [o for o in cfg.get("lenh", []) if o.get("loai") == "doi"]
+        return pending[-1] if pending else None
+    except Exception as e:
+        print(f"[lỗi] lệnh hoán đổi: {e!r}", file=sys.stderr)
+        return None
 
 
 def main_name():
@@ -701,6 +741,13 @@ def run(a, now, chat, option=None):
         return run_transfer(a, now, chat)
     if job == "quy":
         return run_fund(a, now, option)
+    if job == "doi_xong":
+        order = switch_order(a)
+        if not order:
+            return "Không thấy lệnh hoán đổi nào đang chờ", [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
+        note = ct.dautu().finish_switch(order["id"], date.fromisoformat(a["ngay_ban"]),
+                                        date.fromisoformat(a["ngay_mua"]), a.get("ccq"))
+        return note, [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]
     if job == "sua_ccq":
         return ct.dautu().fix_units(f"{num(a['ccq'])} {a.get('ma') or ''}".strip()), [[("📈 Đầu tư", "dt:xem")]]
     if job == "no_moi":
@@ -996,6 +1043,9 @@ def on_button(arg, message, now):
         if job not in JOBS:
             return None, None
         extra = {"ma": preset.upper()} if preset and job == "sua_ccq" else {}
+        if preset.isdigit() and job == "doi_xong":
+            order = switch_order({"lenh": int(preset)})
+            extra = {"lenh": int(preset), **({"ngay_ban": order["ban"]} if order and order.get("ban") else {})}
         if preset == "chinh" and job == "tai_khoan":
             main = ct.taisan().main_account()
             extra = {"ten": main["ten"], "chinh": True} if main else {"chinh": True}

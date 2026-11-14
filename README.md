@@ -420,8 +420,12 @@ Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu 
   12 tháng đầu mới mất 2%), nên VFF vừa là phần trái phiếu của danh mục, vừa là tiền chờ cho VA. Góp thêm mỗi tháng vào
   VFF: `/dautu vff 1tr` (ví dụ 4tr VA + 1tr VFF). Mỗi tháng tiền góp mua VMEEF trước theo VA, phần chưa mua vào VFF; tháng
   cần mua nhiều hơn tiền góp thì hoán đổi từ VFF. Tin ngày hạn ghi sẵn từng lệnh (mua VMEEF, mua VFF, hoán đổi bao nhiêu
-  ccq) và một nút ✅ ghi tất cả; khớp lệnh bot tự cập nhật số ccq hai quỹ (VFF giao dịch thứ Ba, thứ Năm). Đã mua VFF
-  ngoài lịch: nhắn `mua VFF 1tr`; đã hoán đổi: `/dautu doi 125,5`; sửa số ccq VFF: `/dautu ccq 36,7 vff`. Chạy thử trên
+  ccq) và một nút ✅ ghi tất cả; khớp lệnh bot tự cập nhật số ccq (VFF giao dịch thứ Ba, thứ Năm). Đã mua VFF
+  ngoài lịch: nhắn `mua VFF 1tr`; đã hoán đổi: `/dautu doi 125,5`; sửa số ccq VFF: `/dautu ccq 36,7 vff`.
+  **Hoán đổi mất khoảng 1 tuần, hai bước**: bán VFF (tối ngày khớp bot trừ ccq VFF, tiền "VMEEF đang chuyển" vẫn tính vào
+  tài sản), tiền về rồi mới mua VMEEF. Từ 7 ngày sau ngày đặt, tin sáng và 🏠 Hôm nay hỏi "xong chưa?" (bấm ⏳ Chưa thì 2
+  ngày sau hỏi lại); xong thì bot hỏi ngày bán, ngày mua (và số ccq Fmarket báo, bỏ qua được), tính theo NAV đúng ngày rồi
+  cập nhật hai quỹ. Nhắn câu thường cũng được: «hoán đổi VFF xong, bán 18/11 mua 21/11». Chạy thử trên
   NAV thật (góp 5tr: 4tr VA + 1tr VFF, VA được rút từ VFF): tài sản cuối gần bằng dồn cả 5tr vào cổ phiếu (−1% tới +2%),
   sụt giảm lớn nhất nhẹ hơn 4–6 điểm; VFF tăng 6–10% mỗi năm, giảm sâu nhất −4,3% (2014), vẫn tăng trong đợt sập 2022.
 - Bản tin tối của bot bản tin có thêm dòng NAV quỹ, % hôm nay, cách đỉnh 52 tuần.

@@ -138,6 +138,8 @@ def todo(day, n, now):
                                 (f"✅ {label[:18]}", f"dp:nap:{int(amount)}" if kind == "dp" else f"dt:nap:{int(amount)}")))
         if not n["fund"]["monthly"]:
             out.append((f"📒 Ghi chép đủ 14 ngày để bot tính quỹ dự phòng (đang có {n['fund']['days']} ngày)", None))
+    for text, rows in part("hoán đổi quỹ", lambda: ct.dautu().switch_prompts(day)) or []:
+        out.append((text, rows[0][0]))
     unsorted = sum(ct.pending(e) for e in ct.load(day.strftime("%Y-%m")))
     if unsorted:
         out.append((f"🗂 {unsorted} khoản chưa rõ nhóm", ("🗂 Xếp nhóm", "m:cx")))
