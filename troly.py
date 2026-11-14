@@ -1114,7 +1114,7 @@ def try_text(text, day):
     lines += [f"AI ({model}) trả: {out.strip()[:300]}", f"Việc sau khi kiểm tra: {a}"]
     if a["viec"] in JOBS:
         f = missing(a)
-        lines.append("→ Bot hỏi tiếp: " + f["hoi"] if f else "→ " + (
+        lines.append("→ Bot hỏi tiếp: " + f["hoi"].format(**fund_names()) if f else "→ " + (
             "Thẻ xác nhận: " if JOBS[a["viec"]]["xac_nhan"] else "Làm luôn: ") + re.sub(r"<[^>]+>", "", describe(a)))
     else:
         lines.append({"chi": "→ Ghi như khoản chi thường.", "hoi": "→ Trả lời bằng sổ chi tiêu.",
