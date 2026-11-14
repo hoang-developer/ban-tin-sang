@@ -140,6 +140,9 @@ def todo(day, n, now):
             out.append((f"📒 Ghi chép đủ 14 ngày để bot tính quỹ dự phòng (đang có {n['fund']['days']} ngày)", None))
     for text, rows in part("hoán đổi quỹ", lambda: ct.dautu().switch_prompts(day)) or []:
         out.append((text, rows[0][0]))
+    check = part("đối chiếu", lambda: __import__("doichieu").todo(day))
+    if check:
+        out.append(check)
     unsorted = sum(ct.pending(e) for e in ct.load(day.strftime("%Y-%m")))
     if unsorted:
         out.append((f"🗂 {unsorted} khoản chưa rõ nhóm", ("🗂 Xếp nhóm", "m:cx")))
@@ -195,6 +198,7 @@ def home(day, now=None):
 # ---- 💰 Tiền của tôi -----------------------------------------------------------------------
 
 MONEY_ROWS = [[("🏦 Tài khoản chính", "ts:chinh"), ("🔁 Chuyển tiền", "y:them:chuyen_tk")],
+              [("🔄 Đối chiếu tháng", "dc:xem")],
               [("💼 Chi tiết, giá mới", "ts:xem"), ("📊 Biểu đồ", "ts:bd")],
               [("🛟 Quỹ dự phòng", "dp:xem"), ("💳 Sổ nợ", "no:xem")],
               [("📈 Đầu tư quỹ", "dt:xem"), ("🩺 Sức khỏe", "ts:sk")],

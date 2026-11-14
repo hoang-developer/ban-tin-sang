@@ -83,6 +83,10 @@ JOBS = {
         F("ccq", "so", "Fmarket báo nhận bao nhiêu ccq {chinh}? (bỏ qua: bot tính theo NAV ngày mua)", can=False,
           goi=True),
         F("lenh", "so", can=False)]},
+    "doi_chieu": {"nhan": "🔄 Đối chiếu", "xac_nhan": False, "truong": [
+        F("gia_tri", "tien", "Số thật là bao nhiêu?"), F("muc", "so", can=False)]},
+    "doi_chieu_sl": {"nhan": "🔄 Đối chiếu", "xac_nhan": False, "truong": [
+        F("gia_tri", "so", "Số lượng thật là bao nhiêu?"), F("muc", "so", can=False)]},
     "sua_ccq": {"nhan": "✏️ Sửa số ccq", "xac_nhan": False, "truong": [
         F("ccq", "so", "Fmarket báo lệnh vừa khớp được bao nhiêu ccq?"), F("ma", "chu", can=False)]},
     "no_moi": {"nhan": "💳 Khoản nợ", "xac_nhan": True, "truong": [
@@ -455,7 +459,7 @@ def show(f, v):
 def known(a):
     """'🐷 Sổ tiết kiệm: VCB · 100.000.000đ' từ các trường đã có."""
     spec = JOBS[a["viec"]]
-    parts = [show(f, a[f["ten"]]) for f in spec["truong"] if a.get(f["ten"]) is not None and f["ten"] != "lenh"]
+    parts = [show(f, a[f["ten"]]) for f in spec["truong"] if a.get(f["ten"]) is not None and f["ten"] not in ("lenh", "muc")]
     return spec["nhan"] + (": " + " · ".join(parts) if parts else "")
 
 
@@ -473,7 +477,7 @@ def question(a, f):
     opts = choices(f)
     rows = [[(label, f"y:tl:{f['ten']}:{i}") for i, (_, label) in enumerate(opts)][j:j + 3] for j in range(0, len(opts), 3)]
     last = ([("⏭ Bỏ qua", f"y:bo:{f['ten']}")] if not f["can"] else []) + [("❌ Thôi", "y:thoi")]
-    ask = f["hoi"].format(**fund_names()) if "{" in f["hoi"] else f["hoi"]
+    ask = a.get("_hoi") or (f["hoi"].format(**fund_names()) if "{" in f["hoi"] else f["hoi"])
     return f"{known(a)}\n❓ <b>{ask}</b>", rows + [last]
 
 
@@ -741,6 +745,9 @@ def run(a, now, chat, option=None):
         return run_transfer(a, now, chat)
     if job == "quy":
         return run_fund(a, now, option)
+    if job in ("doi_chieu", "doi_chieu_sl"):
+        import doichieu
+        return doichieu.set_value(a["muc"], a["gia_tri"], now)
     if job == "doi_xong":
         order = switch_order(a)
         if not order:
@@ -1043,6 +1050,14 @@ def on_button(arg, message, now):
         if job not in JOBS:
             return None, None
         extra = {"ma": preset.upper()} if preset and job == "sua_ccq" else {}
+        if preset.isdigit() and job in ("doi_chieu", "doi_chieu_sl"):
+            import doichieu
+            found = next(((it, v, u) for it, v, u in doichieu.items(now.date()) if str(it["id"]) == preset), None)
+            if not found:
+                return "Ngăn này không còn trong tài sản", None
+            it, value, unit = found
+            extra = {"muc": int(preset), "_hoi": f"{doichieu.name(it)} thật là bao nhiêu? (bot đang tính "
+                                                 f"{doichieu.amount_text(value, unit)})"}
         if preset.isdigit() and job == "doi_xong":
             order = switch_order({"lenh": int(preset)})
             extra = {"lenh": int(preset), **({"ngay_ban": order["ban"]} if order and order.get("ban") else {})}

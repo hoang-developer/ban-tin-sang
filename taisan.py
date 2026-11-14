@@ -380,7 +380,13 @@ def add_saving(data, args):
 
 
 def add_saving_item(data, name, amount, rate, months, start):
-    """Thêm một sổ tiết kiệm (chưa lưu): tên, tiền gốc, lãi %/năm, kỳ hạn tháng (0 là không kỳ hạn), ngày gửi."""
+    """Thêm một sổ tiết kiệm (chưa lưu): tên, tiền gốc, lãi %/năm, kỳ hạn tháng (0 là không kỳ hạn), ngày gửi. Sổ
+    cùng tên đã có thì cập nhật (khai báo lại khi đối chiếu, gửi tiếp), không tạo sổ trùng."""
+    same = next((it for it in data["items"] if it["loai"] == "tietkiem" and same_name(it["ten"], name[:30])), None)
+    if same:
+        same.update(tien=amount, lai=rate, ky=months, ngay=start.isoformat())
+        due = f", đáo hạn {add_months(start, months):%d/%m/%Y}" if months else ", không kỳ hạn"
+        return f"✅ Đã cập nhật sổ tiết kiệm {html.escape(name[:30])} {ct.vnd(amount)}, lãi {qty_text(rate)}%/năm{due}"
     data["items"].append({"id": new_id(data), "loai": "tietkiem", "ten": name[:30], "tien": amount,
                           "lai": rate, "ky": months, "ngay": start.isoformat()})
     due = f", đáo hạn {add_months(start, months):%d/%m/%Y}" if months else ", không kỳ hạn"
