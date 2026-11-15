@@ -8,7 +8,9 @@ Tin theo sự kiện vẫn gửi riêng vì cần làm ngay: nhắc hạn đặt
 """
 import sys
 
-import sochitieu as ct
+from domain.chitieu.kinds import INCOME
+from interface.chitieu import features
+from repositories.chitieu import ledger as ledger_repo
 
 
 def part(name, make):
@@ -31,11 +33,11 @@ def join(title, parts):
 
 def morning(day):
     """Tin sáng gộp; None nếu không có gì cần nhắc."""
-    ts, sono = ct.taisan(), ct.sono()
+    ts, sono = features.taisan(), features.sono()
     salary = part("nhắc lương", lambda: ts.salary_due(day))
     notes = part("đáo hạn", lambda: ts.maturity_notes(day)) or []
     debts = part("nhắc nợ", lambda: sono.reminders(day))
-    switches = part("hoán đổi quỹ", lambda: ct.dautu().switch_prompts(day)) or []
+    switches = part("hoán đổi quỹ", lambda: features.dautu().switch_prompts(day)) or []
     check = part("đối chiếu", lambda: __import__("interface.doichieu.reconcile", fromlist=["morning_part"]).morning_part(day))
     parts = [salary, ("\n".join(notes), [[("💰 Tiền của tôi", "m:tien")]]) if notes else None, debts, *switches, check]
     return join(f"☀️ <b>Sáng {day:%d/%m}</b>", parts)
@@ -44,10 +46,10 @@ def morning(day):
 def evening(now):
     """Tin tối gộp; None nếu không có gì đáng nói."""
     day = now.date()
-    pt = ct.phantich()
-    remind = part("nhắc ghi chép", lambda: ct.tietkiem().reminder(day))
+    pt = features.phantich()
+    remind = part("nhắc ghi chép", lambda: features.tietkiem().reminder(day))
     alerts = part("để ý chi tiêu", lambda: pt.alerts(day)) or []
-    fund = part("lãi lỗ quỹ", lambda: ct.dautu().daily_report(now))
+    fund = part("lãi lỗ quỹ", lambda: features.dautu().daily_report(now))
     parts = [remind]
     if alerts:
         parts.append(("👀 <b>Để ý</b>\n" + "\n".join(alerts), [[("🔮 Dự báo", "db"), ("💬 Nhận xét", "nx:thang")]]))
@@ -63,9 +65,9 @@ def evening(now):
 def today_line(day):
     """'💸 Hôm nay chi 85k · trong mức (dư 246k)' theo con số mỗi ngày được tiêu."""
     from interface.kehoach import plan as kehoach
-    group = ct.sono().debt_group()[0]
-    spent = sum(e["tien"] for e in ct.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()
-                and e["nhom"] not in (ct.INCOME, group) and not e.get("no"))
+    group = features.sono().debt_group()[0]
+    spent = sum(e["tien"] for e in ledger_repo.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()
+                and e["nhom"] not in (INCOME, group) and not e.get("no"))
     s = kehoach.spendable_safe(day)
     if not s or s["per_day"] <= 0:
         return f"💸 Hôm nay chi {kehoach.short(spent)}"

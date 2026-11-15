@@ -19,7 +19,9 @@ import re
 import sys
 from datetime import datetime, timedelta
 
-import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày hôm nay
+from domain.common.money import parse_amount
+from domain.common.text import plain
+from interface.chitieu import context as chitieu_ctx
 from domain.common.money import number
 from domain.dautu.calendar import months, ym_add, ym_of, ym_text  # noqa: F401
 from domain.dautu.plan import (DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG, MIN_ORDER, STEP, WATCH,  # noqa: F401
@@ -67,7 +69,7 @@ def view(day=None, fresh=False):
         return pview.NOT_ENABLED
     s = status(cfg, fresh=fresh)
     final, sess = is_deadline(cfg)
-    return pview.view_text(cfg, s, final, sess, fund_info(cfg), ct.today(), lambda: session(s["side"])["phien"])
+    return pview.view_text(cfg, s, final, sess, fund_info(cfg), chitieu_ctx.today(), lambda: session(s["side"])["phien"])
 
 
 def reminder(now, second=False):
@@ -102,10 +104,10 @@ MONEY_WORDS = {"tr", "trieu", "k", "nghin", "ngan", "d", "dong", "thang"}
 
 def start(args, switch=False):
     cfg = config()
-    found = ct.parse_amount(" ".join(args))
+    found = parse_amount(" ".join(args))
     gop = found[0] if found else DEFAULT_GOP
     code = next((a.upper() for a in args if re.fullmatch(r"[A-Za-z][A-Za-z0-9-]{2,11}", a)
-                 and ct.plain(a) not in MONEY_WORDS), cfg.get("ma") or DEFAULT_FUND)
+                 and plain(a) not in MONEY_WORDS), cfg.get("ma") or DEFAULT_FUND)
     if cfg.get("ma") == code:
         cfg.pop("tat", None)
         if found:
@@ -118,7 +120,7 @@ def start(args, switch=False):
     fund = find_fund(code)
     if not fund:
         return f"Không thấy quỹ {html.escape(code)} trên Fmarket (gõ đúng mã, ví dụ VMEEF, VESAF, SSISCA, DCDS)"
-    ym = ym_of(ct.today())
+    ym = ym_of(chitieu_ctx.today())
     data = assets_repo.load()
     hold = next((it for it in data["items"] if it["loai"] == "quy" and it["ma"] == code), None)
     base = 0
@@ -143,7 +145,7 @@ def start(args, switch=False):
 
 @common.needs_store
 def dautu(args):
-    word = ct.plain(args[0]) if args else ""
+    word = plain(args[0]) if args else ""
     rest = " ".join(args[1:])
     if word in ("huongdan", "help", "?"):
         return USAGE
@@ -165,7 +167,7 @@ def dautu(args):
     if word in ("lichsu", "lenh"):
         return history_text()
     if word == "baocao":
-        cfg["baocao_toi"] = ct.plain(rest) not in ("tat", "off", "khong")
+        cfg["baocao_toi"] = plain(rest) not in ("tat", "off", "khong")
         save(cfg)
         return ("✅ Tối các ngày có NAV mới (khoảng 20h) bot báo giá trị, lãi/lỗ các quỹ" if cfg["baocao_toi"]
                 else "Đã tắt tin tối về lãi/lỗ các quỹ. Bật lại: /dautu baocao bat")
@@ -185,7 +187,7 @@ def dautu(args):
         cfg["tang"] = g
         save(cfg)
         return view()
-    found = ct.parse_amount(rest)
+    found = parse_amount(rest)
     if word in ("gop", "moithang"):
         if not found:
             return USAGE
@@ -245,7 +247,7 @@ def dautu(args):
             return USAGE
         now = market.now_vn()
         other = rest[:found[1]] + " " + rest[found[2]:]
-        fund = sd if sd and sd["ma"].lower() in ct.plain(other).split() else None
+        fund = sd if sd and sd["ma"].lower() in plain(other).split() else None
         spec = order_spec(cfg, other, now, fund)
         if isinstance(spec, str):
             return spec
@@ -259,7 +261,7 @@ def restructure(cfg, rest, found, now):
     phiếu); phần cổ phiếu (mặc định 80%) được cộng dần vào kế hoạch quỹ chính trong N tháng (mặc định 3), mỗi cuối
     tháng hoán đổi từ quỹ chờ theo VA. /dautu taicocau xoa: bỏ phần rải còn lại."""
     sd = side(cfg)
-    if ct.plain(rest).split()[:1] == ["xoa"]:
+    if plain(rest).split()[:1] == ["xoa"]:
         ym = current_period(cfg, now)
         left = {k: v for k, v in cfg.get("ke_hoach_them", {}).items() if k >= ym}
         cfg["ke_hoach_them"] = {k: v for k, v in cfg.get("ke_hoach_them", {}).items() if k < ym}
@@ -272,8 +274,8 @@ def restructure(cfg, rest, found, now):
                 "80% trong 3 tháng; đổi: /dautu taicocau 15,5tr 6 thang 70%)")
     amount = found[0]
     other = rest[:found[1]] + " " + rest[found[2]:]
-    plain = ct.plain(other)
-    n = int(m[1]) if (m := re.search(r"(\d{1,2})\s*thang", plain)) else 3
+    other_plain = plain(other)
+    n = int(m[1]) if (m := re.search(r"(\d{1,2})\s*thang", other_plain)) else 3
     share = int(m[1]) if (m := re.search(r"(\d{1,3})\s*%", other)) else 80
     if not 1 <= n <= 24 or not 0 <= share <= 100:
         return "Số tháng từ 1 tới 24, tỉ lệ cổ phiếu từ 0% tới 100%, ví dụ: /dautu taicocau 15,5tr 3 thang 80%"
@@ -307,7 +309,7 @@ def restructure(cfg, rest, found, now):
 
 def set_side(cfg, text):
     """/dautu quycho VFF: quỹ chờ là quỹ trái phiếu (hoán đổi miễn phí sang quỹ chính); /dautu quycho tien: tiền gửi."""
-    word = ct.plain(text).strip()
+    word = plain(text).strip()
     if word in ("tien", "tietkiem", "guitien"):
         cfg.pop("cho", None)
         save(cfg)
@@ -331,7 +333,7 @@ def set_side(cfg, text):
 def from_text(text, now):
     """Tin "mua VMEEF 3tr" (lệnh đặt hôm khác thì thêm ngày đặt: "mua VMEEF 1tr 9/11"): ghi lệnh; None nếu không
     phải."""
-    t = ct.plain(text).split()
+    t = plain(text).split()
     if len(t) < 3 or t[0] != "mua":
         return None
     cfg = config()
@@ -340,7 +342,7 @@ def from_text(text, now):
     code = next((c for c in t[1:3] if c in codes), None)
     if not code:
         return None
-    found = ct.parse_amount(text)
+    found = parse_amount(text)
     if not found:
         return None
     fund = sd if sd and code == sd["ma"].lower() else None

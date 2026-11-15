@@ -12,14 +12,21 @@ import sys
 
 from infrastructure import kho
 from repositories import keys
-import sochitieu as ct
+from domain.chitieu.kinds import INCOME
+from domain.chitieu.learn import pending as pending_count
+from interface.chitieu import bot as chitieu_bot
+from interface.chitieu import commands as chitieu_commands
+from interface.chitieu import context as chitieu_ctx
+from interface.chitieu import features
+from presentation.chitieu import view as cview
+from repositories.chitieu import ledger as ledger_repo
 from domain.common.dates import WEEKDAYS
 from presentation.menu.view import (BOTTOM, GREETING, GUIDE, HOW_TO, MAIN, MONEY_ROWS, NAV, OLD_BOTTOM, QUESTIONS,  # noqa: F401
                                     SETTINGS, bottom_keyboard, gain)
 
 
 def short(x):
-    return ct.taisan().short(x) if abs(x) >= 1000 else "0đ"
+    return features.taisan().short(x) if abs(x) >= 1000 else "0đ"
 
 
 def part(name, make):
@@ -32,7 +39,7 @@ def part(name, make):
 
 
 def note(e):
-    return html.escape((e.get("ghichu") or ct.bare(ct.name(e["nhom"])))[:20])
+    return html.escape((e.get("ghichu") or chitieu_ctx.bare(chitieu_ctx.name(e["nhom"])))[:20])
 
 
 # ---- 🏠 Hôm nay ----------------------------------------------------------------------------
@@ -60,12 +67,12 @@ def todo(day, n, now):
     deadline = part("hạn đặt lệnh quỹ", lambda: fund_deadline(now))
     if deadline:
         out.append(deadline)
-    salary = part("nhắc lương", lambda: ct.taisan().salary_due(day))
+    salary = part("nhắc lương", lambda: features.taisan().salary_due(day))
     if salary:
         out.append((salary[0], salary[1][0][0]))
     if n:
         steps = kehoach.steps(n)
-        paid = any(e["nhom"] == ct.INCOME for e in ct.load(n["ym"]))
+        paid = any(e["nhom"] == INCOME for e in ledger_repo.load(n["ym"]))
         if paid and len(steps) > 1:
             out.append(("📋 Lương đã về: " + " · ".join(f"{html.escape(label[0].lower() + label[1:])} {short(amount)}"
                                                         for _, label, amount, _ in steps),
@@ -82,12 +89,12 @@ def todo(day, n, now):
                                 (f"✅ {label[:18]}", f"dp:nap:{int(amount)}" if kind == "dp" else f"dt:nap:{int(amount)}")))
         if not n["fund"].monthly:
             out.append((f"📒 Ghi chép đủ 14 ngày để bot tính quỹ dự phòng (đang có {n['fund'].days} ngày)", None))
-    for text, rows in part("hoán đổi quỹ", lambda: ct.dautu().switch_prompts(day)) or []:
+    for text, rows in part("hoán đổi quỹ", lambda: features.dautu().switch_prompts(day)) or []:
         out.append((text, rows[0][0]))
     check = part("đối chiếu", lambda: __import__("interface.doichieu.reconcile", fromlist=["todo"]).todo(day))
     if check:
         out.append(check)
-    unsorted = sum(ct.pending(e) for e in ct.load(day.strftime("%Y-%m")))
+    unsorted = sum(pending_count(e) for e in ledger_repo.load(day.strftime("%Y-%m")))
     if unsorted:
         out.append((f"🗂 {unsorted} khoản chưa rõ nhóm", ("🗂 Xếp nhóm", "m:cx")))
     return out
@@ -96,14 +103,14 @@ def todo(day, n, now):
 def home(day, now=None):
     """🏠 Hôm nay."""
     if not kho.ready():
-        return ct.NEED_STORE
+        return cview.NEED_STORE
     from interface.kehoach import plan as kehoach
     from interface.no import debt as sono
-    ts = ct.taisan()
+    ts = features.taisan()
     now = now or ts.now_vn()
-    month = ct.load(day.strftime("%Y-%m"))
+    month = ledger_repo.load(day.strftime("%Y-%m"))
     group = part("nhóm trả nợ", lambda: sono.debt_group()[0])
-    spend = [e for e in month if e["nhom"] not in (ct.INCOME, group) and not e.get("no")]
+    spend = [e for e in month if e["nhom"] not in (INCOME, group) and not e.get("no")]
     today = [e for e in spend if e["ngay"] == day.isoformat()]
     lines = [f"🏠 <b>Hôm nay, {WEEKDAYS[day.weekday()].lower()} {day:%d/%m}</b>"]
     if today:
@@ -116,7 +123,7 @@ def home(day, now=None):
     s = part("mỗi ngày được tiêu", lambda: kehoach.spendable(day, n)) if n else None
     if s:
         lines.append(kehoach.spend_text(s, bold=True))
-    income = sum(e["tien"] for e in month if e["nhom"] == ct.INCOME)
+    income = sum(e["tien"] for e in month if e["nhom"] == INCOME)
     lines.append(f"📅 Tháng {day.month}: đã chi {short(sum(e['tien'] for e in spend))}"
                  + (f" · đã thu {short(income)}" if income else ""))
     main = part("tài khoản chính", lambda: ts.main_line(day))
@@ -143,12 +150,12 @@ def home(day, now=None):
 def money(day):
     """💰 Tiền của tôi: mọi ngăn tiền, mỗi ngăn một dòng."""
     if not kho.ready():
-        return ct.NEED_STORE
-    ts = ct.taisan()
+        return cview.NEED_STORE
+    ts = features.taisan()
     v = ts.valuation(day)
     if not v["rows"]:
         return ("💰 <b>Tiền của tôi</b>\nChưa khai báo gì. Nhắn câu thường, ví dụ «tài khoản VCB còn 30tr», «gửi tiết "
-                "kiệm TCB 50tr lãi 5% 6 tháng», «vay anh Nam 10tr», hoặc bấm ➕ Thêm.", [[("➕ Thêm", "y:them"), ct.BACK]])
+                "kiệm TCB 50tr lãi 5% 6 tháng», «vay anh Nam 10tr», hoặc bấm ➕ Thêm.", [[("➕ Thêm", "y:them"), chitieu_ctx.BACK]])
     items = {str(it["id"]): it for it in ts.load()["items"]}
     rows = v["rows"]
 
@@ -201,15 +208,15 @@ def ask_screen():
              "• tháng 10 đi lại hết bao nhiêu, so với tháng 9?",
              "• bao giờ trả xong nợ? · quỹ dự phòng đủ chưa?",
              "Hoặc bấm câu hay hỏi:"]
-    return "\n".join(lines), [[(q, f"m:q:{k}")] for q, k in QUESTIONS] + [[ct.BACK]]
+    return "\n".join(lines), [[(q, f"m:q:{k}")] for q, k in QUESTIONS] + [[chitieu_ctx.BACK]]
 
 
 def answer_question(key, day):
     """Câu hỏi có sẵn: trả lời bằng màn hình có sẵn (không cần AI, trừ nhận xét)."""
-    pt = ct.phantich()
-    makers = {"tieu": lambda: pt.dubao([]), "thang": lambda: (ct.report("thang", day)[0], ct.REPORT_BUTTONS),
-              "so": lambda: pt.hoi("tháng này so với tháng trước", day), "no": lambda: ct.sono().view(day),
-              "quy": lambda: ct.dautu().view(), "sk": lambda: ct.taisan().health(day),
+    pt = features.phantich()
+    makers = {"tieu": lambda: pt.dubao([]), "thang": lambda: (chitieu_ctx.report("thang", day)[0], chitieu_ctx.REPORT_BUTTONS),
+              "so": lambda: pt.hoi("tháng này so với tháng trước", day), "no": lambda: features.sono().view(day),
+              "quy": lambda: features.dautu().view(), "sk": lambda: features.taisan().health(day),
               "nx": lambda: pt.commentary("thang", day)}
     return makers[key]()
 
@@ -220,8 +227,8 @@ def notify_rows():
     remind = tietkiem_service.reminder_on()
     rows = [[(f"🔔 Nhắc ghi chép 21h: {'bật' if remind else 'tắt'}", "m:tb:nhac")]]
     try:
-        cfg = ct.dautu().config()
-        if ct.dautu().active(cfg):
+        cfg = features.dautu().config()
+        if features.dautu().active(cfg):
             rows.append([(f"📊 Báo lãi/lỗ quỹ tối: {'tắt' if cfg.get('baocao_toi') is False else 'bật'}", "m:tb:quy")])
     except Exception as e:
         print(f"[lỗi] cài đặt báo quỹ: {e!r}", file=sys.stderr)
@@ -232,7 +239,7 @@ def settings():
     rows = [[("🏷 Các nhóm", "m:nhom"), ("🎯 Ngân sách", "m:ns")],
             [("💼 Ngày lương", "y:them:ngay_luong"), ("🎯 Đặt ngân sách", "y:them:ngan_sach")]]
     rows += notify_rows()
-    rows += [[("📤 Xuất Excel tháng này", "m:xuat"), ("📖 Mọi lệnh", "m:hd")], [("📝 Cách ghi", "m:ghi"), ct.BACK]]
+    rows += [[("📤 Xuất Excel tháng này", "m:xuat"), ("📖 Mọi lệnh", "m:hd")], [("📝 Cách ghi", "m:ghi"), chitieu_ctx.BACK]]
     return SETTINGS, rows
 
 
@@ -241,7 +248,7 @@ def toggle(which):
         from services.tietkiem import progress as tietkiem_service
         on = tietkiem_service.toggle_reminder()
         return "Đã " + ("bật" if on else "tắt") + " nhắc ghi chép 21h"
-    dt = ct.dautu()
+    dt = features.dautu()
     cfg = dt.config()
     cfg["baocao_toi"] = cfg.get("baocao_toi") is False
     dt.save(cfg)
@@ -249,15 +256,15 @@ def toggle(which):
 
 
 def chi_screen(day):
-    return ct.report("thang", day)[0], ct.CHI_BUTTONS
+    return chitieu_ctx.report("thang", day)[0], chitieu_ctx.CHI_BUTTONS
 
 
 def screen(name, day):
     from interface.kehoach import plan as kehoach
     return {"home": lambda: home(day), "tien": lambda: money(day), "kh": lambda: kehoach.plan(day),
             "hoi": ask_screen, "chi": lambda: chi_screen(day), "ts": lambda: money(day),
-            "no": lambda: ct.sono().view(day), "lt": lambda: kehoach.roadmap(day),
-            "ghi": lambda: (HOW_TO, [[ct.BACK]]), "cd": settings}[name]()
+            "no": lambda: features.sono().view(day), "lt": lambda: kehoach.roadmap(day),
+            "ghi": lambda: (HOW_TO, [[chitieu_ctx.BACK]]), "cd": settings}[name]()
 
 
 def with_keyboard(reply):
@@ -277,15 +284,15 @@ def push_keyboard(send):
 
 def start(args):
     if not kho.ready():
-        return ct.NEED_STORE
+        return cview.NEED_STORE
     kho.delete(keys.KEYBOARD_FLAG)  # /start luôn gửi lại hàng nút (lỡ người dùng tắt)
-    return with_keyboard(home(ct.today()))
+    return with_keyboard(home(chitieu_ctx.today()))
 
 
 def menu_cmd(args):
     if not kho.ready():
-        return ct.NEED_STORE
-    return with_keyboard(home(ct.today()))
+        return cview.NEED_STORE
+    return with_keyboard(home(chitieu_ctx.today()))
 
 
 def guide(args=None):
@@ -297,7 +304,7 @@ def from_keyboard(text):
     kèm hàng nút mới."""
     label = text.strip()
     name = BOTTOM.get(label) or OLD_BOTTOM.get(label)
-    return with_keyboard(screen(name, ct.today())) if name else None
+    return with_keyboard(screen(name, chitieu_ctx.today())) if name else None
 
 
 def on_button(arg, message, now):
@@ -310,8 +317,8 @@ def on_button(arg, message, now):
     if arg.startswith("tb:"):
         toast = toggle(arg[3:])
         return toast, ("edit", settings)
-    sends = {"ls": lambda: ct.lichsu([]), "cx": lambda: ct.chuaxep([]), "ns": lambda: ct.ngansach([]),
-             "nhom": lambda: ct.nhom_cmd([]), "xuat": lambda: ct.xuat([]), "hd": lambda: GUIDE}
+    sends = {"ls": lambda: chitieu_commands.lichsu([]), "cx": lambda: chitieu_commands.chuaxep([]), "ns": lambda: chitieu_commands.ngansach([]),
+             "nhom": lambda: chitieu_commands.nhom_cmd([]), "xuat": lambda: chitieu_commands.xuat([]), "hd": lambda: GUIDE}
     if arg in sends:
         return None, ("send", sends[arg])
     return None, None
@@ -327,7 +334,7 @@ def run_lines(text, now):
     out = []
     for line in lines[:20]:
         try:
-            reply = ct.respond(line, now)
+            reply = chitieu_bot.respond(line, now)
         except Exception as e:
             print(f"[lỗi] lệnh {line!r}: {e!r}", file=sys.stderr)
             reply = "⚠️ Lỗi, thử lại riêng lệnh này"

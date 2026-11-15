@@ -1,7 +1,9 @@
 """Tiết kiệm từ khi dùng bot: lệnh /tietkiem, nút tk:, tin nhắc 21h. Đọc lệnh, gọi service, nhờ presentation dựng tin."""
 from datetime import timedelta
 
-import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày, hàng nút
+from domain.common.money import parse_amount
+from domain.common.text import plain
+from interface.chitieu import context as chitieu_ctx
 from interface import common
 from presentation.duphong import reserve as reserve_view
 from presentation.tietkiem import progress as pview
@@ -42,30 +44,30 @@ def mark_no_spend(day_iso, today):
 
 @common.needs_store
 def tietkiem(args):
-    day = ct.today()
-    word = ct.plain(args[0]) if args else ""
+    day = chitieu_ctx.today()
+    word = plain(args[0]) if args else ""
     rest = " ".join(args[1:])
     if not word:
         return view(day)
     if word in ("huongdan", "help", "?"):
         return pview.USAGE
     if word in ("khongtieu", "khong"):
-        target = day - timedelta(days=1) if "qua" in ct.plain(rest) else day
+        target = day - timedelta(days=1) if "qua" in plain(rest) else day
         return mark_no_spend(target.isoformat(), day)
     if word == "moc":
-        found = ct.parse_amount(rest)
+        found = parse_amount(rest)
         if not found or not 10_000 <= found[0] <= 10_000_000:
             return "Mốc chi lặt vặt mỗi ngày, ví dụ: /tietkiem moc 300k"
         service.set_base(found[0])
         return view(day)
     if word == "batdau":
-        when, _ = ct.parse_date(rest, day)
+        when, _ = chitieu_ctx.parse_date(rest, day)
         if when > day:
             return "Ngày bắt đầu phải là hôm nay hoặc trước đó, ví dụ: /tietkiem batdau 04/11"
         service.set_start(when)
         return view(day)
     if word == "nhac":
-        on = service.set_reminder(ct.plain(rest) not in ("tat", "off", "khong"))
+        on = service.set_reminder(plain(rest) not in ("tat", "off", "khong"))
         return "✅ Bật nhắc 21h khi hôm đó chưa ghi gì" if on else "Đã tắt nhắc 21h"
     return pview.USAGE
 

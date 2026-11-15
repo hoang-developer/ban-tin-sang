@@ -1,5 +1,7 @@
 """Quỹ dự phòng: lệnh /duphong và nút dp: của bot chi tiêu. Đọc lệnh, gọi service, nhờ presentation dựng tin."""
-import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày hôm nay, hàng nút
+from domain.common.money import parse_amount
+from domain.common.text import plain
+from interface.chitieu import context as chitieu_ctx
 from interface import common
 from interface.kehoach import plan as kehoach
 from presentation.duphong import reserve as view
@@ -22,8 +24,8 @@ def _where(day):
 
 @common.needs_store
 def duphong(args):
-    day = ct.today()
-    word = ct.plain(args[0]) if args else ""
+    day = chitieu_ctx.today()
+    word = plain(args[0]) if args else ""
     rest = " ".join(args[1:])
     usage = ("🛟 /duphong: xem quỹ · /duphong nap 2tr · /duphong rut 1tr · /duphong muctieu 6 (tháng chi) · "
              "/duphong han 12 (đạt trong bao nhiêu tháng) · /duphong chi 10tr (tự đặt chi thiết yếu; /duphong chi tu dong "
@@ -31,7 +33,7 @@ def duphong(args):
     if not word:
         return text(day)
     if word in ("nap", "them", "de", "rut"):
-        found = ct.parse_amount(rest)
+        found = parse_amount(rest)
         if not found:
             return usage
         return change(found[0] if word != "rut" else -found[0], day)
@@ -48,10 +50,10 @@ def duphong(args):
         service.set_deadline(int(n), day)
         return text(day)
     if word == "chi":
-        if ct.plain(rest).replace(" ", "") in ("tudong", "auto"):
+        if plain(rest).replace(" ", "") in ("tudong", "auto"):
             service.clear_monthly()
             return text(day)
-        found = ct.parse_amount(rest)
+        found = parse_amount(rest)
         if not found:
             return usage
         service.set_monthly(found[0])

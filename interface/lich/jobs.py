@@ -17,7 +17,8 @@ from repositories.vang import gold as gold_repo
 from interface.lenh import bot as lenh
 from interface.nhandinh import analysis as nhandinh
 from interface.phantich import analysis as phantich
-import sochitieu as chitieu
+from interface.chitieu import context as chitieu_ctx
+from repositories.chitieu import groups as groups_repo
 from interface.no import debt as sono
 from interface.taisan import assets as taisan
 from infrastructure import telegram as tg
@@ -278,11 +279,11 @@ def ban_tin_toi(now, chat):
 
 def expense_summary(now, job, kind, title):
     """Gửi báo cáo chi tiêu qua bot chi tiêu (nếu đã cài và kỳ đó có khoản chi)."""
-    tok = chitieu.token()
+    tok = chitieu_ctx.token()
     if not tok or done_today(job, now):
         return None
-    chitieu.reset()  # đọc lại nhóm tự chỉnh mới nhất
-    text, count = chitieu.report(kind, now.date())
+    groups_repo.reset()  # đọc lại nhóm tự chỉnh mới nhất
+    text, count = chitieu_ctx.report(kind, now.date())
     extras = []
     if count and kind == "thangtruoc":  # tổng kết tháng: thêm dòng nợ, quỹ dự phòng; biểu đồ, nhận xét (1 lượt AI)
         text += "".join("\n" + line for line in month_lines(now.date()))
@@ -299,8 +300,8 @@ def expense_summary(now, job, kind, title):
                 text += "\n" + saved
         except Exception as e:
             print(f"[lỗi] tiết kiệm trong tổng kết: {e!r}", file=sys.stderr)
-        for chat in chitieu.owner_chats():
-            tg.send(chat, f"{title}\n{text}", chitieu.REPORT_BUTTONS, tok=tok)
+        for chat in chitieu_ctx.owner_chats():
+            tg.send(chat, f"{title}\n{text}", chitieu_ctx.REPORT_BUTTONS, tok=tok)
             for reply in extras:
                 try:
                     tg.send_reply(chat, reply, tok)
@@ -333,27 +334,27 @@ def month_lines(day):
 
 def ban_phim_moi(now, chat):
     """Từ 7h tới 22h: hàng nút dưới ô chat của bot chi tiêu vừa đổi mà chưa gửi thì gửi luôn (không chờ người dùng nhắn)."""
-    tok = chitieu.token()
+    tok = chitieu_ctx.token()
     if not tok or not between(now, (7, 0), (22, 0)):
         return None
     from interface.menu import screens as menu
-    owners = list(chitieu.owner_chats())
+    owners = list(chitieu_ctx.owner_chats())
     sent = menu.push_keyboard(lambda text, markup: [tg.send(o, text, markup, tok=tok) for o in owners])
     return "đã gửi hàng nút mới" if sent else None
 
 
 def tong_ket_toi(now, chat):
     """21h: một tin tối gộp (thongbao.evening): nhắc ghi chép nếu hôm nay chưa ghi, điều cần để ý, lãi/lỗ quỹ."""
-    tok = chitieu.token()
+    tok = chitieu_ctx.token()
     if not between(now, (21, 0), (23, 0)) or not tok or done_today("tong_ket_toi", now):
         return None
     from interface.thongbao import digest as thongbao
-    chitieu.reset()
+    groups_repo.reset()
     mark_done("tong_ket_toi", now)
     message = thongbao.evening(now)
     if not message:
         return "không có gì cần báo"
-    for owner in chitieu.owner_chats():
+    for owner in chitieu_ctx.owner_chats():
         tg.send(owner, message[0], message[1], tok=tok)
     return "đã gửi"
 
@@ -375,25 +376,25 @@ def chi_tieu_thang(now, chat):
 def tai_chinh_sang(now, chat):
     """Từ 9h: một tin sáng (thongbao.morning): đã nhận lương chưa (3 ngày từ ngày lương), sổ tiết kiệm sắp đáo hạn,
     khoản nợ tới hạn mà tháng này chưa trả (qua bot chi tiêu)."""
-    tok = chitieu.token()
+    tok = chitieu_ctx.token()
     if not between(now, (9, 0), (21, 0)) or not tok or done_today("tai_chinh_sang", now):
         return None
     from interface.thongbao import digest as thongbao
-    chitieu.reset()
+    groups_repo.reset()
     mark_done("tai_chinh_sang", now)
     message = thongbao.morning(now.date())  # một tin: lương, sổ đáo hạn, nợ tới hạn
     if not message:
         return "không có gì cần nhắc"
-    for owner in chitieu.owner_chats():
+    for owner in chitieu_ctx.owner_chats():
         tg.send(owner, message[0], message[1], tok=tok)
     return "đã gửi tin sáng"
 
 
 def tai_san_cuoi_ngay(now, chat):
     """Từ 18h (sau giờ giao dịch): lưu tài sản ròng hôm nay để xem tăng giảm và vẽ biểu đồ."""
-    if not between(now, (18, 0), (23, 45)) or not chitieu.token() or done_today("tai_san_cuoi_ngay", now):
+    if not between(now, (18, 0), (23, 45)) or not chitieu_ctx.token() or done_today("tai_san_cuoi_ngay", now):
         return None
-    chitieu.reset()
+    groups_repo.reset()
     if not taisan.load()["items"] and not gold_repo.load():
         mark_done("tai_san_cuoi_ngay", now)
         return "chưa khai báo tài sản"
@@ -407,14 +408,14 @@ def dau_tu(now, chat):
     """Đầu tư quỹ mở (/dautu, qua bot chi tiêu): ngày hạn đặt lệnh cuối tháng nhắc lúc 8:30 và 13:00 (nếu chưa
     đặt), qua 14:40 thì chốt kỳ, sau 17h báo lệnh đã khớp (lãi/lỗ các quỹ: tin tối 21h, interface/thongbao/digest.py), mỗi
     ngày xem danh mục quỹ có cổ phiếu cần để ý không."""
-    tok = chitieu.token()
+    tok = chitieu_ctx.token()
     if not tok or not between(now, (8, 30), (23, 45)):
         return None
     from interface.dautu import fund as dautu
     cfg = dautu.config()
     if not dautu.active(cfg):
         return None
-    chitieu.reset()
+    groups_repo.reset()
     notes, replies = [], []
     if between(now, (8, 30), (14, 40)):
         deadline, _ = dautu.is_deadline(cfg, now)
@@ -441,7 +442,7 @@ def dau_tu(now, chat):
         if alert:
             replies.append(alert)
             notes.append("danh mục quỹ")
-    for owner in chitieu.owner_chats():
+    for owner in chitieu_ctx.owner_chats():
         for reply in replies:
             tg.send_reply(owner, reply, tok)
     return ", ".join(notes) or None

@@ -11,7 +11,12 @@ from datetime import date, datetime
 
 from infrastructure import kho
 from repositories import keys
-import sochitieu as ct
+from domain.chitieu.kinds import INCOME
+from domain.common.money import parse_amount
+from domain.common.text import plain
+from infrastructure import ai as ai_client
+from interface.chitieu import context as chitieu_ctx
+from interface.chitieu import features
 
 DAY = date(2026, 11, 20)  # thứ Sáu
 LIMIT = 80  # số lượt ?danhgia= mỗi ngày (mỗi lượt vài câu, mỗi câu tối đa một lần gọi AI)
@@ -39,8 +44,8 @@ Chi trung bình 3 tháng qua: 9,8tr/tháng · nhóm nhiều nhất tháng này: 
 
 def money_rule(text):
     """Câu "mua VMEEF 3tr" (luật của dautu.from_text, không ghi): việc hoặc None."""
-    t = ct.plain(text).split()
-    found = ct.parse_amount(text)
+    t = plain(text).split()
+    found = parse_amount(text)
     if len(t) < 3 or t[0] != "mua" or not found:
         return None
     code = next((c for c in t[1:3] if c in ("vmeef", "vff")), None)
@@ -57,36 +62,36 @@ def as_list(a):
 
 def plan(text, day=DAY, people=DEMO_CONTEXT, facts=DEMO_FACTS):
     """Đường đi của câu trong sochitieu.respond (luật trước, AI sau), không ghi gì: danh sách việc."""
-    troly = ct.troly()
+    troly = features.troly()
     t = text.strip()
     if t.startswith("/"):
         return [{"viec": "lenh"}]
-    trade = ct.taisan().parse_trade(t)
+    trade = features.taisan().parse_trade(t)
     if trade:
         side, qty, code, price = trade
         return [{"viec": "co_phieu", "chieu": side, "ma": code, "sl": qty, "gia": price}]
     fund = money_rule(t)
     if fund:
         return [fund]
-    bare = ct.plain(t)
-    if len(bare) <= 40 and not ct.parse_amount(t) and troly.NO_SPEND.search(bare):
+    bare = plain(t)
+    if len(bare) <= 40 and not parse_amount(t) and troly.NO_SPEND.search(bare):
         return [{"viec": "khong_tieu"}]
-    question = ct.phantich().is_question(t)
-    if question and not (ct.ai_key() and troly.beyond_spending(t)):
+    question = features.phantich().is_question(t)
+    if question and not (ai_client.key() and troly.beyond_spending(t)):
         return [{"viec": "hoi"}]
     if question or troly.wants(t, DEMO_NAMES):
         a = troly.ask_ai(t, day, people=people, facts=facts if question else None)  # như bot thật: số liệu chỉ đi kèm câu hỏi
         out = []
         for one in as_list(a):
             if one.get("viec") == "chi" and not one.get("tien"):  # AI bảo là khoản chi: bot ghi bằng luật
-                e = ct.parse_line(t, day, {})
+                e = chitieu_ctx.parse_line(t, day, {})
                 one = {"viec": "chi", **({"tien": e["tien"], "ngay": e["ngay"]} if e else {})}
             out.append(one)
         return out
-    e = ct.parse_line(t, day, {})
+    e = chitieu_ctx.parse_line(t, day, {})
     if not e:
         return [{"viec": "khac"}]
-    return [{"viec": "thu" if e["nhom"] == ct.INCOME else "chi", "tien": e["tien"], "ngay": e["ngay"]}]
+    return [{"viec": "thu" if e["nhom"] == INCOME else "chi", "tien": e["tien"], "ngay": e["ngay"]}]
 
 
 def same(field, want, got):
@@ -102,7 +107,7 @@ def same(field, want, got):
         if field == "gia" and got >= 1000:
             got /= 1000  # luật đọc giá ra đồng, AI đưa nghìn đồng
         return abs(got - want) <= max(1, abs(want) * 0.01)
-    return ct.plain(str(want)) in ct.plain(str(got)) or ct.plain(str(got)) in ct.plain(str(want))
+    return plain(str(want)) in plain(str(got)) or plain(str(got)) in plain(str(want))
 
 
 def matches(want, got):
@@ -112,8 +117,8 @@ def matches(want, got):
         if field == "viec":
             continue
         if field == "chua":
-            answer = ct.plain(got.get("cau") or "").replace(" ", "")
-            if not all(ct.plain(x).replace(" ", "") in answer for x in value):
+            answer = plain(got.get("cau") or "").replace(" ", "")
+            if not all(plain(x).replace(" ", "") in answer for x in value):
                 return False
         elif not same(field, value, got.get(field)):
             return False
