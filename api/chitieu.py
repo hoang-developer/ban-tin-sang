@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import các file ở thư mục gốc
 
-import docanh  # noqa: E402
+from interface.docanh import photo as docanh  # noqa: E402
 from infrastructure import kho  # noqa: E402
 import sochitieu as chitieu  # noqa: E402 (file lõi đặt tên khác file này để khỏi import nhầm)
 from infrastructure import telegram as tg  # noqa: E402

@@ -249,7 +249,7 @@ Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câ
 
 Chụp hóa đơn, hoặc chụp màn hình chuyển khoản / nhận tiền rồi gửi vào bot. AI (Gemini, cần `GEMINI_API_KEY`;
 không có thì OpenRouter với model đọc ảnh `AI_VISION_MODEL`, mặc định Nemotron 3.5 Super VL) đọc tổng tiền,
-ngày, nội dung; bot ghi như tin nhắn thường, vẫn có nút ✏️ đổi nhóm, ❌ xóa. Code ở [docanh.py](docanh.py).
+ngày, nội dung; bot ghi như tin nhắn thường, vẫn có nút ✏️ đổi nhóm, ❌ xóa. Code ở [interface/docanh/photo.py](interface/docanh/photo.py).
 
 - Lấy **tổng** hóa đơn (dòng Tổng cộng / Tong tien), không lấy tiền khách đưa, tiền thừa, số dư hay từng
   phương thức thanh toán. Nhận tiền vào tài khoản thì ghi vào Thu nhập.

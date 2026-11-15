@@ -152,3 +152,16 @@ def handle_button(query, on_button, now, tok=None):
     else:
         text, buttons = reply if isinstance(reply, tuple) else (reply, None)
         edit(chat_id, message["message_id"], text, buttons, tok)
+
+
+MAX_FILE_BYTES = 8_000_000  # ảnh Telegram đã nén thường dưới 500KB; file gửi nguyên bản có thể lớn hơn
+
+
+def download_file(file_id, tok):
+    """Tải một file (ảnh) người dùng gửi lên bot; quá 8MB thì từ chối."""
+    path = call("getFile", tok, file_id=file_id)["file_path"]
+    with urllib.request.urlopen(f"https://api.telegram.org/file/bot{tok}/{path}", timeout=20) as r:
+        data = r.read(MAX_FILE_BYTES + 1)
+    if len(data) > MAX_FILE_BYTES:
+        raise ValueError("ảnh quá lớn")
+    return data
