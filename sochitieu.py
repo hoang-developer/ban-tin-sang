@@ -18,12 +18,17 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta
 
 from domain.chitieu import classify as classify_rules
+from domain.chitieu import income as income_rules
+from domain.chitieu import period as periods
+from domain.chitieu import refs
+from domain.chitieu import text as chitieu_text
 from domain.chitieu.learn import MAX_LEARNED, NOISE, learn_key, pending  # noqa: F401
 from domain.chitieu import parse as parse_rules
 from domain.chitieu.categories import (AMBIGUOUS_PLAIN, CATEGORIES, GENERIC, KEYWORDS, plain_pattern,  # noqa: F401
                                        word_pattern)
 from domain.chitieu.kinds import INCOME, OTHER  # noqa: F401
 from domain.chitieu.parse import DATE, DAY_WORDS, TAG  # noqa: F401
+from domain.common import format as format_text
 from domain.common.money import MONEY, QUANTITY, UNITS, money, money_count, parse_amount, to_number  # noqa: F401
 from domain.common.text import norm, plain  # noqa: F401
 from infrastructure import kho
@@ -123,7 +128,9 @@ from infrastructure import ai as ai_client  # noqa: E402
 env_list, gemini_key, openrouter_key = ai_client.env_list, ai_client.gemini_key, ai_client.openrouter_key
 ai_key, ai_models, ai_providers = ai_client.key, ai_client.openrouter_models, ai_client.providers
 ai_post, ai_chat, first_json = ai_client.post, ai_client.chat, ai_client.first_json
-from services.chitieu import ai_sort, ledger as ledger_service  # noqa: E402
+from presentation.chitieu import view as cview  # noqa: E402
+from services.chitieu import ai_sort, budget as budget_service, ledger as ledger_service  # noqa: E402
+from services.chitieu import report as report_service  # noqa: E402
 
 add, recent, learn_all, learn, tidy = (ledger_service.add, ledger_service.recent, ledger_service.learn_all,
                                        ledger_service.learn, ledger_service.tidy)
@@ -147,10 +154,6 @@ def save(e):
     ledger_repo.save(e)
 
 
-def ref(e):
-    return f"{e['ngay'][:7]}:{e['id']}"
-
-
 def find(reference):
     """'2026-11:12' -> khoản đó, None nếu đã xóa."""
     ym, _, rid = reference.partition(":")
@@ -166,119 +169,56 @@ def between(start, end):
 
 # ---- Hiển thị ---------------------------------------------------------------------
 
-def short(x):
-    """Số tiền gọn: 1.250.000 -> '1,25tr', 35.000 -> '35k' (âm thì có dấu −)."""
-    sign, x = ("−" if x < 0 else ""), abs(x)
-    if x >= 999_500:
-        return sign + f"{x / 1e6:.2f}".rstrip("0").rstrip(".").replace(".", ",") + "tr"
-    return sign + (f"{round(x / 1000)}k" if x >= 1000 else f"{round(x)}đ")
-
-
-def vnd(x):
-    return f"{vn_num(x, 0)}đ"
-
-
-def entry_text(e, day):
-    when = "" if e["ngay"] == day.isoformat() else (
-        " · hôm qua" if e["ngay"] == (day - timedelta(days=1)).isoformat() else f" · {e['ngay'][8:]}/{e['ngay'][5:7]}")
-    note = html.escape(e["ghichu"]) if e["ghichu"] else "<i>không ghi chú</i>"
-    robot = " ✨" if e.get("ai") else ""  # ✨ nhóm do AI đoán
-    return f"<b>{vnd(e['tien'])}</b> · {name(e['nhom'])}{robot} — {note}{when}"
-
-
-def budget_label(code):
-    return {"tong": "Tổng chi", "hangngay": "Chi hằng ngày"}.get(code) or name(code)
-
-
-def budget_lines(codes, day):
-    """Tiến độ ngân sách tháng của các nhóm vừa ghi (và ngân sách tổng)."""
-    budgets = kho.get(keys.BUDGET, {})
-    if not budgets:
-        return []
-    items = [e for e in load(day.strftime("%Y-%m")) if e["nhom"] != INCOME]
-    lines = []
-    daily = phantich().daily_groups() if "hangngay" in budgets else []
-    extra = (["hangngay"] if daily and set(codes) & set(daily + ["hangngay"]) else []) + (["tong"] if "tong" in budgets else [])
-    for code in list(dict.fromkeys([c for c in codes if c in budgets and c not in ("tong", "hangngay")] + extra)):
-        if code == "hangngay":  # chi tiêu hằng ngày, không tính khoản đột biến
-            spent = phantich().daily_spent(day)
-        else:
-            spent = sum(e["tien"] for e in items if code == "tong" or e["nhom"] == code)
-        limit = budgets[code]
-        pct = spent / limit * 100
-        label = budget_label(code)
-        mark = "🔴" if pct >= 100 else "🟡" if pct >= 80 else "🟢"
-        extra = f" · vượt {short(spent - limit)}" if pct > 100 else ""
-        lines.append(f"{mark} {label}: {short(spent)}/{short(limit)} ({pct:.0f}%{extra})")
-    return lines
-
-
-SORT_TITLE = "🗂"  # tin /chuaxep bắt đầu bằng biểu tượng này, vẽ lại vẫn giữ kiểu tin
-
-
-def entries_message(entries, day, sorting=False, focus=None, extra=()):
-    """Tin báo các khoản vừa ghi, kèm nút ✏️ đổi nhóm và ❌ xóa từng khoản. Khoản chưa rõ nhóm (Khác)
-    thì hiện luôn nút chọn nhóm, từng khoản một, để ít khoản phải nằm ở Khác. focus: khoản vừa bấm ✏️."""
-    if not entries:
-        return "🗑 Đã xóa", None
-    ask = next((e for e in entries if ref(e) == focus), None) or next((e for e in entries if pending(e)), None)
-    notes = [] if sorting else budget_lines([e["nhom"] for e in entries if e["nhom"] != INCOME], day)
-    for tag in dict.fromkeys(e["_tag"] for e in entries if e.get("_tag")):
-        notes.append(f"⚠️ Chưa có nhóm «{html.escape(tag)}»: /nhom them {html.escape(tag)}")
-    what = html.escape((ask["ghichu"] or vnd(ask["tien"])) if ask else "")
-    if ask and pending(ask):
-        notes.append(f"❓ «{what}» thuộc nhóm nào?")
-    elif ask:
-        notes.append(f"✏️ Chọn nhóm đúng cho «{what}»")
-    notes += list(extra)
-    if sorting:
-        left = sum(pending(e) for e in entries)
-        lines = [f"{SORT_TITLE} <b>{'Còn ' + str(left) + ' khoản chưa rõ nhóm' if left else 'Đã xếp xong'}</b>"]
-        lines += [f"{i}. {entry_text(e, day)}" for i, e in enumerate(entries, 1)]
-        rows = [[(f"✏️ {i}. {e['ghichu'][:12] or vnd(e['tien'])}", f"doi:{ref(e)}"), (f"❌ {i}", f"xoa:{ref(e)}")]
-                for i, e in enumerate(entries, 1)]
-    elif len(entries) == 1:
-        e = entries[0]
-        lines = [f"✅ Đã ghi {entry_text(e, day)}"]
-        rows = [[("✏️ Đổi nhóm", f"doi:{ref(e)}"), ("❌ Xóa", f"xoa:{ref(e)}")]]
-    else:
-        total = sum(e["tien"] for e in entries if e["nhom"] != INCOME)
-        lines = [f"✅ Đã ghi {len(entries)} khoản" + (f", chi <b>{vnd(total)}</b>" if total else "")]
-        lines += [f"{i}. {entry_text(e, day)}" for i, e in enumerate(entries, 1)]
-        rows = [[(f"✏️ {i}. {e['ghichu'][:12] or vnd(e['tien'])}", f"doi:{ref(e)}"), (f"❌ {i}", f"xoa:{ref(e)}")]
-                for i, e in enumerate(entries, 1)]
-    if ask:
-        rows = with_picker(rows, ref(ask), "📦 Để ở Khác" if pending(ask) else "↩️ Thôi")
-    return "\n".join(lines + notes), rows
-
-
-def picker(reference, keep="↩️ Thôi"):
-    """Nút chọn nhóm cho một khoản: mọi nhóm đang dùng (kể cả nhóm tự tạo), rồi nút giữ nguyên/xóa."""
-    choices = [(label, f"nhom:{reference}:{code}") for code, (label, _, _) in groups().items()]
-    rows = [choices[i:i + 2] for i in range(0, len(choices), 2)]
-    return rows + [[(keep, f"giu:{reference}"), ("❌ Xóa", f"xoa:{reference}")]]
-
-
-def with_picker(rows, reference, keep="↩️ Thôi"):
-    """Thay hàng nút của một khoản bằng nút chọn nhóm, ngay tại chỗ; nút của khoản khác giữ nguyên."""
-    out, done = [], False
-    for row in rows:
-        if any(button_ref(data) == reference for _, data in row):
-            if not done:
-                out += picker(reference, keep)
-                done = True
-        else:
-            out.append(row)
-    return out if done else picker(reference, keep) + rows
 
 
 # ---- Báo cáo ------------------------------------------------------------------------
 
-REPORT_BUTTONS = [[("Hôm nay", "bc:ngay"), ("Tuần này", "bc:tuan"), ("Tháng này", "bc:thang"),
-                   ("Tháng trước", "bc:thangtruoc")],
-                  [("📈 Biểu đồ", "bd:thang"), ("🔮 Dự báo", "db"), ("💬 Nhận xét", "nx:thang")]]
-BACK = ("⬅️ Hôm nay", "m:home")  # nút quay về màn hình 🏠 Hôm nay (menu.py)
-CHI_BUTTONS = REPORT_BUTTONS + [[("🧾 Lịch sử", "m:ls"), ("🗂 Chưa xếp", "m:cx"), ("🎯 Ngân sách", "m:ns")], [BACK]]
+
+short = chitieu_text.short
+vnd = format_text.vnd
+ref, button_ref = refs.ref, refs.button_ref
+period, full_month = periods.period, periods.full_month
+income_kind, income_kinds, INCOME_KINDS = income_rules.income_kind, income_rules.income_kinds, income_rules.INCOME_KINDS
+SORT_TITLE, REPORT_BUTTONS, BACK, CHI_BUTTONS = cview.SORT_TITLE, cview.REPORT_BUTTONS, cview.BACK, cview.CHI_BUTTONS
+
+
+def entry_text(e, day):
+    return cview.entry_text(e, day, config())
+
+
+def budget_label(code):
+    return cview.budget_label(code, config())
+
+
+def budget_lines(codes, day):
+    """Tiến độ ngân sách tháng của các nhóm vừa ghi (và ngân sách tổng)."""
+    return cview.budget_lines(budget_service.progress(codes, day), config())
+
+
+def budget_status(day):
+    """Tiến độ mọi ngân sách đã đặt (từng nhóm và tổng) trong tháng này."""
+    return cview.budget_lines(budget_service.all_progress(day), config())
+
+
+def entries_message(entries, day, sorting=False, focus=None, extra=()):
+    """Tin báo các khoản vừa ghi, kèm nút ✏️ đổi nhóm và ❌ xóa từng khoản."""
+    notes = [] if sorting else budget_lines([e["nhom"] for e in entries if e["nhom"] != INCOME], day)
+    return cview.entries_message(entries, day, config(), notes, sorting, focus, extra)
+
+
+def picker(reference, keep="↩️ Thôi"):
+    """Nút chọn nhóm cho một khoản."""
+    return cview.picker(reference, config(), keep)
+
+
+def with_picker(rows, reference, keep="↩️ Thôi"):
+    """Thay hàng nút của một khoản bằng nút chọn nhóm, ngay tại chỗ."""
+    return cview.with_picker(rows, reference, config(), keep)
+
+
+def report(kind, day):
+    """(nội dung báo cáo, số khoản chi) của một kỳ."""
+    return cview.report_text(report_service.report_data(kind, day), config())
 
 
 def from_menu(message):
@@ -286,101 +226,6 @@ def from_menu(message):
     return any(data.startswith("m:") for row in keyboard_rows(message) for _, data in row)
 
 
-def period(kind, day):
-    """(từ ngày, tới ngày, tên kỳ, từ ngày kỳ trước, tới ngày kỳ trước, tên kỳ trước)."""
-    first = day.replace(day=1)
-    if kind == "ngay":
-        y = day - timedelta(days=1)
-        return day, day, "hôm nay", y, y, "hôm qua"
-    if kind == "tuan":
-        start = day - timedelta(days=day.weekday())
-        return start, day, "tuần này", start - timedelta(days=7), day - timedelta(days=7), "tuần trước, cùng số ngày"
-    if kind == "thang":
-        prev_first = (first - timedelta(days=1)).replace(day=1)
-        prev_end = min(prev_first + timedelta(days=day.day - 1), first - timedelta(days=1))
-        return first, day, f"tháng {day.month}/{day.year}", prev_first, prev_end, "cùng kỳ tháng trước"
-    if kind == "thangtruoc":
-        end = first - timedelta(days=1)
-        return full_month(end.year, end.month, day)
-    month = int(kind)  # /thang 10
-    year = day.year if month <= day.month else day.year - 1
-    return full_month(year, month, day)
-
-
-def full_month(year, month, day):
-    start = date(year, month, 1)
-    end = min(date(year, month, monthrange(year, month)[1]), day)
-    prev_end = start - timedelta(days=1)
-    return (start, end, f"tháng {month}/{year}", prev_end.replace(day=1), prev_end,
-            f"tháng {prev_end.month}/{prev_end.year}")
-
-
-def report(kind, day):
-    """(nội dung báo cáo, số khoản chi) của một kỳ."""
-    start, end, label, prev_start, prev_end, prev_label = period(kind, day)
-    items = between(start, end)
-    spend = [e for e in items if e["nhom"] != INCOME]
-    income = sum(e["tien"] for e in items if e["nhom"] == INCOME)
-    total = sum(e["tien"] for e in spend)
-    span = f"{start:%d/%m}" + (f" – {end:%d/%m}" if end != start else "")
-    lines = [f"📊 <b>Chi tiêu {label}</b> ({span})"]
-    if not items:
-        return "\n".join(lines + ["Chưa có khoản nào. Nhắn kiểu: cà phê 35k"]), 0
-    days = (end - start).days + 1
-    lines.append(f"💸 Chi <b>{vnd(total)}</b> · {len(spend)} khoản" + (f" · ~{short(total / days)}/ngày" if days > 1 else ""))
-    by_cat = {}
-    for e in spend:
-        by_cat[e["nhom"]] = by_cat.get(e["nhom"], 0) + e["tien"]
-    top = max(by_cat.values(), default=0)
-    for code, amount in sorted(by_cat.items(), key=lambda x: -x[1]):
-        lines.append(f"{name(code)} <b>{short(amount)}</b> · {amount / total * 100:.0f}%\n"
-                     + "▇" * max(1, round(amount / top * 10)))
-    prev_total = sum(e["tien"] for e in between(prev_start, prev_end) if e["nhom"] != INCOME)
-    if prev_total:
-        change = (total - prev_total) / prev_total * 100
-        lines.append(f"{'🔺' if change >= 0 else '🔻'}{abs(change):.0f}% so với {prev_label} ({short(prev_total)})")
-    if income:
-        kinds = income_kinds([e for e in items if e["nhom"] == INCOME])
-        detail = f" ({' · '.join(f'{k} {short(v)}' for k, v in kinds)})" if len(kinds) > 1 else ""
-        left = income - total
-        lines.append(f"💰 Thu {short(income)}{detail} → {'🟢' if left >= 0 else '🔴'} còn <b>{short(left)}</b>")
-    biggest = sorted(spend, key=lambda e: -e["tien"])[:3]
-    if biggest and len(spend) > 3:
-        lines.append("🏆 " + " · ".join(f"{html.escape(e['ghichu'] or name(e['nhom']))} {short(e['tien'])}"
-                                       for e in biggest))
-    unsorted = sum(pending(e) for e in spend)
-    if unsorted:
-        lines.append(f"❓ {unsorted} khoản chưa rõ nhóm: /chuaxep")
-    status = budget_status(day) if kind == "thang" else []
-    if status:
-        lines += ["", "<b>🎯 Ngân sách</b>"] + status
-    return "\n".join(lines), len(spend)
-
-
-INCOME_KINDS = [("📈 Đầu tư", ["lãi bán", "cổ tức", "lãi tiết kiệm", "tiền lãi", "lãi"]), ("💼 Lương", ["lương"]),
-                ("🎁 Thưởng", ["thưởng"]), ("🧑‍💻 Làm thêm", ["làm thêm", "freelance", "hoa hồng", "dự án", "bán hàng",
-                                                             "kinh doanh", "cho thuê"])]
-
-
-def income_kind(note):
-    """Loại thu nhập theo ghi chú: lương, thưởng, đầu tư (lãi bán cổ phiếu, cổ tức, lãi tiết kiệm), làm thêm, khác."""
-    bare = plain(note or "")
-    for label, words in INCOME_KINDS:
-        if any(re.search(rf"(?<!\w){re.escape(plain(w))}(?!\w)", bare) for w in words):
-            return label
-    return "💰 Khác"
-
-
-def income_kinds(items):
-    sums = {}
-    for e in items:
-        sums[income_kind(e["ghichu"])] = sums.get(income_kind(e["ghichu"]), 0) + e["tien"]
-    return sorted(sums.items(), key=lambda x: -x[1])
-
-
-def budget_status(day):
-    """Tiến độ mọi ngân sách đã đặt (từng nhóm và tổng) trong tháng này."""
-    return budget_lines([c for c in kho.get(keys.BUDGET, {}) if c != "tong"], day)
 
 
 # ---- Lệnh ---------------------------------------------------------------------------
@@ -821,12 +666,6 @@ def debt_after(entries, day):
     except Exception as e:
         print(f"[lỗi] trừ dư nợ: {e!r}", file=sys.stderr)
         return [], []
-
-
-def button_ref(data):
-    """'nhom:2026-11:12:an' -> '2026-11:12' (khoản mà nút đó trỏ tới), None nếu không phải nút của khoản."""
-    kind, _, rest = data.partition(":")
-    return ":".join(rest.split(":")[:2]) if kind in ("doi", "xoa", "nhom", "giu") else None
 
 
 def keyboard_rows(message):
