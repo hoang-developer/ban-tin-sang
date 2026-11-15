@@ -2,15 +2,14 @@
 from datetime import timedelta
 
 import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày, hàng nút
-from infrastructure import kho
+from interface import common
 from presentation.duphong import reserve as reserve_view
 from presentation.tietkiem import progress as pview
 from services.tietkiem import progress as service
 
 
+@common.needs_store
 def view(day):
-    if not kho.ready():
-        return ct.NEED_STORE
     p = service.summary(day)
     return pview.view_text(p, day, service.invest_fund() if p.movable else None)
 
@@ -41,9 +40,8 @@ def mark_no_spend(day_iso, today):
     return pview.no_spend_text(service.mark_no_spend(day_iso, today))
 
 
+@common.needs_store
 def tietkiem(args):
-    if not kho.ready():
-        return ct.NEED_STORE
     day = ct.today()
     word = ct.plain(args[0]) if args else ""
     rest = " ".join(args[1:])
@@ -80,10 +78,10 @@ def on_button(arg, message, now):
         return None, ("edit", lambda: view(day))
     if kind == "khong":
         note = mark_no_spend(value, day)
-        if (message.get("text") or "").startswith("💚"):
-            return note[:190], ("edit", lambda: view(day))
-        rows = [[b for b in row if not b[1].startswith("tk:khong")] for row in ct.keyboard_rows(message)]
-        return note[:190], ("buttons", lambda: [r for r in rows if r])
+        if common.title_starts(message, "💚"):
+            return common.clip(note), ("edit", lambda: view(day))
+        rows = common.without_buttons(message, "tk:khong")
+        return common.clip(note), ("buttons", lambda: rows)
     if kind == "chuyen":
         where, _, amount = value.partition(":")
         if not amount.isdigit():
@@ -93,5 +91,5 @@ def on_button(arg, message, now):
             note = pview.invest_move_note(service.move_to_invest(amount), amount)
         else:
             note = reserve_view.change_note(service.move_to_reserve(amount, day)).split("\n")[0][2:]
-        return note[:190], ("edit", lambda: view(day))
+        return common.clip(note), ("edit", lambda: view(day))
     return None, None

@@ -5,7 +5,7 @@ Các hàm ở đây giữ tên và dạng giá trị trả về mà các màn h�
 import sys
 
 import sochitieu as ct  # module cũ ở gốc: đọc lệnh, ngày hôm nay
-from infrastructure import kho
+from interface import common
 from presentation.kehoach import plan as pview
 from services.kehoach import plan as service
 
@@ -22,14 +22,13 @@ def steps(n):
     return [(kind, pview.step_label(kind, d, _invest_fund(n)), amount, ref) for kind, d, amount, ref in service.steps(n)]
 
 
-def next_actions(day, n=None):
+def _next_actions(day, n=None):
     """Tối đa 3 việc nên làm ngay, theo thứ tự ưu tiên."""
     return pview.next_action_lines(service.next_actions(day, n))
 
 
+@common.needs_store
 def plan(day):
-    if not kho.ready():
-        return ct.NEED_STORE
     n = service.numbers(day)
     try:
         step = pview.step_line(service.roadmap(day, n), n["fund"], n["invest"])
@@ -44,7 +43,7 @@ def plan(day):
 def salary_hint(entries, day):
     """Vừa ghi lương: (dòng gợi ý chia lương, hàng nút); None nếu không có lương hoặc chưa có gì để chia."""
     salary = [e for e in entries if e["nhom"] == ct.INCOME and "luong" in ct.plain(e.get("ghichu") or "")]
-    if not salary or not kho.ready():
+    if not salary or not common.ready():
         return None
     n = service.numbers(day)
     if not n["debt_left"] and not n["fund_left"] and not n["invest_left"]:
@@ -52,17 +51,15 @@ def salary_hint(entries, day):
     return pview.salary_hint_view(n, service.steps(n))
 
 
+@common.needs_store
 def roadmap(day):
-    if not kho.ready():
-        return ct.NEED_STORE
     n = service.numbers(day)
     r = service.roadmap(day, n)
     return pview.roadmap_view(day, n, r, service.next_actions(day, n))
 
 
-def confirm_all(day):
-    if not kho.ready():
-        return ct.NEED_STORE
+@common.needs_store
+def _confirm_all(day):
     n = service.numbers(day)
     todo = service.steps(n)
     main, balance = service.main_account()
@@ -74,9 +71,8 @@ def do_all(now):
     return pview.do_all_lines(service.do_all(now))
 
 
+@common.needs_store
 def kehoach(args):
-    if not kho.ready():
-        return ct.NEED_STORE
     word = ct.plain(args[0]) if args else ""
     if word in ("chia", "luong", "chialuong", "thang"):
         return plan(ct.today())
@@ -89,9 +85,9 @@ def on_button(arg, message, now):
     if arg == "lt":
         return None, ("edit", lambda: roadmap(day))
     if arg == "het":
-        if (message.get("text") or "").startswith("📋"):
-            return None, ("edit", lambda: confirm_all(day))
-        return None, ("send", lambda: confirm_all(day))
+        if common.title_starts(message, "📋"):
+            return None, ("edit", lambda: _confirm_all(day))
+        return None, ("send", lambda: _confirm_all(day))
     if arg == "het:ok":
         done = do_all(now)
 
@@ -100,7 +96,7 @@ def on_button(arg, message, now):
             return "\n".join(done) + "\n\n" + text, rows
         return "Đã làm theo kế hoạch", ("edit", result)
     if arg == "chia":
-        if (message.get("text") or "").startswith(("🎯", "📋", "🏠")):
+        if common.title_starts(message, "🎯", "📋", "🏠"):
             return None, ("edit", lambda: plan(day))
         return None, ("send", lambda: plan(day))
     return None, None
