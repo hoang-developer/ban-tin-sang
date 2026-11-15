@@ -204,7 +204,7 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/tietkiem` | Chi lặt vặt so với trước khi dùng bot, đã bớt bao nhiêu, chuỗi ngày ghi chép, nhắc 21h (xem dưới) |
 | `/dautu` | Đầu tư quỹ mở hằng tháng (Value Averaging): tháng này nên mua bao nhiêu, nhắc hạn đặt lệnh (xem dưới) |
 
-**Thông báo gộp** ([thongbao.py](thongbao.py)), mỗi buổi tối đa một tin (qua lịch chạy `/api/tick` sẵn có):
+**Thông báo gộp** ([interface/thongbao/digest.py](interface/thongbao/digest.py)), mỗi buổi tối đa một tin (qua lịch chạy `/api/tick` sẵn có):
 
 - **☀️ Sáng** (từ 9h): đã nhận lương chưa, sổ tiết kiệm sắp đáo hạn, khoản nợ tới hạn chưa trả, chung một tin, nút
   của từng việc nằm dưới tin.

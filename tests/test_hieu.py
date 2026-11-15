@@ -4,7 +4,7 @@ import unittest
 from tests import harness as h
 from tests.test_dongtien import item, main_balance, set_main
 
-import danhgia
+from interface.danhgia import benchmark as danhgia
 from infrastructure import kho
 from interface.taisan import assets as ts
 

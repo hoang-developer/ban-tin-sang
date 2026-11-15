@@ -9,7 +9,7 @@ from interface.dautu import fund as dautu
 from domain.common.format import vn_num
 from services.dautu import market as dautu_market
 from interface.taisan import assets as ts
-import thongbao
+from interface.thongbao import digest as thongbao
 
 
 def setup_plan():

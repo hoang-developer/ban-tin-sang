@@ -8,7 +8,7 @@ from infrastructure import kho
 import lich
 import menu
 from interface.no import debt as sono
-import thongbao
+from interface.thongbao import digest as thongbao
 from repositories.tietkiem import progress as tietkiem_repo
 
 

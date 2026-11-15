@@ -34,6 +34,8 @@ LEGACY_IMPORTS = {
     "interface/chitieu/features.py": {"menu", "troly"},
     "interface/chitieu/commands.py": {"sochitieu"},
     "services/taisan/declare.py": {"lenh"},
+    "interface/thongbao/digest.py": {"sochitieu"},
+    "interface/danhgia/benchmark.py": {"sochitieu"},
     "presentation/dautu/view.py": {"sochitieu"},
     "presentation/taisan/view.py": {"sochitieu"},
     "interface/taisan/assets.py": {"sochitieu"},
@@ -42,7 +44,7 @@ LEGACY_IMPORTS = {
     "presentation/kehoach/plan.py": {"sochitieu"},
     "interface/kehoach/plan.py": {"sochitieu"},
 }
-ROOT_PY_MAX = 10  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
+ROOT_PY_MAX = 7  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
 
 
 def py_files(folder):
