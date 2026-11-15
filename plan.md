@@ -183,7 +183,8 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.2 `tietkiem` (tiết kiệm từ khi dùng bot) | xong, đã deploy ([#58](https://github.com/hoang-developer/ban-tin-sang/pull/58)) |
 | 6.3 `doichieu` (đối chiếu tài sản tháng) | xong, đã deploy ([#59](https://github.com/hoang-developer/ban-tin-sang/pull/59)); tick sau deploy chạy bình thường |
 | 6.4 `no` (sổ nợ) | xong, đã deploy ([#60](https://github.com/hoang-developer/ban-tin-sang/pull/60)); tick sau deploy chạy bình thường |
-| 6.5 `kehoach` (kế hoạch chia lương, lộ trình) | đang làm |
+| 6.5 `kehoach` (kế hoạch chia lương, lộ trình) | xong, đã deploy (#61) |
+| 6.6a `dautu`: dữ liệu Fmarket (`infrastructure/fmarket`, `repositories/dautu/market`), lịch phiên (`domain/dautu/calendar`), phiên kế tiếp (`services/dautu/market`) | xong, chờ deploy |
 | 6.6… các chức năng còn lại | chưa |
 | Cuối: dọn | chưa |
 

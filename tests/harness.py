@@ -16,6 +16,7 @@ os.environ["GEMINI_API_KEY"] = "test"
 os.environ.pop("AI_API_KEY", None)
 
 from infrastructure import kho  # noqa: E402
+from infrastructure import web  # noqa: E402
 
 STORE = {}
 
@@ -63,6 +64,7 @@ kho.ready = lambda: True
 
 import bantin  # noqa: E402
 import dautu  # noqa: E402
+from services.dautu import market as dautu_market  # noqa: E402
 import sochitieu as ct  # noqa: E402
 import taisan as ts  # noqa: E402
 from infrastructure import telegram as tg  # noqa: E402
@@ -73,6 +75,7 @@ CHAT = 1
 SENT = []  # tin bot tự gửi (việc theo giờ)
 ct.today = lambda: CLOCK["now"].date()
 dautu.now_vn = lambda: CLOCK["now"]
+dautu_market.now_vn = lambda: CLOCK["now"]  # service dữ liệu quỹ có đồng hồ riêng
 ts.now_vn = lambda: CLOCK["now"]
 tg.send_reply = lambda chat, reply, tok=None: SENT.append(reply)
 tg.send = lambda chat, text, buttons=None, tok=None: SENT.append((text, buttons))
@@ -121,7 +124,7 @@ def fake_fmarket(url, body=None):
 
 
 STOCKS = {"HAG": 12000, "FPT": 95000, "E1VFVN30": 33600}
-ts.http_json = fake_fmarket
+web.http_json = fake_fmarket
 ts.SOURCES["quy"] = (lambda codes=None: {c: published(c, CLOCK["now"])[-1][1] for c in NAV}, 0)
 ts.SOURCES["cp"] = ts.SOURCES["etf"] = (lambda codes: {c: STOCKS[c] for c in codes if c in STOCKS}, 0)
 ts.SOURCES["vang"] = (lambda codes=None: {"sjc": 138e6, "nhan": 136e6}, 0)
