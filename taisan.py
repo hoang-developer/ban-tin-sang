@@ -16,6 +16,7 @@ from datetime import date, datetime, timedelta
 
 import chungkhoan
 from infrastructure import kho
+from infrastructure import web
 from repositories import keys
 from repositories.chitieu import ledger as ledger_repo
 from domain.luong.salary import Salary
@@ -81,13 +82,6 @@ def new_id(data):
 
 # ---- Giá: lấy từ nguồn, nhớ trong kho; nguồn lỗi thì dùng giá gần nhất ---------------
 
-def http_json(url, body=None):
-    req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None,
-                                 headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return json.loads(r.read())
-
-
 def stock_prices(codes):
     quotes = chungkhoan.quotes(codes)
     return {s: q["price"] or q["ref"] for s, q in quotes.items() if q["price"] or q["ref"]}
@@ -102,7 +96,7 @@ def fund_navs(codes=None):
     body = {"types": ["NEW_FUND", "TRADING_FUND"], "issuerIds": [], "sortOrder": "DESC", "sortField": "navTo6Months",
             "page": 1, "pageSize": 100, "isIpo": False, "fundAssetTypes": [], "bondRemainPeriods": [],
             "searchField": "", "isBuyByReward": False, "thirdAppIds": []}
-    rows = http_json(FMARKET, body)["data"]["rows"]
+    rows = web.http_json(FMARKET, body)["data"]["rows"]
     return {r["shortName"].upper(): float(r["nav"]) for r in rows if r.get("shortName") and r.get("nav")}
 
 
@@ -110,7 +104,7 @@ def coin_prices(codes):
     """Giá tiền số (đồng): CoinGecko; bị chặn hay quá lượt thì lấy giá USD trên Coinbase × tỷ giá Vietcombank."""
     ids = {COINS.get(c, c): c for c in codes}
     try:
-        data = http_json("https://api.coingecko.com/api/v3/simple/price?vs_currencies=vnd&ids=" + ",".join(ids))
+        data = web.http_json("https://api.coingecko.com/api/v3/simple/price?vs_currencies=vnd&ids=" + ",".join(ids))
         got = {ids[i]: float(v["vnd"]) for i, v in data.items() if v.get("vnd")}
         if got:
             return got
@@ -122,7 +116,7 @@ def coin_prices(codes):
     got = {}
     for code in codes:
         try:
-            got[code] = float(http_json(f"https://api.coinbase.com/v2/prices/{code.upper()}-USD/spot")["data"]["amount"]) * usd
+            got[code] = float(web.http_json(f"https://api.coinbase.com/v2/prices/{code.upper()}-USD/spot")["data"]["amount"]) * usd
         except Exception as e:
             print(f"[lỗi] Coinbase {code}: {e!r}", file=sys.stderr)
     return got

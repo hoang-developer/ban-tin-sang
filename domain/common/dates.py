@@ -1,6 +1,8 @@
 """Tính ngày dùng chung."""
 from calendar import monthrange
-from datetime import date
+from datetime import date, timedelta, timezone
+
+VN_TZ = timezone(timedelta(hours=7))  # Việt Nam không đổi giờ mùa hè
 
 
 def add_months(d, months):

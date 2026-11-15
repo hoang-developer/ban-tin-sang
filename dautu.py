@@ -20,6 +20,9 @@ from infrastructure import kho
 from repositories import keys
 from repositories.dautu import fund as fund_repo
 from repositories.luong import salary as salary_repo
+from domain.dautu.calendar import cutoff_day, months, weekdays_after, ym_add, ym_of, ym_text  # noqa: F401
+from services.dautu.market import (current_period, find_fund, fund_info, is_deadline, nav_history,  # noqa: F401
+                                   next_trading, now_vn, session)
 import phantich as pt
 import sochitieu as ct
 import taisan as ts
@@ -28,7 +31,6 @@ from bantin import VN_TZ, vn_num
 # {"ma", "id", "ten", "bat_dau": "YYYY-MM", "goc": giá trị quỹ có sẵn lúc bắt đầu, "gop": {"YYYY-MM": số góp từ tháng đó},
 #  "tang": 0.01, "nap": {"YYYY-MM": đã góp vào hệ thống trong tháng}, "ky": {"YYYY-MM": {"chot", "bo", "muc", "gt"}},
 #  "lenh": [{"id", "ky", "tien", "dat", "phien", "trang_thai": "cho"|"khop", "nav", "ccq"}], "tat": bool, "top_luc"}
-FMARKET = "https://api.fmarket.vn/res"
 DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG = "VMEEF", 4_000_000, 0.01
 MIN_ORDER, STEP = 100_000, 10_000
 SWITCH_DAYS = 7  # hoán đổi quỹ chờ → quỹ chính: bán quỹ chờ, tiền về rồi mới mua quỹ chính, khoảng 1 tuần
@@ -65,33 +67,6 @@ def active(cfg=None):
     return bool(cfg.get("ma")) and not cfg.get("tat")
 
 
-def now_vn():
-    return datetime.now(VN_TZ)
-
-
-def ym_of(d):
-    return f"{d.year}-{d.month:02d}"
-
-
-def ym_add(ym, n):
-    y, m = map(int, ym.split("-"))
-    m += n - 1
-    return f"{y + m // 12}-{m % 12 + 1:02d}"
-
-
-def ym_text(ym):
-    return f"{int(ym[5:])}/{ym[:4]}"
-
-
-def months(start, end):
-    """Các tháng từ start tới end (cả hai đầu), dạng 'YYYY-MM'."""
-    out, ym = [], start
-    while ym <= end:
-        out.append(ym)
-        ym = ym_add(ym, 1)
-    return out
-
-
 def money(x):
     return pt.short(x) if abs(x) >= 1000 else "0đ"
 
@@ -102,106 +77,7 @@ def units_text(x):
 
 # ---- Dữ liệu quỹ trên Fmarket ----------------------------------------------------------
 
-def find_fund(code):
-    """(id, tên quỹ) trên Fmarket theo mã (VMEEF, VESAF, SSISCA...); None nếu không thấy."""
-    body = {"types": ["NEW_FUND", "TRADING_FUND"], "issuerIds": [], "sortOrder": "DESC", "sortField": "navTo6Months",
-            "page": 1, "pageSize": 100, "isIpo": False, "fundAssetTypes": [], "bondRemainPeriods": [],
-            "searchField": code, "isBuyByReward": False, "thirdAppIds": []}
-    for r in ts.http_json(f"{FMARKET}/products/filter", body)["data"]["rows"]:
-        if (r.get("shortName") or "").upper() == code.upper():
-            return r["id"], r.get("name") or code
-    return None
-
-
-def nav_history(cfg, fresh=False):
-    """[(ngày, NAV)] khoảng 400 phiên gần nhất. Lưu trong kho 2 tiếng; nguồn lỗi thì dùng bản đã lưu."""
-    key = keys.fund_nav(cfg['ma'])
-    store = kho.get(key, {}) or {}
-    if store.get("ma") == cfg["ma"] and store.get("nav") and not fresh and \
-            (now_vn() - datetime.fromisoformat(store["luc"])).total_seconds() < 2 * 3600:
-        return [(date.fromisoformat(d), v) for d, v in store["nav"]]
-    try:
-        rows = ts.http_json(f"{FMARKET}/product/get-nav-history",
-                            {"isAllData": 1, "productId": cfg["id"], "fromDate": None,
-                             "toDate": now_vn().strftime("%Y%m%d")})["data"]
-        navs = sorted((p["navDate"], float(p["nav"])) for p in rows if p.get("nav"))[-400:]
-        if navs:
-            kho.put(key, {"ma": cfg["ma"], "luc": now_vn().isoformat(timespec="minutes"), "nav": navs})
-            return [(date.fromisoformat(d), v) for d, v in navs]
-    except Exception as e:
-        print(f"[lỗi] NAV {cfg['ma']}: {e!r}", file=sys.stderr)
-    if store.get("ma") == cfg["ma"]:
-        return [(date.fromisoformat(d), v) for d, v in store.get("nav", [])]
-    return []
-
-
-def fund_info(cfg, fresh=False):
-    """Chi tiết quỹ của Fmarket (phiên giao dịch kế tiếp, top 10 mã, phí); lưu 1 tiếng, lỗi thì dùng bản cũ."""
-    key = keys.fund_info(cfg['ma'])
-    store = kho.get(key, {}) or {}
-    if store.get("ma") == cfg["ma"] and not fresh and \
-            (now_vn() - datetime.fromisoformat(store["luc"])).total_seconds() < 3600:
-        return store["data"]
-    try:
-        d = ts.http_json(f"{FMARKET}/products/{cfg['id']}")["data"]
-        keep = {"phien": d.get("productTradingSession"), "top": [
-            {"ma": h.get("stockCode"), "nganh": h.get("industry"), "tyle": h.get("netAssetPercent")}
-            for h in d.get("productTopHoldingList") or []],
-            "top_luc": (d.get("productFund") or {}).get("updateAssetHoldingTime")}
-        kho.put(key, {"ma": cfg["ma"], "luc": now_vn().isoformat(timespec="minutes"), "data": keep})
-        return keep
-    except Exception as e:
-        print(f"[lỗi] thông tin quỹ {cfg['ma']}: {e!r}", file=sys.stderr)
-        return store.get("data") if store.get("ma") == cfg["ma"] else None
-
-
-def weekdays_after(d, n):
-    while n:
-        d += timedelta(days=1)
-        if d.weekday() < 5:
-            n -= 1
-    return d
-
-
-def session(cfg, now=None):
-    """Phiên kế tiếp: {"phien": ngày khớp lệnh, "dong": lúc đóng sổ lệnh, "du_phong": True nếu tự đoán (không có
-    dữ liệu Fmarket: theo các thứ quỹ có NAV gần đây, VMEEF mọi ngày làm việc, VFF thứ Ba và thứ Năm; đóng sổ 14:40
-    ngày làm việc trước phiên; chưa tính ngày lễ)}."""
-    now = now or now_vn()
-    info = fund_info(cfg) or {}
-    s = info.get("phien") or {}
-    try:
-        trading = datetime.strptime(s["tradingTimeString"], "%d/%m/%Y").date()
-        closing = datetime.strptime(s["closedOrderBookTimeString"], "%H:%M %d/%m/%Y").replace(tzinfo=VN_TZ)
-        if closing > now:
-            return {"phien": trading, "dong": closing, "du_phong": False}
-        if now - closing < timedelta(hours=1):  # vừa qua giờ đóng sổ, bản lưu chưa đổi: hỏi lại Fmarket
-            s = (fund_info(cfg, fresh=True) or {}).get("phien") or {}
-            trading = datetime.strptime(s["tradingTimeString"], "%d/%m/%Y").date()
-            closing = datetime.strptime(s["closedOrderBookTimeString"], "%H:%M %d/%m/%Y").replace(tzinfo=VN_TZ)
-            if closing > now:
-                return {"phien": trading, "dong": closing, "du_phong": False}
-    except (KeyError, TypeError, ValueError):
-        pass
-    day = now.date()  # ngày đóng sổ sớm nhất còn kịp: hôm nay trước 14:40, cuối tuần thì thứ Hai
-    if day.weekday() >= 5 or (now.hour, now.minute) >= (14, 40):
-        day = weekdays_after(day, 1)
-    trading = next_trading(cfg, day)  # phiên kế tiếp theo lịch của quỹ này (VFF chỉ thứ Ba, thứ Năm)
-    close = cutoff_day(trading)
-    return {"phien": trading, "dong": datetime(close.year, close.month, close.day, 14, 40, tzinfo=VN_TZ),
-            "du_phong": True}
-
-
-def is_deadline(cfg, now=None):
-    """Hôm nay là hạn đặt lệnh của tháng (phiên đóng sổ cuối cùng trong tháng, chưa qua 14:40)?"""
-    now = now or now_vn()
-    s = session(cfg, now)
-    return s["dong"].date() == now.date() and ym_of(s["phien"]) != ym_of(now.date()), s
-
-
-def current_period(cfg, now=None):
-    """Kỳ đang mở: tháng của lần đóng sổ kế tiếp (qua hạn cuối tháng thì đã sang kỳ tháng sau)."""
-    return ym_of(session(cfg, now)["dong"].date())
+# ---- Dữ liệu quỹ trên Fmarket, phiên giao dịch: xem services/dautu/market.py
 
 
 # ---- Quỹ chờ, danh mục -----------------------------------------------------------------
@@ -624,28 +500,6 @@ def take_money(cfg, amount, to_main=True, notes=None):
         notes.append(moved)
     ts.save(data)
     return taken, item["tien"]
-
-
-def cutoff_day(trading):
-    """Ngày đóng sổ của phiên `trading`: ngày giao dịch liền trước (thứ Hai–thứ Sáu, chưa tính ngày lễ)."""
-    d = trading - timedelta(days=1)
-    while d.weekday() >= 5:
-        d -= timedelta(days=1)
-    return d
-
-
-def next_trading(cfg, d, include=False):
-    """Ngày giao dịch đầu tiên sau d (include: tính cả d). Theo lịch NAV thật nếu có (bỏ ngày lễ), không thì
-    thứ Hai–thứ Sáu."""
-    navs = nav_history(cfg)
-    known = [x for x, _ in navs if (x >= d if include else x > d)]
-    if known:
-        return known[0]
-    days = {x.weekday() for x, _ in navs[-20:]} if len(navs) >= 5 else {0, 1, 2, 3, 4}
-    x = d if include else d + timedelta(days=1)
-    while x.weekday() not in days:
-        x += timedelta(days=1)
-    return x
 
 
 def order_spec(cfg, text, now, fund=None):

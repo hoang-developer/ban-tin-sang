@@ -6,6 +6,7 @@ from tests import harness as h
 from datetime import date
 
 import dautu
+from services.dautu import market as dautu_market
 import taisan as ts
 import thongbao
 
@@ -206,8 +207,8 @@ class LichKhopLenh(unittest.TestCase):
         self.assertEqual(next_session("VFF", 2026, 10, 28, 15, 0), ("03/11 T3", "03/11 T3"))  # thứ Tư sau 14:40
 
     def test_khong_lay_duoc_lich_fmarket_van_dung_lich_tung_quy(self):
-        orig = dautu.fund_info
-        dautu.fund_info = lambda cfg, fresh=False: None
+        orig = dautu_market.fund_info
+        dautu_market.fund_info = lambda cfg, fresh=False: None
         try:
             self.assertEqual(next_session("VMEEF", 2026, 10, 17, 10, 0)[0], "20/10 T3")
             self.assertEqual(next_session("VMEEF", 2026, 10, 19, 10, 0)[0], "20/10 T3")
@@ -215,7 +216,7 @@ class LichKhopLenh(unittest.TestCase):
                              ["22/10 T5", "22/10 T5", "27/10 T3", "27/10 T3"])
             self.assertTrue(dautu.session(dautu.side(dautu.config()))["du_phong"])
         finally:
-            dautu.fund_info = orig
+            dautu_market.fund_info = orig
 
     def test_lenh_dat_thu_bay_khop_dung_nav_thu_ba(self):
         h.at(2026, 10, 17, 10)
