@@ -115,7 +115,7 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
 - Nhiều khoản một lúc: mỗi khoản một dòng.
 - 📷 **Gửi ảnh** hóa đơn hoặc màn hình chuyển khoản: bot đọc rồi ghi (xem mục Ghi bằng ảnh).
 
-**Nhắn câu thường, không cần nhớ lệnh** ([troly.py](troly.py), cần bật AI): ngoài khoản chi, bot hiểu cả các việc khác
+**Nhắn câu thường, không cần nhớ lệnh** ([interface/troly/assistant.py](interface/troly/assistant.py), cần bật AI): ngoài khoản chi, bot hiểu cả các việc khác
 và chỉ ghi sau khi bạn bấm ✅ trên thẻ "Mình hiểu là…" (có nút ✏️ Sửa: nhắn phần cần sửa, ví dụ «6 tháng»; ❌ Thôi):
 
 - `mua 2 chỉ vàng nhẫn hết 27tr` · `gửi tiết kiệm VCB 50tr lãi 4,7% 6 tháng` · `vay anh Nam 10tr, mỗi tháng trả 2tr`

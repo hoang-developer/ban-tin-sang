@@ -35,5 +35,5 @@ def tietkiem():
     return module
 
 def troly():
-    import troly as module  # hiểu câu nói thường, hỏi lại khi thiếu, thẻ xác nhận
+    from interface.troly import assistant as module  # hiểu câu nói thường, hỏi lại khi thiếu, thẻ xác nhận
     return module

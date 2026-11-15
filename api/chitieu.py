@@ -64,7 +64,7 @@ def try_page(environ):
         return danhgia.page(query)
     if "hieu" not in query or not kho.ready():
         return None
-    import troly
+    from interface.troly import assistant as troly
     chitieu.reset()
     return troly.try_text(query["hieu"][0], datetime.now(VN_TZ).date())
 
