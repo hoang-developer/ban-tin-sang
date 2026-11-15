@@ -1,4 +1,5 @@
-"""Đầu tư quỹ mở hằng tháng theo Value Averaging cho bot chi tiêu (/dautu). Mặc định quỹ VMEEF trên Fmarket.
+"""Đầu tư quỹ mở hằng tháng theo Value Averaging (Mặc định quỹ VMEEF trên Fmarket): lệnh /dautu, nút dt:, tin nhắn
+"mua VMEEF 3tr", màn hình và tin nhắc. Đọc lệnh, gọi service, nhờ presentation dựng tin.
 
 Cách làm (đã chạy thử trên NAV thật của VMEEF, VESAF, SSISCA, DCDS):
 - Đường kế hoạch: tháng đầu = số góp (cộng giá trị quỹ có sẵn lúc bắt đầu), mỗi tháng sau = tháng trước × (1 + 1%)
@@ -10,40 +11,42 @@ Cách làm (đã chạy thử trên NAV thật của VMEEF, VESAF, SSISCA, DCDS)
 - Quỹ dự phòng chưa tới mốc 1 tháng chi thiết yếu: bot khuyên tạm dừng góp, không chặn.
 Bot không đặt lệnh, không chuyển tiền: bạn tự đặt trên Fmarket rồi bấm nút xác nhận; số ccq bot tính theo NAV phiên
 khớp (phí mua 0%), sai thì sửa bằng /dautu ccq. Thông tin tham khảo, không phải lời khuyên đầu tư.
+
+Các hàm ở đây giữ tên và dạng giá trị trả về mà các màn hình khác (menu, trợ lý, tin sáng/tối, chia lương) đang gọi.
 """
 import html
 import re
 import sys
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
-from infrastructure import kho
+import phantich as pt  # module cũ ở gốc: vẽ biểu đồ
+import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày hôm nay
+import taisan as ts  # module cũ ở gốc: giá quỹ khi bắt đầu
+from domain.common.money import number
+from domain.dautu.calendar import months, ym_add, ym_of, ym_text  # noqa: F401
+from domain.dautu.plan import (DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG, MIN_ORDER, STEP, WATCH,  # noqa: F401
+                               gop_of, holding, is_active, side, them_of, total_of)
+from domain.dautu.text import money, units_text
+from interface import common
+from interface.kehoach import plan as kehoach
+from presentation.dautu import view as pview
+from presentation.dautu.view import USAGE, fix_button, last_weekday
 from repositories.dautu import fund as fund_repo
 from repositories.luong import salary as salary_repo
-from domain.dautu.calendar import cutoff_day, months, weekdays_after, ym_add, ym_of, ym_text  # noqa: F401
-from domain.dautu.plan import (DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG, MIN_ORDER, STEP, SWITCH_DAYS,  # noqa: F401
-                                contributed_of, extra_of, goes_main, gop_of, holding, pending_main, side, target, them_of,
-                                total_of, wait_name)
-from domain.dautu.calendar import read_date  # noqa: F401
-from domain.dautu.text import money, units_text  # noqa: F401
-from presentation.dautu import view as pview
-from presentation.dautu.view import (USAGE, WATCH, arrow, fix_button, gain_text, last_weekday,  # noqa: F401
-                                     pct)
-from services.dautu.status import close_periods, status, wait_item  # noqa: F401
+from repositories.taisan import assets as assets_repo
+from services.dautu import market
+from services.dautu.market import (current_period, find_fund, fund_info, is_deadline, nav_history,  # noqa: F401
+                                   next_trading, session)
 from services.dautu.orders import (add_money, fix_units, match_details, match_orders, order_spec,  # noqa: F401
                                    record_order, record_plan, record_switch, skip, take_money)
-from services.dautu.switch import (finish_switch, nav_on, open_switches, switch_calc, switch_preview,  # noqa: F401
-                                   switch_prompts)
-from services.dautu.market import (current_period, find_fund, fund_info, is_deadline, nav_history,  # noqa: F401
-                                   next_trading, now_vn, session)
-import phantich as pt
-import sochitieu as ct
-import taisan as ts
-from bantin import vn_num
+from services.dautu.reports import daily_report, evening_line, holdings_alert, salary_part  # noqa: F401
+from services.dautu.status import close_periods, status, wait_item  # noqa: F401
+from services.dautu.switch import finish_switch, nav_on, open_switches, switch_calc, switch_preview, switch_prompts  # noqa: F401
 
 # {"ma", "id", "ten", "bat_dau": "YYYY-MM", "goc": giá trị quỹ có sẵn lúc bắt đầu, "gop": {"YYYY-MM": số góp từ tháng đó},
 #  "tang": 0.01, "nap": {"YYYY-MM": đã góp vào hệ thống trong tháng}, "ky": {"YYYY-MM": {"chot", "bo", "muc", "gt"}},
 #  "lenh": [{"id", "ky", "tien", "dat", "phien", "trang_thai": "cho"|"khop", "nav", "ccq"}], "tat": bool, "top_luc"}
-# ---- Lưu trữ ---------------------------------------------------------------------------
+
 
 def config():
     return fund_repo.load()
@@ -54,25 +57,11 @@ def save(cfg):
 
 
 def active(cfg=None):
-    cfg = config() if cfg is None else cfg
-    return bool(cfg.get("ma")) and not cfg.get("tat")
+    return is_active(config() if cfg is None else cfg)
 
 
-
-
-# ---- Dữ liệu quỹ trên Fmarket ----------------------------------------------------------
-
-# ---- Dữ liệu quỹ trên Fmarket, phiên giao dịch: xem services/dautu/market.py
-
-
-# ---- Quỹ chờ, kế hoạch, tình trạng kỳ: xem domain/dautu/plan.py và services/dautu/status.py
-
-
-# ---- Câu trả lời: xem presentation/dautu/view.py -----------------------------------------
-
+@common.needs_store
 def view(day=None, fresh=False):
-    if not kho.ready():
-        return ct.NEED_STORE
     cfg = config()
     if not cfg.get("ma"):
         return pview.NOT_ENABLED
@@ -108,12 +97,6 @@ def chart_reply():
         return "⚠️ Chưa vẽ được biểu đồ (dịch vụ vẽ không trả lời), thử lại sau"
 
 
-
-# ---- Ghi lệnh, góp tiền, khớp lệnh, hoán đổi: xem services/dautu/orders.py và switch.py
-
-
-# ---- Lệnh /dautu -----------------------------------------------------------------------
-
 MONEY_WORDS = {"tr", "trieu", "k", "nghin", "ngan", "d", "dong", "thang"}
 
 
@@ -136,7 +119,7 @@ def start(args, switch=False):
     if not fund:
         return f"Không thấy quỹ {html.escape(code)} trên Fmarket (gõ đúng mã, ví dụ VMEEF, VESAF, SSISCA, DCDS)"
     ym = ym_of(ct.today())
-    data = ts.load()
+    data = assets_repo.load()
     hold = next((it for it in data["items"] if it["loai"] == "quy" and it["ma"] == code), None)
     base = 0
     if hold:  # đã có ccq từ trước: tính vào điểm xuất phát của kế hoạch
@@ -146,7 +129,7 @@ def start(args, switch=False):
            "tang": DEFAULT_TANG, "nap": {}, "ky": {}, "lenh": []}
     save(cfg)
     wait_item(data, cfg)
-    ts.save(data)
+    assets_repo.save(data)
     lines = [f"✅ Đã bật đầu tư {code} ({html.escape(fund[1].title())}): góp {money(gop)}/tháng từ tháng {ym_text(ym)}."]
     if base:
         lines.append(f"Đã tính {units_text(hold['sl'])} ccq đang có ({money(base)}) vào điểm xuất phát.")
@@ -158,9 +141,8 @@ def start(args, switch=False):
     return "\n".join(lines) + "\n\n" + text, rows
 
 
+@common.needs_store
 def dautu(args):
-    if not kho.ready():
-        return ct.NEED_STORE
     word = ct.plain(args[0]) if args else ""
     rest = " ".join(args[1:])
     if word in ("huongdan", "help", "?"):
@@ -195,7 +177,7 @@ def dautu(args):
         return fix_units(rest)
     if word in ("tang", "muctang"):
         try:
-            g = ts.number(rest.replace("%", "")) / 100
+            g = number(rest.replace("%", "")) / 100
         except ValueError:
             g = 0
         if not 0.003 <= g <= 0.02:
@@ -237,15 +219,15 @@ def dautu(args):
         text, rows = view()
         return f"✅ Từ tháng {ym_text(ym)} góp thêm {money(found[0])}/tháng vào {sd['ma']}\n\n" + text, rows
     if word in ("taicocau", "gopmotlan", "rai"):
-        return restructure(cfg, rest, found, now_vn())
+        return restructure(cfg, rest, found, market.now_vn())
     if word in ("doi", "hoandoi"):
         try:
-            units = ts.number(rest.split()[0]) if rest.split() else 0
+            units = number(rest.split()[0]) if rest.split() else 0
         except ValueError:
             units = 0
         if units <= 0:
             return "Gõ số ccq đã hoán đổi, ví dụ: /dautu doi 125,5 (thêm ngày đặt nếu là lệnh cũ: /dautu doi 125,5 9/11)"
-        now = now_vn()
+        now = market.now_vn()
         spec = order_spec(cfg, " ".join(rest.split()[1:]), now, sd)
         if isinstance(spec, str):
             return spec
@@ -254,14 +236,14 @@ def dautu(args):
     if word in ("quycho", "sodu"):
         if not found:
             return USAGE
-        data = ts.load()
+        data = assets_repo.load()
         wait_item(data, cfg)["tien"] = found[0]
-        ts.save(data)
+        assets_repo.save(data)
         return f"✅ Số dư quỹ chờ {cfg['ma']}: {money(found[0])}"
     if word in ("dadat", "mua", "datlenh"):
         if not found:
             return USAGE
-        now = now_vn()
+        now = market.now_vn()
         other = rest[:found[1]] + " " + rest[found[2]:]
         fund = sd if sd and sd["ma"].lower() in ct.plain(other).split() else None
         spec = order_spec(cfg, other, now, fund)
@@ -393,7 +375,7 @@ def on_button(arg, message, now):
         return "Đã ghi các lệnh", ("edit", lambda: (note, [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]))
     if kind == "bo":
         note = skip(value)
-        return note[:190], ("edit", lambda: view())
+        return common.clip(note), ("edit", lambda: view())
     if kind == "nap" and value.isdigit():
         cfg = config()
         notes = []
@@ -401,11 +383,10 @@ def on_button(arg, message, now):
         save(cfg)
         toast = f"Đã để {money(int(value))} vào quỹ chờ ({money(left)})" + "".join(
             f" · {x[2:].replace('<b>', '').replace('</b>', '')}" for x in notes)
-        if (message.get("text") or "").startswith("📋"):  # nút trên tin chia lương: vẽ lại tin đó
-            from interface.kehoach import plan as kehoach
+        if common.title_starts(message, "📋"):  # nút trên tin chia lương: vẽ lại tin đó
             return toast, ("edit", lambda: kehoach.plan(now.date()))
-        rows = [[b for b in row if not b[1].startswith("dt:nap")] for row in ct.keyboard_rows(message)]
-        return toast, ("buttons", lambda: [r for r in rows if r])
+        rows = common.without_buttons(message, "dt:nap")
+        return toast, ("buttons", lambda: rows)
     if kind == "chua" and value.isdigit():  # hoán đổi chưa xong: 2 ngày sau hỏi lại
         cfg = config()
         o = next((x for x in cfg.get("lenh", []) if x["id"] == int(value)), None)
@@ -420,99 +401,9 @@ def on_button(arg, message, now):
     return None, None
 
 
-# ---- Dùng ở chỗ khác: chia lương, bản tin tối, việc theo giờ ---------------------------
-
-def salary_part(day):
-    """Phần đầu tư trong gợi ý chia lương: (số nên để tháng này, đã để, ghi chú) hoặc None nếu chưa bật."""
-    cfg = config()
-    if not active(cfg):
-        return None
-    ym = ym_of(day)
-    gop = total_of(cfg, ym)
-    added = cfg.get("nap", {}).get(ym, 0)
-    note = ""
-    try:
-        from services.duphong import reserve as reserve_service
-        f = reserve_service.status(day)
-        if f.monthly and f.covered < 1:
-            return {"ma": cfg["ma"], "gop": 0, "added": added, "note": "tạm dừng: ưu tiên quỹ dự phòng tới mốc 1 tháng chi"}
-    except Exception as e:
-        print(f"[lỗi] quỹ dự phòng khi chia lương: {e!r}", file=sys.stderr)
-    if (cfg.get("ky", {}).get(ym) or {}).get("bo"):
-        gop, note = 0, "tháng này tạm dừng"
-    return {"ma": cfg["ma"], "gop": gop, "added": added, "note": note}
-
-
-def evening_line(day):
-    """Dòng NAV quỹ cho bản tin tối của bot bản tin; None nếu chưa bật."""
-    cfg = config()
-    if not active(cfg):
-        return None
-    navs = nav_history(cfg, fresh=True)
-    if len(navs) < 2:
-        return None
-    (_, v0), (d1, v1) = navs[-2], navs[-1]
-    peak = max(v for d, v in navs if (d1 - d).days <= 365)
-    when = "hôm nay" if d1 == day else f"{d1:%d/%m}"
-    line = f"💹 {cfg['ma']} {vn_num(v1, 2)}đ ({when}, {pct(v1 / v0 - 1)}) · cách đỉnh 52 tuần {pct(v1 / peak - 1)}"
-    sd = side(cfg)
-    if sd:
-        snavs = nav_history(sd)
-        if len(snavs) >= 2:
-            year = [v for d, v in snavs if (snavs[-1][0] - d).days <= 365]
-            line += f" · {sd['ma']} {vn_num(snavs[-1][1], 2)}đ ({pct(snavs[-1][1] / year[0] - 1)} 12 tháng)"
-    return line
-
-
-def holdings_alert(cfg):
-    """Fmarket vừa cập nhật danh mục: tin báo nếu có cổ phiếu trong WATCH; None nếu không có gì mới."""
-    info = fund_info(cfg, fresh=True) or {}
-    when = info.get("top_luc")
-    if not when or when == cfg.get("top_luc"):
-        return None
-    cfg["top_luc"] = when
-    save(cfg)
-    flagged = [h for h in info.get("top", []) if h["ma"] in WATCH]
-    if not flagged:
-        return None
-    return (f"⚠️ <b>{cfg['ma']}</b> vừa cập nhật danh mục ({when}): top 10 có "
-            + ", ".join(f"{h['ma']} {vn_num(h['tyle'] or 0, 1)}%" for h in flagged) + ". Xem: /dautu")
-
-
-def daily_report(now):
-    """Tin tối (từ 20h, ngày có NAV mới), ngắn gọn: mỗi quỹ đang giữ một dòng (giá trị theo NAV, lãi/lỗ so với tiền
-    gốc), một dòng tổng. None nếu tắt, chưa có gì, hoặc hôm nay không có NAV mới (cuối tuần, ngày lễ)."""
-    cfg = config()
-    if not active(cfg) or cfg.get("baocao_toi") is False:
-        return None
-    data = ts.load()
-    lines, fresh_today = [], False
-    total_value = total_cost = 0.0
-    for f in [cfg] + ([side(cfg)] if side(cfg) else []):
-        hold = holding(data, cfg, f["ma"])
-        navs = nav_history(f, fresh=True) if hold and hold["sl"] > 0 else []
-        if not navs:
-            continue
-        day, nav = navs[-1]
-        fresh_today |= day == now.date()
-        value, cost = hold["sl"] * nav, hold["sl"] * (hold.get("gia_von") or nav)
-        total_value += value
-        total_cost += cost
-        lines.append(f"{f['ma']} <b>{money(value)}</b> · {gain_text(value - cost, cost)}")
-    if not lines or not fresh_today:
-        return None
-    if len(lines) > 1:
-        lines.append(f"Tổng <b>{money(total_value)}</b> · {gain_text(total_value - total_cost, total_cost)}")
-    pending = sum(o["tien"] for o in cfg.get("lenh", []) if o["trang_thai"] in ("cho", "chuyen"))
-    if pending:
-        lines.append(f"⏳ {money(pending)} đang chờ khớp")
-    return f"📊 <b>Quỹ tối {now:%d/%m}</b> (so với tiền gốc)\n" + "\n".join(lines), [[("📈 Chi tiết", "dt:xem")]]
-
-
 def match_job(now):
     """Sau 17h: lệnh đã có NAV thì tính ccq. Trả các tin báo [(câu báo, nút)]; lệnh mua có nút sửa số ccq."""
     if (now.hour, now.minute) < (17, 0) or not active():
         return []
     return [(note, ([[fix_button(code)]] if code else []) + [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]])
             for code, note in match_details(now)]
-

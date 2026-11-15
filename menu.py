@@ -95,7 +95,7 @@ def note(e):
 
 def fund_deadline(now):
     """Hôm nay là hạn đặt lệnh quỹ mà chưa đặt: (việc, nút); None nếu không."""
-    import dautu
+    from interface.dautu import fund as dautu
     cfg = dautu.config()
     if not dautu.active(cfg):
         return None

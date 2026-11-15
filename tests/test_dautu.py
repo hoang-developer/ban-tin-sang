@@ -5,7 +5,8 @@ from tests import harness as h
 
 from datetime import date
 
-import dautu
+from interface.dautu import fund as dautu
+from domain.common.format import vn_num
 from services.dautu import market as dautu_market
 import taisan as ts
 import thongbao
@@ -227,7 +228,7 @@ class LichKhopLenh(unittest.TestCase):
         h.at(2026, 10, 20, 17, 30)
         text, _ = h.run_jobs()[0]
         nav = dict(h.NAV["VMEEF"])[date(2026, 10, 20)]
-        self.assertIn(f"Lệnh VMEEF 1.000.000đ đã khớp phiên 20/10: NAV {dautu.vn_num(nav, 2)}đ", text)
+        self.assertIn(f"Lệnh VMEEF 1.000.000đ đã khớp phiên 20/10: NAV {vn_num(nav, 2)}đ", text)
 
     def test_hoan_doi_dat_cuoi_tuan_ban_vff_thu_ba(self):
         h.at(2026, 9, 14, 20)

@@ -1116,7 +1116,7 @@ def menu():
 
 
 def dautu():
-    import dautu as module  # đầu tư quỹ mở hằng tháng (Value Averaging)
+    from interface.dautu import fund as module  # đầu tư quỹ mở hằng tháng (Value Averaging)
     return module
 
 

@@ -8,8 +8,12 @@ from datetime import date, timedelta
 import sochitieu as ct  # module cũ ở gốc: đọc sổ chi tiêu
 from domain.tietkiem import progress as rules
 from domain.tietkiem.progress import InvestMove, Milestones, NoSpend, PeriodInfo
+from domain.dautu.plan import is_active
+from repositories.dautu import fund as dautu_fund
 from repositories.duphong import reserve as reserve_repo
 from repositories.tietkiem import progress as progress_repo
+from services.dautu import market as dautu_market
+from services.dautu import orders as dautu_orders
 from services.duphong import reserve as reserve_service
 from services.no import debt as debt_service
 
@@ -41,8 +45,7 @@ def real_saved(cfg, entries):
     except Exception as e:
         print(f"[lỗi] quỹ dự phòng trong /tietkiem: {e!r}", file=sys.stderr)
     try:
-        import dautu  # module cũ ở gốc
-        out["dautu"] = sum(v for k, v in dautu.config().get("nap", {}).items() if k >= ym)
+        out["dautu"] = sum(v for k, v in dautu_fund.load().get("nap", {}).items() if k >= ym)
     except Exception as e:
         print(f"[lỗi] đầu tư trong /tietkiem: {e!r}", file=sys.stderr)
     group = debt_group()
@@ -156,9 +159,9 @@ def reminder_on():
 def invest_fund():
     """Mã quỹ chờ đầu tư đang bật (để hiện nút chuyển vào quỹ chờ), None nếu không có."""
     try:
-        import dautu  # module cũ ở gốc
-        if dautu.active():
-            return dautu.config()["ma"]
+        cfg = dautu_fund.load()
+        if is_active(cfg):
+            return cfg["ma"]
     except Exception as e:
         print(f"[lỗi] nút chuyển đầu tư: {e!r}", file=sys.stderr)
     return None
@@ -171,11 +174,10 @@ def _mark_moved(amount):
 
 
 def move_to_invest(amount):
-    import dautu  # module cũ ở gốc
-    cfg_dt = dautu.config()
+    cfg_dt = dautu_fund.load()
     notes = []
-    left = dautu.add_money(cfg_dt, amount, dautu.current_period(cfg_dt), notes=notes)
-    dautu.save(cfg_dt)
+    left = dautu_orders.add_money(cfg_dt, amount, dautu_market.current_period(cfg_dt), notes=notes)
+    dautu_fund.save(cfg_dt)
     _mark_moved(amount)
     return InvestMove(cfg_dt["ma"], left, notes)
 

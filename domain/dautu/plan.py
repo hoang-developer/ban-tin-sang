@@ -3,7 +3,13 @@ from domain.dautu.calendar import months
 
 DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG = "VMEEF", 4_000_000, 0.01
 MIN_ORDER, STEP = 100_000, 10_000
+WATCH = ("VIC", "VHM", "VRE", "VPL")  # nhóm Vingroup: báo nếu vào top 10 của quỹ
 SWITCH_DAYS = 7  # hoán đổi quỹ chờ → quỹ chính: bán quỹ chờ, tiền về rồi mới mua quỹ chính, khoảng 1 tuần
+
+
+def is_active(cfg):
+    """Đã bật /dautu và chưa tắt."""
+    return bool(cfg.get("ma")) and not cfg.get("tat")
 
 
 def wait_name(cfg):

@@ -413,7 +413,7 @@ không có thì thu trung bình 3 tháng. Đã bật `/dautu` thì thêm bước
 
 ### Đầu tư quỹ mở hằng tháng (Value Averaging)
 
-Code ở [dautu.py](dautu.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu mỗi tháng, mã quỹ trên Fmarket). Bot không
+Code ở [interface/dautu/fund.py](interface/dautu/fund.py). Bật: `/dautu batdau 4tr VMEEF` (góp 4 triệu mỗi tháng, mã quỹ trên Fmarket). Bot không
 đặt lệnh, không chuyển tiền: bot tính nên mua bao nhiêu và nhắc, bạn đặt trên Fmarket rồi bấm ✅.
 
 - **Đường kế hoạch**: tháng đầu = số góp (cộng giá trị quỹ đang có lúc bật), mỗi tháng sau = tháng trước × 1,01 + số

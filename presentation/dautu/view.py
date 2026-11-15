@@ -4,10 +4,9 @@ from datetime import date, timedelta
 import sochitieu as ct  # module cũ ở gốc: nút ⬅️ Hôm nay
 from domain.common.format import vn_num, vnd
 from domain.dautu.calendar import ym_of, ym_text
-from domain.dautu.plan import SWITCH_DAYS, gop_of, side, them_of
-from domain.dautu.text import money, units_text
+from domain.dautu.plan import SWITCH_DAYS, WATCH, gop_of, side, them_of
+from domain.dautu.text import arrow, gain_text, money, pct, units_text  # noqa: F401 (pct, arrow, gain_text dùng chung)
 
-WATCH = ("VIC", "VHM", "VRE", "VPL")  # nhóm Vingroup: báo nếu vào top 10 của quỹ
 
 USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
          "/dautu: tình trạng, tháng này nên mua bao nhiêu\n"
@@ -24,24 +23,6 @@ USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
          "đã hoán đổi: /dautu doi 125,5 (số ccq VFF)\n"
          "<b>Khoản tiền lớn</b> (ví dụ tiền bán cổ phiếu) đã mua VFF: /dautu taicocau 15,5tr — phần cổ phiếu (80%) rải "
          "dần vào VMEEF trong 3 tháng (đổi: /dautu taicocau 15,5tr 6 thang 70%)")
-
-
-def pct(x):
-    return "0,0%" if abs(x) < 0.0005 else f"{x * 100:+.1f}%".replace(".", ",")
-
-
-def arrow(x):
-    """+1,2% -> '🔺1,2%', −0,8% -> '🔻0,8%'."""
-    return "0,0%" if abs(x) < 0.0005 else f"{'🔺' if x > 0 else '🔻'}{abs(x) * 100:.1f}%".replace(".", ",")
-
-
-def gain_text(gain, cost):
-    """'🟢 +22k (+0,6%)', '🔴 −22k (−0,6%)' hoặc '⚪ hòa vốn' (chênh dưới 1.000đ)."""
-    if abs(gain) < 1000:
-        return "⚪ hòa vốn"
-    sign = "+" if gain > 0 else "−"
-    return f"{'🟢' if gain > 0 else '🔴'} {sign}{money(abs(gain))}" + (f" ({pct(gain / cost).replace('-', '−')})"
-                                                                     if cost else "")
 
 
 def nav_line(cfg, s):

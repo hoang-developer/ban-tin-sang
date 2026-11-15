@@ -21,7 +21,7 @@ LEGACY_IMPORTS = {
     "services/duphong/reserve.py": {"phantich", "sochitieu", "taisan"},
     "presentation/duphong/reserve.py": {"phantich", "sochitieu", "taisan", "bantin"},
     "interface/duphong/reserve.py": {"sochitieu"},
-    "services/tietkiem/progress.py": {"sochitieu", "dautu"},
+    "services/tietkiem/progress.py": {"sochitieu"},
     "presentation/tietkiem/progress.py": {"phantich", "sochitieu"},
     "interface/tietkiem/progress.py": {"sochitieu"},
     "services/doichieu/reconcile.py": {"sochitieu", "taisan"},
@@ -33,11 +33,12 @@ LEGACY_IMPORTS = {
     "interface/common.py": {"sochitieu"},
     "presentation/dautu/view.py": {"sochitieu"},
     "services/dautu/orders.py": {"taisan"},
-    "services/kehoach/plan.py": {"sochitieu", "taisan", "phantich", "dautu"},
+    "interface/dautu/fund.py": {"phantich", "sochitieu", "taisan"},
+    "services/kehoach/plan.py": {"sochitieu", "taisan", "phantich"},
     "presentation/kehoach/plan.py": {"sochitieu", "taisan"},
     "interface/kehoach/plan.py": {"sochitieu"},
 }
-ROOT_PY_MAX = 19  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
+ROOT_PY_MAX = 18  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
 
 
 def py_files(folder):
