@@ -14,7 +14,7 @@ Bot Telegram riêng: bản tin mỗi sáng, bản tin tối, cảnh báo tức t
 
 ## Lệnh trên Telegram
 
-Gõ trong chat với bot hoặc bấm nút **Menu** cạnh ô nhập ([lenh.py](lenh.py)):
+Gõ trong chat với bot hoặc bấm nút **Menu** cạnh ô nhập ([interface/lenh/bot.py](interface/lenh/bot.py)):
 
 | Lệnh | Làm gì |
 |---|---|
@@ -542,7 +542,7 @@ GitHub không tự tắt lịch khi repo 60 ngày không có commit.
 
 ```
 python -m interface.bantin.bulletin                    # bản tin sáng
-python lenh.py /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
+python -m interface.lenh.bot /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
 python -m interface.thoitiet.report Đà Nẵng
 python -m interface.tintuc.search giá vàng 24h
 python sochitieu.py "cà phê 35k"   # bot chi tiêu: chỉ đọc và xếp nhóm, không ghi

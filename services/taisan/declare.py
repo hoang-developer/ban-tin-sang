@@ -110,7 +110,7 @@ def add_fx(data, code, args):
 def add_gold(args):
     """/taisan vang nhan 0,1 chi 148,02 [20/10]: loại, số lượng, đơn vị, giá mua triệu/lượng, ngày mua (không bắt buộc;
     có thì hiện ở 💼 Tài sản)."""
-    import lenh  # dùng chung cách nhập của /vivang bên bot bản tin
+    from domain.lenh import rules as lenh  # dùng chung cách nhập của /vivang bên bot bản tin
     bought = None
     if args and re.fullmatch(r"\d{1,2}/\d{1,2}(?:/\d{4})?", args[-1]):
         parts = [int(x) for x in args[-1].split("/")]

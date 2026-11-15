@@ -1,16 +1,19 @@
 """Các lệnh và nút bấm của bot Telegram; phần nhận tin nhắn nằm ở api/telegram.py.
 
 Mỗi lệnh trả về tin nhắn HTML, hoặc (tin nhắn, nút bấm) với nút dạng [[(nhãn, dữ liệu), ...], ...].
-Xem thử: python lenh.py /vang
-         python lenh.py /stock FPT
+Xem thử: python -m interface.lenh.bot /vang
+         python -m interface.lenh.bot /stock FPT
 """
 import html
 import os
-import re
 import sys
 from datetime import date, datetime, timedelta, timezone
 
 from domain.amlich import lunar as amlich
+from domain.lenh.rules import (AMOUNT, DATE, GUESS_DEADLINE, INDEX_NAMES, KINDS, LUNAR_WORDS, MAX_KEYWORDS,  # noqa: F401
+                               MAX_REMINDERS, MAX_WATCH, PERIOD, SAVINGS_RATE, UNIT_DAYS, UNIT_MONEY, UNITS,
+                               amount_text, money, parse_level, rows_of, when_text)
+from presentation.lenh.view import GUESS_BUTTONS, GUESS_LABEL, GUESS_TEXT, NEED_STORE, level_text  # noqa: F401
 from infrastructure import kho
 from repositories import keys
 from domain.vang.gold import GoldLot
@@ -29,16 +32,8 @@ from interface.thoitiet.report import find_place, report
 from interface.tintuc.search import headlines_text, parse_query, results_text
 
 # ---- Cấu hình -------------------------------------------------------------
-MAX_WATCH = 10            # số mã theo dõi tối đa
-MAX_KEYWORDS = 20         # số từ khóa báo tin mới tối đa
-MAX_REMINDERS = 30        # số ngày cần nhớ tối đa
-SAVINGS_RATE = 0.05       # lãi gửi tiết kiệm/năm để so sánh trong /neu
-GUESS_DEADLINE = (9, 15)  # nhận đoán xanh/đỏ tới giờ này (hết đợt khớp lệnh mở cửa)
 # ---------------------------------------------------------------------------
 
-NEED_STORE = "⚠️ Tính năng này cần kho dữ liệu. Gõ /caidat để xem cách cài."
-DATE = re.compile(r"(\d{1,2})/(\d{1,2})")
-LUNAR_WORDS = {"âm", "am", "al", "âl"}
 
 
 def today():
@@ -49,8 +44,6 @@ def day_label(d):
     return f"{WEEKDAYS[d.weekday()]} {d:%d/%m/%Y}"
 
 
-def rows_of(buttons, size=3):
-    return [buttons[i:i + size] for i in range(0, len(buttons), size)]
 
 
 # ---- Chứng khoán và theo dõi mã ------------------------------------------------
@@ -95,15 +88,8 @@ def more_news(symbol):
     return f"📰 <b>Tin về {symbol}</b> trong 7 ngày\n" + "\n".join(news(symbol, 8))
 
 
-def parse_level(text):
-    return None if text == "-" else float(text.replace(",", "."))
 
 
-def level_text(levels):
-    low, high = levels
-    parts = ([f"≤ {dong(low * 1000)}"] if low is not None else []) + \
-            ([f"≥ {dong(high * 1000)}"] if high is not None else [])
-    return f" · báo khi {' hoặc '.join(parts)}" if parts else ""
 
 
 def theodoi(args):
@@ -163,8 +149,6 @@ def toggle_follow(symbol):
 
 # ---- Ngày cần nhớ, âm lịch ---------------------------------------------------------
 
-def when_text(r):
-    return f"{r['ngay']}/{r['thang']}{' âm lịch' if r['am'] else ''}"
 
 
 def nho(args):
@@ -235,19 +219,8 @@ def amlich_cmd(args):
 
 # ---- Nếu ngày xưa mua... -------------------------------------------------------------
 
-AMOUNT = re.compile(r"(\d+(?:[.,]\d+)?)(tr|triệu|trieu|k|ty|tỷ|tỉ|ti)?")
-PERIOD = re.compile(r"(\d+)(nam|năm|thang|tháng|tuan|tuần|ngay|ngày)")
-UNIT_MONEY = {None: 1, "k": 1e3, "tr": 1e6, "triệu": 1e6, "trieu": 1e6, "ty": 1e9, "tỷ": 1e9, "tỉ": 1e9, "ti": 1e9}
-UNIT_DAYS = {"nam": 365, "năm": 365, "thang": 30, "tháng": 30, "tuan": 7, "tuần": 7, "ngay": 1, "ngày": 1}
-INDEX_NAMES = {"VNINDEX": "VN-Index", "VN30": "VN30", "HNX": "HNX", "UPCOM": "UPCoM"}
 
 
-def money(vnd):
-    for unit, name in [(1e9, "tỷ"), (1e6, "triệu")]:
-        if abs(vnd) >= unit:
-            x = vnd / unit
-            return f"{vn_num(x, 0 if abs(x - round(x)) < 0.005 else 2)} {name}"  # số tròn thì bỏ ",00"
-    return f"{vn_num(vnd, 0)}đ"
 
 
 def history_from(what, start):
@@ -326,16 +299,8 @@ def neu(args):
 
 # ---- Ví vàng -------------------------------------------------------------------
 
-KINDS = {"sjc": "sjc", "mieng": "sjc", "miếng": "sjc", "nhan": "nhan", "nhẫn": "nhan"}
-UNITS = {"chi": 0.1, "chỉ": 0.1, "luong": 1, "lượng": 1, "cay": 1, "cây": 1}
 
 
-def amount_text(taels):
-    chi = round(taels * 10, 2)  # 0,02 lượng = 0,2 chỉ (vàng ép vỉ 0,1 chỉ)
-    whole = int(chi // 10)
-    rest = round(chi - whole * 10, 2)
-    rest_text = f"{rest:g}".replace(".", ",")
-    return " ".join(([f"{whole} lượng"] if whole else []) + ([f"{rest_text} chỉ"] if rest else [])) or "0 chỉ"
 
 
 def wallet(items, prices=None):
@@ -396,10 +361,6 @@ def vivang(args):
 
 # ---- Đoán xanh/đỏ ------------------------------------------------------------------
 
-GUESS_TEXT = ("🎯 <b>Đoán nhanh</b>: hôm nay VN-Index đóng cửa <b>xanh</b> hay <b>đỏ</b>?\n"
-              f"<i>Nhận đoán tới {GUESS_DEADLINE[0]}:{GUESS_DEADLINE[1]:02d} · 15h bot chấm điểm</i>")
-GUESS_BUTTONS = [[("🟢 Xanh", "doan:xanh"), ("🔴 Đỏ", "doan:do")]]
-GUESS_LABEL = {"xanh": "🟢 Xanh", "do": "🔴 Đỏ"}
 
 
 def record_guess(choice, now):

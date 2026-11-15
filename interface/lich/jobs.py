@@ -14,7 +14,7 @@ from infrastructure import kho
 from repositories import keys
 from repositories.lich.jobs import done_today, mark_done  # noqa: F401
 from repositories.vang import gold as gold_repo
-import lenh
+from interface.lenh import bot as lenh
 from interface.nhandinh import analysis as nhandinh
 from interface.phantich import analysis as phantich
 import sochitieu as chitieu
