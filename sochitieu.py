@@ -228,9 +228,13 @@ def find_group(text, include_hidden=False, cfg=None):
 
 MONEY = re.compile(
     r"(?<![\w.,])(\d+(?:[.,]\d+)*)\s*"                                   # 35 | 35.000 | 1,5
-    r"(?:(k|nghìn|nghin|ngàn|ngan|tr|triệu|trieu|củ|cu|tỷ|ty|tỏi)(\d{1,3})?)?"  # đơn vị, phần lẻ: 1tr2, 1k5
-    # (phần lẻ chỉ đi sau đơn vị: "tháng 11 19,1tr" là 19,1 triệu, không phải "11 19")
+    r"(?:(k|nghìn|nghin|ngàn|ngan|tr|triệu|trieu|củ|cu|tỷ|ty|tỏi)(\d{1,3})?(k|nghìn|nghin|ngàn|ngan)?)?"
+    # đơn vị, phần lẻ: 1tr2, 1k5, 1tr287k (= 1.287.000). Phần lẻ chỉ đi sau đơn vị: "tháng 11 19,1tr" là 19,1 triệu
     r"\s*(đ|đồng|dong|vnđ|vnd)?(?!\w)", re.IGNORECASE)
+# Số trơn đứng trước các chữ này là số lượng, không phải tiền: "0.1 chỉ", "2 vỉ", "6 tháng", "5%", "100 cp"
+QUANTITY = re.compile(r"\s*(?:%|chỉ|chi|lượng|luong|cây|cay|vỉ|ccq|cp|cổ phiếu|co phieu|tháng|thang|năm|nam|ngày|ngay|"
+                      r"tuần|tuan|lần|lan|cái|cai|kg|gram|gr|người|nguoi|ly|cốc|coc|hộp|hop|chai|gói|goi)(?!\w)",
+                      re.IGNORECASE)
 UNITS = {"k": 1e3, "nghìn": 1e3, "nghin": 1e3, "ngàn": 1e3, "ngan": 1e3, "tr": 1e6, "triệu": 1e6, "trieu": 1e6,
          "củ": 1e6, "cu": 1e6, "tỷ": 1e9, "ty": 1e9, "tỏi": 1e9}
 DATE = re.compile(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?:/(\d{2}|\d{4}))?(?![\d/])")
@@ -253,11 +257,15 @@ def money(match):
     if number is None:
         return None, False
     unit = UNITS.get((match[2] or "").lower())
-    if unit:
+    if unit and match[3] and match[4]:  # 1tr287k: phần lẻ có đơn vị riêng
+        number = number * unit + int(match[3]) * UNITS[match[4].lower()]
+    elif unit:
         number = number * unit + (int(match[3]) / 10 ** len(match[3]) * unit if match[3] else 0)
-    elif not match[4] and number < 1000:
+    elif not match[5] and QUANTITY.match(match.string, match.end()):
+        return None, False  # số lượng (0.1 chỉ, 6 tháng, 5%), không phải tiền
+    elif not match[5] and number < 1000:
         number *= 1000  # "cà phê 35" hiểu là 35 nghìn
-    return round(number), bool(unit or match[4])
+    return round(number), bool(unit or match[5])
 
 
 def parse_amount(text):

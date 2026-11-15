@@ -41,6 +41,7 @@ def debt_choices():
         return []
 
 
+GOLD_PRICE = (50, 300)  # triệu đồng/lượng: ngoài khoảng này gần như chắc nhập nhầm (giá một chỉ, thiếu số 0…)
 TERMS = [(0, "Không kỳ hạn"), (1, "1 tháng"), (3, "3 tháng"), (6, "6 tháng"), (12, "12 tháng")]
 JOBS = {
     "thu": {"nhan": "💰 Khoản thu", "xac_nhan": False, "truong": [
@@ -348,8 +349,8 @@ def clean(raw, text=None):
         if v is not None:
             a[f["ten"]] = v
     seen, explicit = text_amounts(text) if text else ([], [])
-    sure = explicit or seen  # số có ghi đơn vị đáng tin hơn số trơn ("2 vỉ", "0,1 chỉ")
-    if a.get("tien") and a["tien"] not in seen and len(sure) == 1:
+    sure = explicit or seen  # số có ghi đơn vị đáng tin hơn số trơn
+    if a.get("tien") and a["tien"] not in seen and len(sure) == 1 and sure[0] >= 1000:
         a["tien"] = int(sure[0])  # câu chỉ có một số tiền mà AI đọc khác: tin số code đọc
     return a
 
@@ -497,10 +498,14 @@ def describe(a):
     if job == "vang":
         kind = "vàng miếng SJC" if a["loai"] == "sjc" else "vàng nhẫn 24k"
         paid = ""
+        warn = ""
         if a.get("tien"):
             per = a["tien"] / (a["chi"] / 10) / 1e6
             paid = f", trả <b>{money}</b> (≈ {vn_num(per, 2)} triệu/lượng)"
-        return f"🥇 Mua <b>{num(a['chi'])} chỉ</b> {kind}{paid}"
+            if not GOLD_PRICE[0] <= per <= GOLD_PRICE[1]:
+                warn = (f"\n⚠️ Giá ~{vn_num(per, 2)} triệu/lượng có vẻ sai (thường {GOLD_PRICE[0]}–{GOLD_PRICE[1]}): "
+                        "kiểm tra số chỉ và tổng tiền, bấm ✏️ Sửa nếu nhầm")
+        return f"🥇 Mua <b>{num(a['chi'])} chỉ</b> {kind}{paid}{warn}"
     if job == "co_phieu":
         cost = f", giá vốn {vn_num(price_dong(a['gia_von']), 0)}đ" if a.get("gia_von") else ""
         return (f"📈 {'Bán' if a['chieu'] == 'ban' else 'Mua'} <b>{vn_num(a['sl'], 0)} {esc(a['ma'].upper())}</b> giá "

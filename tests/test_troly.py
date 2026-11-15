@@ -208,6 +208,29 @@ class TroLy(unittest.TestCase):
         self.assertIn("Đã ghi 1.000.000đ", text)
         self.assertEqual(h.AI.calls, [])
 
+    def test_mua_vang_gia_viet_kieu_1tr287k(self):
+        ask = "mua vàng 0.1 chỉ giá 1tr287k"
+        h.AI.replies[ask] = {"viec": "vang", "loai": "nhan", "chi": 0.1, "tien": 1287000}
+        text, buttons = h.say(ask)
+        self.assertIn("Mua 0,1 chỉ vàng nhẫn 24k, trả 1.287.000đ (≈ 128,70 triệu/lượng)", text)
+        self.assertNotIn("⚠️", text)
+        h.press(h.button(buttons, "y:ok"))
+        self.assertEqual(kho.get("vivang")[-1]["gia"], 128.7)
+
+    def test_gia_vang_vo_ly_thi_canh_bao_tren_the(self):
+        ask = "mua 0,1 chỉ vàng nhẫn giá 12tr8"  # nhầm giá một chỉ thành tổng tiền
+        h.AI.replies[ask] = {"viec": "vang", "loai": "nhan", "chi": 0.1, "tien": 12800000}
+        text, _ = h.say(ask)
+        self.assertIn("⚠️ Giá ~1.280,00 triệu/lượng có vẻ sai", text)
+
+    def test_doc_so_tien_khong_nham_so_luong(self):
+        cases = {"1tr287k": 1_287_000, "1tr287": 1_287_000, "1tr2": 1_200_000, "1287k": 1_287_000, "cà phê 35": 35_000,
+                 "gửi 6 tháng 50tr": 50_000_000, "cơm 2 người 120k": 120_000, "2 vỉ vàng 0,1 chỉ hết 2tr476": 2_476_000,
+                 "tháng 11 19,1tr": 19_100_000}
+        self.assertEqual({t: h.ct.parse_amount(t)[0] for t in cases}, cases)
+        for t in ("0.1 chỉ", "lãi 4,7%", "6 tháng"):
+            self.assertIsNone(h.ct.parse_amount(t), t)
+
 
 if __name__ == "__main__":
     unittest.main()
