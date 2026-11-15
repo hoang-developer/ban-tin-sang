@@ -176,7 +176,7 @@ def on_button(data, message, now):
     if kind == "ts":
         return features.taisan().on_button(arg, message, now)
     if kind == "anh":
-        import docanh
+        from interface.docanh import photo as docanh
         return docanh.on_button(arg, message, now)
     if kind == "dp":
         return features.duphong().on_button(arg, message, now)

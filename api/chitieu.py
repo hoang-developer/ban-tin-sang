@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import các file ở thư mục gốc
 
-import docanh  # noqa: E402
+from interface.docanh import photo as docanh  # noqa: E402
 from infrastructure import kho  # noqa: E402
 import sochitieu as chitieu  # noqa: E402 (file lõi đặt tên khác file này để khỏi import nhầm)
 from infrastructure import telegram as tg  # noqa: E402
@@ -58,8 +58,8 @@ def handle_button(query, tok):
 def try_page(environ):
     """?hieu=<câu>: cho xem bot hiểu một câu nói thường thế nào, không ghi gì (tối đa vài chục câu mỗi ngày)."""
     query = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
-    if "danhgia" in query and kho.ready():  # đo bot hiểu tin nhắn tới đâu (danhgia.py)
-        import danhgia
+    if "danhgia" in query and kho.ready():  # đo bot hiểu tin nhắn tới đâu (interface/danhgia/benchmark.py)
+        from interface.danhgia import benchmark as danhgia
         chitieu.reset()
         return danhgia.page(query)
     if "hieu" not in query or not kho.ready():

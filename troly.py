@@ -571,7 +571,7 @@ def finance_facts(day):
 
 def ask_ai(text, day, context=None, personal=True, people=None, facts=None):
     """Nhờ AI hiểu một tin thành việc. context=(việc đang dở, câu bot vừa hỏi hoặc None): tin là câu trả lời/lời sửa.
-    people: thay tên nợ, tài khoản, quỹ của người dùng (đo bằng danhgia.py dùng ngữ cảnh mẫu); facts: số liệu tài chính."""
+    people: thay tên nợ, tài khoản, quỹ của người dùng (đo bằng interface/danhgia/benchmark.py dùng ngữ cảnh mẫu); facts: số liệu tài chính."""
     system = prompt(day, personal and people is None, facts, people)
     if context:
         doing, asked = context

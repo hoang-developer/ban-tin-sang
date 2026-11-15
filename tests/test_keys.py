@@ -67,7 +67,7 @@ class Khoa(unittest.TestCase):
         """kho.get/put/put_new/delete/command và remembered() phải nhận khóa từ repositories.keys, không phải chuỗi."""
         bad = []
         for path in source_files():
-            if path.name in ("kho.py", "danhgia_cau.py"):
+            if path.name in ("kho.py", "questions.py"):
                 continue
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if not isinstance(node, ast.Call):
@@ -88,7 +88,7 @@ class Khoa(unittest.TestCase):
         """Hằng như K_X = "chitieu:..." hay f"chitieu:..." chỉ được nằm trong repositories/keys.py."""
         bad = []
         for path in source_files():
-            if path.name == "danhgia_cau.py" or path == ROOT / "repositories" / "keys.py":
+            if path.name == "questions.py" or path == ROOT / "repositories" / "keys.py":
                 continue
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.startswith("chitieu:"):

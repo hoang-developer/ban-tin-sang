@@ -14,7 +14,7 @@ from domain.common.format import vnd
 NEED_STORE = "⚠️ Bot chi tiêu cần kho dữ liệu (Upstash Redis trên Vercel), xem README."
 SORT_TITLE = "🗂"  # tin /chuaxep bắt đầu bằng biểu tượng này, vẽ lại vẫn giữ kiểu tin
 
-BACK = ("⬅️ Hôm nay", "m:home")  # nút quay về màn hình 🏠 Hôm nay (menu.py)
+BACK = ("⬅️ Hôm nay", "m:home")  # nút quay về màn hình 🏠 Hôm nay (interface/menu/screens.py)
 REPORT_BUTTONS = [[("Hôm nay", "bc:ngay"), ("Tuần này", "bc:tuan"), ("Tháng này", "bc:thang"),
                    ("Tháng trước", "bc:thangtruoc")],
                   [("📈 Biểu đồ", "bd:thang"), ("🔮 Dự báo", "db"), ("💬 Nhận xét", "nx:thang")]]

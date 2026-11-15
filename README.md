@@ -138,7 +138,7 @@ riêng cho AI).
 **Kiểm thử** ([tests/](tests)): `python -m unittest discover -s tests -t .` chạy bot trong bộ nhớ (kho, Telegram, Fmarket,
 AI đều giả lập; NAV thật của VMEEF, VFF trong `tests/data`), GitHub tự chạy mỗi lần đẩy code.
 
-**Menu: 4 mục** ([menu.py](menu.py)), cũng là 4 nút cố định dưới ô chat (bot gửi lần đầu, hoặc khi bạn bấm nút của
+**Menu: 4 mục** ([interface/menu/screens.py](interface/menu/screens.py)), cũng là 4 nút cố định dưới ô chat (bot gửi lần đầu, hoặc khi bạn bấm nút của
 hàng cũ):
 
 - **🏠 Hôm nay** (`/menu`, `/start`): hôm nay đã chi gì, còn được tiêu bao nhiêu, tháng này đã chi/thu, tài khoản
@@ -204,7 +204,7 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | `/tietkiem` | Chi lặt vặt so với trước khi dùng bot, đã bớt bao nhiêu, chuỗi ngày ghi chép, nhắc 21h (xem dưới) |
 | `/dautu` | Đầu tư quỹ mở hằng tháng (Value Averaging): tháng này nên mua bao nhiêu, nhắc hạn đặt lệnh (xem dưới) |
 
-**Thông báo gộp** ([thongbao.py](thongbao.py)), mỗi buổi tối đa một tin (qua lịch chạy `/api/tick` sẵn có):
+**Thông báo gộp** ([interface/thongbao/digest.py](interface/thongbao/digest.py)), mỗi buổi tối đa một tin (qua lịch chạy `/api/tick` sẵn có):
 
 - **☀️ Sáng** (từ 9h): đã nhận lương chưa, sổ tiết kiệm sắp đáo hạn, khoản nợ tới hạn chưa trả, chung một tin, nút
   của từng việc nằm dưới tin.
@@ -249,7 +249,7 @@ Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câ
 
 Chụp hóa đơn, hoặc chụp màn hình chuyển khoản / nhận tiền rồi gửi vào bot. AI (Gemini, cần `GEMINI_API_KEY`;
 không có thì OpenRouter với model đọc ảnh `AI_VISION_MODEL`, mặc định Nemotron 3.5 Super VL) đọc tổng tiền,
-ngày, nội dung; bot ghi như tin nhắn thường, vẫn có nút ✏️ đổi nhóm, ❌ xóa. Code ở [docanh.py](docanh.py).
+ngày, nội dung; bot ghi như tin nhắn thường, vẫn có nút ✏️ đổi nhóm, ❌ xóa. Code ở [interface/docanh/photo.py](interface/docanh/photo.py).
 
 - Lấy **tổng** hóa đơn (dòng Tổng cộng / Tong tien), không lấy tiền khách đưa, tiền thừa, số dư hay từng
   phương thức thanh toán. Nhận tiền vào tài khoản thì ghi vào Thu nhập.

@@ -1,7 +1,7 @@
-"""Bộ câu đo khả năng hiểu tin nhắn của bot chi tiêu (danhgia.py chạy, ?danhgia= trên trang tình trạng).
+"""Bộ câu đo khả năng hiểu tin nhắn của bot chi tiêu (benchmark.py chạy, ?danhgia= trên trang tình trạng).
 
 Mỗi câu: (nhóm, câu, [việc mong đợi]). Việc mong đợi chỉ ghi các trường cần đúng; trường khác bot đưa thêm không
-sao. Câu chạy với ngữ cảnh mẫu (danhgia.DEMO_CONTEXT, DEMO_FACTS) và ngày cố định danhgia.DAY (thứ Sáu 20/11/2026),
+sao. Câu chạy với ngữ cảnh mẫu (benchmark.DEMO_CONTEXT, DEMO_FACTS) và ngày cố định benchmark.DAY (thứ Sáu 20/11/2026),
 không dùng dữ liệu thật. "tra_loi" có "chua": câu trả lời phải chứa các chuỗi đó (số lấy từ DEMO_FACTS).
 """
 

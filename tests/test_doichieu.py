@@ -7,7 +7,7 @@ from tests.test_dongtien import item, main_balance, set_main
 from interface.doichieu import reconcile as doichieu
 from interface.no import debt as sono
 from interface.taisan import assets as ts
-import thongbao
+from interface.thongbao import digest as thongbao
 
 
 def setup():

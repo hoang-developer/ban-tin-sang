@@ -213,8 +213,8 @@ def run_jobs():
 
 def send_photo(caption=""):
     """Người dùng gửi một ảnh (AI giả trả AI.photo): (chữ bot trả lời, dữ liệu các nút)."""
-    import docanh
-    docanh.download = lambda file_id, tok: b"anh"
+    from interface.docanh import photo as docanh
+    tg.download_file = lambda file_id, tok: b"anh"
     message = {"chat": {"id": CHAT}, "caption": caption,
                "photo": [{"file_id": "f1", "file_unique_id": f"u{len(AI.calls)}"}]}
     return parts(docanh.photo(message, "test", CLOCK["now"]))

@@ -359,7 +359,7 @@ def ban_phim_moi(now, chat):
     tok = chitieu.token()
     if not tok or not between(now, (7, 0), (22, 0)):
         return None
-    import menu
+    from interface.menu import screens as menu
     owners = list(chitieu.owner_chats())
     sent = menu.push_keyboard(lambda text, markup: [tg.send(o, text, markup, tok=tok) for o in owners])
     return "đã gửi hàng nút mới" if sent else None
@@ -370,7 +370,7 @@ def tong_ket_toi(now, chat):
     tok = chitieu.token()
     if not between(now, (21, 0), (23, 0)) or not tok or done_today("tong_ket_toi", now):
         return None
-    import thongbao
+    from interface.thongbao import digest as thongbao
     chitieu.reset()
     mark_done("tong_ket_toi", now)
     message = thongbao.evening(now)
@@ -401,7 +401,7 @@ def tai_chinh_sang(now, chat):
     tok = chitieu.token()
     if not between(now, (9, 0), (21, 0)) or not tok or done_today("tai_chinh_sang", now):
         return None
-    import thongbao
+    from interface.thongbao import digest as thongbao
     chitieu.reset()
     mark_done("tai_chinh_sang", now)
     message = thongbao.morning(now.date())  # một tin: lương, sổ đáo hạn, nợ tới hạn
@@ -428,7 +428,7 @@ def tai_san_cuoi_ngay(now, chat):
 
 def dau_tu(now, chat):
     """Đầu tư quỹ mở (/dautu, qua bot chi tiêu): ngày hạn đặt lệnh cuối tháng nhắc lúc 8:30 và 13:00 (nếu chưa
-    đặt), qua 14:40 thì chốt kỳ, sau 17h báo lệnh đã khớp (lãi/lỗ các quỹ: tin tối 21h, thongbao.py), mỗi
+    đặt), qua 14:40 thì chốt kỳ, sau 17h báo lệnh đã khớp (lãi/lỗ các quỹ: tin tối 21h, interface/thongbao/digest.py), mỗi
     ngày xem danh mục quỹ có cổ phiếu cần để ý không."""
     tok = chitieu.token()
     if not tok or not between(now, (8, 30), (23, 45)):

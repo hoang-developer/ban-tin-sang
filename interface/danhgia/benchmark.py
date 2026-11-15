@@ -1,4 +1,4 @@
-"""Đo bot hiểu tin nhắn tới đâu: chạy bộ câu danhgia_cau.CAU qua đúng đường xử lý của bot (luật trước, AI sau) nhưng
+"""Đo bot hiểu tin nhắn tới đâu: chạy bộ câu questions.CAU qua đúng đường xử lý của bot (luật trước, AI sau) nhưng
 không ghi gì, rồi so với việc mong đợi.
 
 - plan(text): bot sẽ làm những việc gì với câu này (danh sách việc), không ghi sổ, không gửi tin.
@@ -140,7 +140,7 @@ def short(a):
 
 def run(tu=0, n=8, nhom=None, budget=50):
     """Chấm câu [tu, tu+n) (lọc theo nhóm nếu có). Trả chữ: mỗi câu một dòng, dòng cuối là tổng."""
-    import danhgia_cau
+    from interface.danhgia import questions as danhgia_cau
     used = kho.command("INCR", keys.benchmark_usage(date.today()))
     kho.command("EXPIRE", keys.benchmark_usage(date.today()), 2 * 86400)
     if used > LIMIT:
