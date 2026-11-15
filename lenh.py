@@ -25,8 +25,8 @@ from interface.bantin.bulletin import build_message, gold, section
 from services.bantin.data import gold_prices, index_history
 from domain.canhbao.rules import KEYWORDS, normalize
 from interface.chungkhoan.stock import MAX_SYMBOLS, SYMBOL, dong, news, quote, quotes, stock_command
-from thoitiet import find_place, report
-from tintuc import headlines_text, parse_query, results_text
+from interface.thoitiet.report import find_place, report
+from interface.tintuc.search import headlines_text, parse_query, results_text
 
 # ---- Cấu hình -------------------------------------------------------------
 MAX_WATCH = 10            # số mã theo dõi tối đa

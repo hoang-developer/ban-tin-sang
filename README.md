@@ -543,8 +543,8 @@ GitHub không tự tắt lịch khi repo 60 ngày không có commit.
 ```
 python -m interface.bantin.bulletin                    # bản tin sáng
 python lenh.py /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
-python thoitiet.py Đà Nẵng
-python tintuc.py giá vàng 24h
+python -m interface.thoitiet.report Đà Nẵng
+python -m interface.tintuc.search giá vàng 24h
 python sochitieu.py "cà phê 35k"   # bot chi tiêu: chỉ đọc và xếp nhóm, không ghi
 python -m domain.amlich.lunar 17/2/2026
 python -m interface.canhbao.runner --xem             # cảnh báo, không gửi
@@ -561,6 +561,6 @@ TELEGRAM_CHAT_ID=...
 
 Open-Meteo (thời tiết, AQI, tìm địa danh), SJC (dự phòng: PNJ), VNDirect (dự phòng: SSI), RSS VnExpress
 và Dân trí. Chứng khoán trong phiên: VPS (chỉ số), Vietcap (giá từng mã, dự phòng: VPS). Google News:
-tìm tin theo từ khóa ([tintuc.py](tintuc.py), dự phòng: RSS VnExpress, Dân trí, Tuổi Trẻ, Thanh Niên),
+tìm tin theo từ khóa ([interface/tintuc/search.py](interface/tintuc/search.py), dự phòng: RSS VnExpress, Dân trí, Tuổi Trẻ, Thanh Niên),
 tin theo mã, tin cổ tức. Âm lịch tính theo thuật toán của Hồ Ngọc Đức ([domain/amlich/lunar.py](domain/amlich/lunar.py)).
 Lịch sử giá vàng không có nguồn công khai: bot tự ghi giá SJC mỗi tối.

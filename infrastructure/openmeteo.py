@@ -62,3 +62,11 @@ def minutely(place, slots):
     })
     m = fetch_json(f"{FORECAST}?{q}")["minutely_15"]
     return list(zip(m["time"], m["precipitation"], m["weather_code"]))
+
+
+def geocode(name, country_code=None):
+    """Tìm địa danh (Open-Meteo Geocoding): kết quả đầu tiên hoặc None; country_code giới hạn theo nước."""
+    extra = {"countryCode": country_code} if country_code else {}
+    q = urllib.parse.urlencode({"name": name, "count": 1, "language": "vi", **extra})
+    found = fetch_json(f"https://geocoding-api.open-meteo.com/v1/search?{q}").get("results")
+    return found[0] if found else None
