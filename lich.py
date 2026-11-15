@@ -251,7 +251,7 @@ def evening_message(now):
         parts.append(section("📈 Chứng khoán hôm nay", market))
 
     try:
-        import dautu
+        from interface.dautu import fund as dautu
         fund = dautu.evening_line(now.date())  # NAV quỹ đang đầu tư (/dautu của bot chi tiêu)
     except Exception as e:
         print(f"[lỗi] NAV quỹ trong bản tin tối: {e!r}", file=sys.stderr)
@@ -430,7 +430,7 @@ def dau_tu(now, chat):
     tok = chitieu.token()
     if not tok or not between(now, (8, 30), (23, 45)):
         return None
-    import dautu
+    from interface.dautu import fund as dautu
     cfg = dautu.config()
     if not dautu.active(cfg):
         return None

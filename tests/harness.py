@@ -63,7 +63,7 @@ kho.send = command  # lớp nhớ trong một lượt (kho.memo) vẫn chạy th
 kho.ready = lambda: True
 
 import bantin  # noqa: E402
-import dautu  # noqa: E402
+from interface.dautu import fund as dautu  # noqa: E402
 from services.dautu import market as dautu_market  # noqa: E402
 import sochitieu as ct  # noqa: E402
 import taisan as ts  # noqa: E402
@@ -74,7 +74,6 @@ CLOCK = {"now": datetime(2026, 11, 13, 9, 0, tzinfo=VN_TZ)}
 CHAT = 1
 SENT = []  # tin bot tự gửi (việc theo giờ)
 ct.today = lambda: CLOCK["now"].date()
-dautu.now_vn = lambda: CLOCK["now"]
 dautu_market.now_vn = lambda: CLOCK["now"]  # service dữ liệu quỹ có đồng hồ riêng
 ts.now_vn = lambda: CLOCK["now"]
 tg.send_reply = lambda chat, reply, tok=None: SENT.append(reply)

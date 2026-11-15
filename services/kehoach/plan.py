@@ -11,8 +11,12 @@ from domain.kehoach import plan as rules
 from domain.kehoach.plan import DoAllResult, StepResult
 from domain.no import debt as debt_rules
 from repositories.chitieu import budget as budget_repo
+from repositories.dautu import fund as dautu_fund
 from repositories.duphong import reserve as reserve_repo
 from repositories.luong import salary as salary_repo
+from services.dautu import market as dautu_market
+from services.dautu import orders as dautu_orders
+from services.dautu import reports as dautu_reports
 from services.duphong import reserve as reserve_service
 from services.no import debt as debt_service
 
@@ -30,8 +34,7 @@ def spending_estimate(day, group, debt_need):
 def invest_part(day):
     """Phần đầu tư quỹ mở hằng tháng (/dautu) khi chia lương; None nếu chưa bật hoặc lỗi."""
     try:
-        import dautu  # module cũ ở gốc
-        return dautu.salary_part(day)
+        return dautu_reports.salary_part(day)
     except Exception as e:
         print(f"[lỗi] phần đầu tư khi chia lương: {e!r}", file=sys.stderr)
         return None
@@ -160,10 +163,9 @@ def do_all(now):
                 reserve_service.change(amount, day)
                 ok = True
             else:
-                import dautu  # module cũ ở gốc
-                cfg = dautu.config()
-                dautu.add_money(cfg, amount, dautu.current_period(cfg))
-                dautu.save(cfg)
+                cfg = dautu_fund.load()
+                dautu_orders.add_money(cfg, amount, dautu_market.current_period(cfg))
+                dautu_fund.save(cfg)
                 ok = True
         except Exception as e:
             print(f"[lỗi] làm theo kế hoạch ({kind}): {e!r}", file=sys.stderr)
