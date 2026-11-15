@@ -64,10 +64,11 @@ Xong khi:
 ### Bước 2: `GoldRepo` (bài thử)
 Ví vàng được 3 file dùng chung (`lenh`, `lich` ×2, `taisan` ×6), cả hai bot.
 - `domain/gold.py`: `GoldLot` (loai, luong, gia, ngay), `sell_fifo(lots, chi, kind)` thuần → (lô còn lại, vốn).
-- `repositories/gold.py`: `GoldRepo.all()`, `.save(lots)`, `.add(lot)`.
+- `repositories/gold.py`: repo là module hàm (không dùng lớp): `load()`, `save(lots)`, `add(lot)`, `remove_at(i)`, `clear()`.
+  Thứ tự danh sách giữ nguyên vì là mã dòng `v0`, `v1`… ở màn hình tài sản.
 - Thay các chỗ `kho.get("vivang")` / `kho.put("vivang")`.
 
-Xong khi: không file nào ngoài repo đọc/ghi ví vàng; test bán vàng/mua vàng/hiển thị bảng vàng xanh; thêm test thuần cho `sell_fifo`.
+Xong khi: không file nào ngoài repo đọc/ghi ví vàng (test `test_vi_vang_chi_qua_repository` chặn); test bán vàng/mua vàng/hiển thị bảng vàng xanh; thêm test thuần cho `sell_fifo`; các giá trị ghi vào `vivang` trong toàn bộ test giống `main` từng lần.
 
 ### Bước 3: `AssetRepo`
 `taisan.load/save` đã gần là repository.
@@ -98,6 +99,15 @@ Xong khi: chỉ `repositories/store.py` còn gọi `kho`; không còn hàm nạp
 
 ### Bước 7 (tùy chọn): chống ghi đè
 Thêm số phiên bản vào `AssetRepo` để webhook và tick không ghi đè nhau (Upstash REST hỗ trợ `EVAL`). Làm riêng, có test mô phỏng hai lần ghi chen nhau.
+
+## 4b. Tiến độ
+
+| Bước | Trạng thái |
+|---|---|
+| 0 Nền, `plan.md` | xong, đã deploy ([#52](https://github.com/hoang-developer/ban-tin-sang/pull/52)) |
+| 1 `keys.py` + `Store` | xong, đã deploy ([#52](https://github.com/hoang-developer/ban-tin-sang/pull/52)) |
+| 2 `GoldRepo` | đang làm |
+| 3–7 | chưa |
 
 ## 5. Chưa làm
 

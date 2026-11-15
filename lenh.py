@@ -13,6 +13,8 @@ from datetime import date, datetime, timedelta, timezone
 import amlich
 import kho
 from repositories import keys
+from domain.gold import GoldLot
+from repositories import gold as gold_repo
 import nhandinh
 import tg
 from bantin import BUTTONS as BANTIN_BUTTONS
@@ -339,15 +341,15 @@ def wallet(items, prices=None):
     priced = False
     lines = []
     for it in items:
-        value = prices[it["loai"]][0] * it["luong"]  # triệu đồng
+        value = prices[it.kind][0] * it.taels  # triệu đồng
         total += value
-        name = "Miếng SJC" if it["loai"] == "sjc" else prices["nhan_ten"]
-        line = f"• {name} {amount_text(it['luong'])}: {vn_num(value, 1)} triệu"
-        if it.get("gia"):  # chỉ món có ghi giá mua mới tính được lãi/lỗ
-            gain = value - it["gia"] * it["luong"]
+        name = "Miếng SJC" if it.kind == "sjc" else prices["nhan_ten"]
+        line = f"• {name} {amount_text(it.taels)}: {vn_num(value, 1)} triệu"
+        if it.price:  # chỉ món có ghi giá mua mới tính được lãi/lỗ
+            gain = value - it.price * it.taels
             profit += gain
             priced = True
-            line += f" (mua {vn_num(it['gia'], 1)} → {vn_num(gain, 1, sign=True)} triệu)"
+            line += f" (mua {vn_num(it.price, 1)} → {vn_num(gain, 1, sign=True)} triệu)"
         lines.append(line)
     summary = f"Tổng: <b>{vn_num(total, 1)} triệu</b>"
     if priced:
@@ -365,14 +367,14 @@ def vivang(args):
              "/vivang sjc 1 luong 140\nXóa ví: /vivang xoa")
     if not kho.ready():
         return NEED_STORE
-    items = kho.get(keys.GOLD, [])
+    items = gold_repo.load()
     if not args:
         if not items:
             return usage
         lines, summary = wallet(items)
         return "\n".join(["🪙 <b>Ví vàng</b> <i>(theo giá cửa hàng mua vào)</i>"] + lines + [summary])
     if args[0].lower() in ("xoa", "xóa"):
-        kho.put(keys.GOLD, [])
+        gold_repo.clear()
         return "🗑 Đã xóa ví vàng"
     try:
         kind = KINDS[args[0].lower()]
@@ -382,8 +384,8 @@ def vivang(args):
         return usage
     if taels <= 0 or taels > 1000:
         return usage
-    items.append({"loai": kind, "luong": taels, "gia": paid})
-    kho.put(keys.GOLD, items)
+    items.append(GoldLot(kind, taels, paid))
+    gold_repo.save(items)
     lines, summary = wallet(items)
     return "\n".join([f"🪙 Đã thêm {amount_text(taels)} vào ví"] + lines + [summary])
 

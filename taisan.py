@@ -17,6 +17,8 @@ from datetime import date, datetime, timedelta
 import chungkhoan
 import kho
 from repositories import keys
+from domain.gold import GoldLot, holdings_chi, sell_fifo
+from repositories import gold as gold_repo
 import phantich as pt
 import sochitieu as ct
 from bantin import VN_TZ, gold_prices, vn_num
@@ -188,7 +190,7 @@ def gold_name(kind):
 def valuation(day, fresh=False):
     """Định giá mọi tài sản: dict gồm các dòng theo loại, tổng tài sản, tổng nợ, tài sản ròng, ghi chú giá."""
     data = load()
-    items, gold = data["items"], kho.get(keys.GOLD, []) or []
+    items, gold = data["items"], gold_repo.load()
     by_kind = {}
     for it in items:
         by_kind.setdefault(it["loai"], []).append(it)
@@ -232,10 +234,10 @@ def valuation(day, fresh=False):
             rows.append(("quy", f"lenh{o['id']}", f"{o['quy']} chờ khớp", o["tien"], o["tien"],
                          f"lệnh {o['dat'][8:]}/{o['dat'][5:7]}, khớp phiên {o['phien'][8:]}/{o['phien'][5:7]}"))
     for i, g in enumerate(gold):
-        price = quotes.get("vang", {}).get(g["loai"])
-        value = g["luong"] * price if price else 0
-        cost = g["luong"] * g["gia"] * 1e6 if g.get("gia") else None
-        rows.append(("vang", f"v{i}", gold_name(g["loai"]), value, cost, gold_amount(g["luong"])))
+        price = quotes.get("vang", {}).get(g.kind)
+        value = g.taels * price if price else 0
+        cost = g.taels * g.price * 1e6 if g.price else None
+        rows.append(("vang", f"v{i}", gold_name(g.kind), value, cost, gold_amount(g.taels)))
     assets = sum(r[3] for r in rows if r[0] != "no")
     debts = sum(r[3] for r in rows if r[0] == "no")
     return {"rows": rows, "assets": assets, "debts": debts, "net": assets - debts, "notes": notes,
@@ -454,9 +456,7 @@ def add_gold(args):
         return None
     if not 0 < taels <= 1000:
         return None
-    items = kho.get(keys.GOLD, []) or []
-    items.append({"loai": kind, "luong": taels, "gia": paid, **({"ngay": bought.isoformat()} if bought else {})})
-    kho.put(keys.GOLD, items)
+    gold_repo.add(GoldLot(kind, taels, paid, bought.isoformat() if bought else None))
     return f"✅ Đã thêm {lenh.amount_text(taels)} {gold_name(kind).lower()} vào ví vàng (dùng chung với bot bản tin)"
 
 
@@ -508,11 +508,11 @@ def gain_text(gain, cost):
 def gold_lines(rows):
     """Vàng: mỗi loại một bảng chữ đều cột (<pre>): mỗi lần mua một dòng (ngày, số chỉ, giá mua một chỉ, lãi/lỗ),
     dòng Tổng (vốn trung bình), dòng Hôm nay (giá cửa hàng mua vào). Chấm màu ở cuối dòng để không lệch cột."""
-    gold = kho.get(keys.GOLD, []) or []
+    gold = gold_repo.load()
     lots = {}
     for _, rid, _, value, cost, _ in rows:
         g = gold[int(rid[1:])]
-        lots.setdefault(g["loai"], []).append((g, value, cost))
+        lots.setdefault(g.kind, []).append((g, value, cost))
 
     def tr(x):
         return f"{x / 1e6:.2f}".replace(".", ",") + "tr"
@@ -533,15 +533,15 @@ def gold_lines(rows):
     for kind, items in lots.items():
         table = [f"{'Ngày':<5} {'Chỉ':>3} {'Giá/chỉ':>7} {'Lãi/lỗ':>6} {'%':>4}"]
         for g, v, c in items:
-            chi = g["luong"] * 10
-            when = f"{g['ngay'][8:]}/{g['ngay'][5:7]}" if g.get("ngay") else "—"
+            chi = g.chi
+            when = f"{g.bought[8:]}/{g.bought[5:7]}" if g.bought else "—"
             table.append(row(when, chi, tr(c / chi), v - c, c) if c else row(when, chi, "?"))
-        chi = sum(g["luong"] for g, _, _ in items) * 10
+        chi = sum(g.taels for g, _, _ in items) * 10
         value = sum(v for _, v, _ in items)
         priced = [(g, v, c) for g, v, c in items if c]
         if priced:
             cost = sum(c for _, _, c in priced)
-            table.append(row("Tổng", chi, tr(cost / (sum(g["luong"] for g, _, _ in priced) * 10)),
+            table.append(row("Tổng", chi, tr(cost / (sum(g.taels for g, _, _ in priced) * 10)),
                              sum(v for _, v, _ in priced) - cost, cost))
         if chi and value:
             table.append(f"{'Hôm nay':<9} {tr(value / chi):>7}")
@@ -609,13 +609,7 @@ def edit_list():
 
 def remove(rid):
     if rid.startswith("v"):
-        items = kho.get(keys.GOLD, []) or []
-        index = int(rid[1:])
-        if index < len(items):
-            items.pop(index)
-            kho.put(keys.GOLD, items)
-            return True
-        return False
+        return gold_repo.remove_at(int(rid[1:]))
     data = load()
     kept = [it for it in data["items"] if str(it["id"]) != rid]
     if len(kept) == len(data["items"]):
@@ -914,23 +908,16 @@ def gain_line(gain, cost):
 
 def sell_gold(chi, received, now, kind=None, to_main=True):
     """Bán vàng: lấy dần từ các lần mua cũ nhất (cùng loại nếu có nói). chi=None: bán hết. Trả câu báo."""
-    gold = kho.get(keys.GOLD, []) or []
-    lots = [g for g in gold if not kind or g["loai"] == kind]
-    have = sum(g["luong"] for g in lots) * 10
-    if not lots or have <= 0:
+    gold = gold_repo.load()
+    have = holdings_chi(gold, kind)
+    if not any(not kind or g.kind == kind for g in gold) or have <= 0:
         return "Ví vàng đang trống, chưa có gì để bán"
     chi = have if chi is None else chi
     if chi > have + 1e-6:
         return f"Ví chỉ có {qty_text(round(have, 2))} chỉ{' ' + gold_name(kind).lower() if kind else ''}, không bán được {qty_text(chi)} chỉ"
-    left, cost = chi / 10, 0.0
-    for g in sorted(lots, key=lambda x: x.get("ngay") or ""):
-        take = min(g["luong"], left)
-        cost += take * (g.get("gia") or 0) * 1e6
-        g["luong"] = round(g["luong"] - take, 6)
-        left = round(left - take, 6)
-        if left <= 0:
-            break
-    kho.put(keys.GOLD, [g for g in gold if g["luong"] > 1e-6])
+    sale = sell_fifo(gold, chi, kind)
+    cost = sale.cost
+    gold_repo.save(sale.lots)
     data = load()
     gain = received - cost if cost else 0
     if cost:
