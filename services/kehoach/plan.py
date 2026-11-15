@@ -83,11 +83,11 @@ def numbers(day):
 def spendable(day, n=None):
     """Mỗi ngày được tiêu bao nhiêu, dùng chung cho tin sau khi ghi, /dubao, tổng quan và chia lương. Có ngân sách tổng
     thì theo ngân sách (tính mọi khoản chi), không thì theo kế hoạch chia lương. None nếu chưa tính được (chưa có thu nhập)."""
-    import phantich as pt  # module cũ ở gốc: dự báo chi tiêu
-    f = pt.forecast(day)
+    from services.phantich import analysis as phantich_service  # nạp muộn: phantich cũng dùng kehoach
+    f = phantich_service.forecast(day)
     budgets = budget_repo.load()
     if budgets.get("tong"):
-        per_day, today_left = pt.allowance(f)
+        per_day, today_left = phantich_service.allowance(f)
         return {"per_day": per_day, "today_left": today_left, "limit": budgets["tong"], "spent": f["spent"],
                 "basis": "tong", "parts": None}
     n = n or numbers(day)

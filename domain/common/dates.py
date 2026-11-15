@@ -10,3 +10,6 @@ def add_months(d, months):
     m = d.month - 1 + months
     year, month = d.year + m // 12, m % 12 + 1
     return date(year, month, min(d.day, monthrange(year, month)[1]))
+
+
+WEEKDAYS = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]

@@ -218,7 +218,7 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 ### Hiểu mình tiêu thế nào
 
 Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câu hỏi và viết nhận xét. Code ở
-[phantich.py](phantich.py).
+[interface/phantich/analysis.py](interface/phantich/analysis.py).
 
 - **Dự báo chi tiêu hằng ngày** (`/dubao`, nút 🔮 dưới báo cáo): chỉ tính các nhóm sinh hoạt thường nhật, mặc
   định ăn uống, đi chợ/siêu thị, đi lại (đổi: `/dubao nhom ăn uống, đi chợ`; về mặc định: `/dubao nhom macdinh`).

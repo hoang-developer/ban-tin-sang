@@ -1,7 +1,7 @@
 """Sổ nợ: dựng tin Telegram (HTML) và nút từ kết quả của service. Không logic nghiệp vụ, không đọc kho."""
 import html
 
-import phantich as pt  # module cũ ở gốc: định dạng số tiền gọn, tạm dùng
+from domain.common.format import short as format_short
 import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
 from domain.taisan import text as taisan_text
 from domain.no.debt import Ask, month_left, month_of, paid_in, schedule, ym_text
@@ -16,7 +16,7 @@ USAGE = ("💳 <b>Sổ nợ</b>\n"
 
 
 def short(x):
-    return pt.short(x) if x >= 1000 else "0đ"
+    return format_short(x) if x >= 1000 else "0đ"
 
 
 def short_name(d, width=16):

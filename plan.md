@@ -200,6 +200,7 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.8c `chitieu`: báo cáo, kỳ báo cáo, ngân sách, tin báo khoản vừa ghi, nút chọn nhóm (`domain/chitieu/{period,income,refs,text}`, `services/chitieu/{budget,report}`, `presentation/chitieu/view`) | xong, chờ deploy |
 | 6.8d `chitieu`: lệnh /baocao /thang /lichsu /xoa /ngansach /nhom /chuaxep /xuat (`interface/chitieu/{commands,context}`, `domain/chitieu/labels`) | xong, chờ deploy |
 | 6.8e `chitieu`: định tuyến bot (bảng lệnh, trả lời tin nhắn, nút bấm) ở `interface/chitieu/{bot,features}`, `sochitieu.py` chỉ còn tên cũ dùng tạm (174 dòng) | xong, chờ deploy |
+| 6.9 `phantich`: số liệu và câu hỏi ở `domain/phantich`, đọc sổ ở `services/phantich` + `repositories/chitieu/analysis`, màn hình ở `presentation/phantich`, lệnh ở `interface/phantich`, vẽ biểu đồ ở `infrastructure/quickchart` (xóa `phantich.py`, file gốc còn 16) | xong, chờ deploy |
 | 6.8… dọn `sochitieu.py` khi các module còn lại (`troly`, `menu`, `phantich`, `docanh`...) bỏ `ct.`; rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
 | Cuối: dọn | chưa |
 

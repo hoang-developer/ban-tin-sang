@@ -17,6 +17,7 @@ from pathlib import Path
 
 import amlich
 from infrastructure import telegram as tg
+from domain.common.dates import WEEKDAYS  # noqa: F401
 from domain.common.format import vn_num  # noqa: F401
 
 # ---- Cấu hình -------------------------------------------------------------
@@ -42,7 +43,6 @@ UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/130.0 Safari/537.36")
 PNJ_GOLD_URL = "https://edge-api.pnj.io/ecom-frontend/v1/get-gold-price?zone=00"
 
-WEEKDAYS = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
 
 # Mã thời tiết WMO -> (biểu tượng, mô tả)
 WEATHER = {

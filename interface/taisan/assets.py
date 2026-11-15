@@ -12,7 +12,6 @@ import html
 import re
 import sys
 
-import phantich as pt  # module cũ ở gốc: vẽ biểu đồ
 import sochitieu as ct  # module cũ ở gốc: ngày hôm nay, khóa AI, trò chuyện với AI, gợi ý chia lương
 from domain.common.dates import add_months  # noqa: F401
 from domain.common.format import vnd
@@ -24,6 +23,7 @@ from domain.taisan.rules import accrued, find_item, is_etf, money_and_name, remo
 from domain.taisan.text import gain_line, gold_amount, gold_name, qty_text, short  # noqa: F401
 from domain.taisan.trade import BROKER_FEE, SELL_TAX, parse_trade  # noqa: F401
 from infrastructure import clock
+from infrastructure import quickchart
 from interface import common
 from interface.no import debt as sono
 from presentation.taisan import view as pview
@@ -123,10 +123,10 @@ def chart_reply(day):
     if pie is None:
         return "Chưa có tài sản nào để vẽ. " + pview.USAGE
     try:
-        images = [pt.chart_png(pie)]
+        images = [quickchart.chart_png(pie)]
         past = history()
         if len(past) >= 2:
-            images.append(pt.chart_png(pview.line_chart(past), 900, 450))
+            images.append(quickchart.chart_png(pview.line_chart(past), 900, 450))
     except Exception as e:
         print(f"[lỗi] vẽ biểu đồ tài sản: {e!r}", file=sys.stderr)
         return "⚠️ Chưa vẽ được biểu đồ (dịch vụ vẽ không trả lời), thử lại sau"

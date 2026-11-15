@@ -6,7 +6,8 @@ Số dư quỹ là các tài sản trong /taisan được gắn vào quỹ. Tr�
 """
 from datetime import date, timedelta
 
-import phantich as pt  # module cũ ở gốc, tạm dùng tới khi chức năng phantich được chuyển
+from domain.phantich import numbers as phantich_numbers
+from services.phantich import analysis as phantich_service
 import sochitieu as ct  # module cũ ở gốc
 from repositories.taisan import assets as assets_repo
 from services.taisan import accounts, flows
@@ -26,11 +27,11 @@ def essential(day):
     """(chi thiết yếu/tháng, {nhóm: chi/tháng}, số ngày dữ liệu). Nhóm hằng ngày bỏ khoản đột biến; tiền nhà, hóa
     đơn, trả nợ... tính đủ vì tháng nào cũng có."""
     codes = essential_groups()
-    items = [e for e in pt.spending(ct.between(day - timedelta(days=89), day)) if e["nhom"] in codes]
+    items = [e for e in phantich_numbers.spending(ct.between(day - timedelta(days=89), day)) if e["nhom"] in codes]
     if not items:
         return 0, {}, 0
-    daily = [c for c in pt.daily_groups() if c in codes] + [c for c in ("khoe", "giadinh") if c in codes]
-    limits = pt.spike_limits(items, daily)
+    daily = [c for c in phantich_service.daily_groups() if c in codes] + [c for c in ("khoe", "giadinh") if c in codes]
+    limits = phantich_numbers.spike_limits(items, daily)
     kept = [e for e in items if e["nhom"] not in limits or e["tien"] < limits[e["nhom"]]]
     days = (day - date.fromisoformat(min(e["ngay"] for e in items))).days + 1
     by_group = {}

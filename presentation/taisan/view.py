@@ -2,11 +2,11 @@
 import html
 from datetime import date
 
-import phantich as pt  # module cũ ở gốc: bảng màu biểu đồ
 import sochitieu as ct  # module cũ ở gốc: nút ⬅️ Hôm nay
 from domain.common.format import short as short_vnd, vnd
 from domain.taisan.kinds import TYPES
 from domain.taisan.text import gold_name, qty_text, short
+from presentation.phantich.view import PALETTE
 
 
 USAGE = ("💼 <b>Khai báo tài sản</b> (số tiền viết kiểu 25tr, 1tỷ2):\n"
@@ -135,7 +135,7 @@ def pie_chart(v):
     if not sums:
         return None
     order = sorted(sums.items(), key=lambda x: -x[1])
-    colors = {k: pt.PALETTE[i] for i, k in enumerate(TYPES)}
+    colors = {k: PALETTE[i] for i, k in enumerate(TYPES)}
     return {"type": "doughnut", "data": {
         "labels": [f"{TYPES[k].split(' ', 1)[1]} {short_vnd(x)} ({x / v['assets'] * 100:.0f}%)" for k, x in order],
         "datasets": [{"data": [round(x) for _, x in order], "backgroundColor": [colors[k] for k, _ in order]}]},

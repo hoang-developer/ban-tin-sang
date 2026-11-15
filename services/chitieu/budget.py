@@ -9,7 +9,7 @@ def progress(codes, day):
     budgets = budget_repo.load()
     if not budgets:
         return []
-    import phantich  # module cũ ở gốc: chi tiêu hằng ngày bỏ khoản đột biến
+    from services.phantich import analysis as phantich  # nạp muộn: phantich cũng dùng sổ chi tiêu
     items = [e for e in ledger_repo.load(day.strftime("%Y-%m")) if e["nhom"] != INCOME]
     out = []
     daily = phantich.daily_groups() if "hangngay" in budgets else []
