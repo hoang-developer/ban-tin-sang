@@ -19,6 +19,7 @@ from datetime import date, timedelta
 import duphong
 import kho
 from repositories import keys
+from repositories import salary as salary_repo
 import sochitieu as ct
 import sono
 import taisan as ts
@@ -59,9 +60,9 @@ def numbers(day):
     income = sum(e["tien"] for e in month if e["nhom"] == ct.INCOME)
     basis = ""
     if not income:
-        salary = kho.get(keys.SALARY) or {}
-        if salary.get("tien"):
-            income, basis = salary["tien"], "lương dự kiến, chưa ghi"
+        salary = salary_repo.load()
+        if salary and salary.amount:
+            income, basis = salary.amount, "lương dự kiến, chưa ghi"
         else:
             _, average, days = ts.monthly_flows(day)
             if average and days >= 20:

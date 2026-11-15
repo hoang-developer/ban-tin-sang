@@ -18,6 +18,8 @@ from datetime import date, datetime, timedelta
 
 import kho
 from repositories import keys
+from repositories import fund as fund_repo
+from repositories import salary as salary_repo
 import phantich as pt
 import sochitieu as ct
 import taisan as ts
@@ -51,11 +53,11 @@ USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
 # ---- Lưu trữ ---------------------------------------------------------------------------
 
 def config():
-    return kho.get(keys.FUND, {}) or {}
+    return fund_repo.load()
 
 
 def save(cfg):
-    kho.put(keys.FUND, cfg)
+    fund_repo.save(cfg)
 
 
 def active(cfg=None):
@@ -1008,7 +1010,7 @@ def start(args, switch=False):
         lines.append(f"Đã tính {units_text(hold['sl'])} ccq đang có ({money(base)}) vào điểm xuất phát.")
     lines.append("Đã mua trong tháng này (trước khi bật) thì ghi lại: /dautu dadat 1tr 9/11 (số tiền, ngày đặt lệnh; "
                  "bot tự tính phiên khớp).")
-    if not kho.get(keys.SALARY):
+    if not salary_repo.load():
         lines.append("Đặt ngày lương để bot nhắc để tiền vào quỹ chờ: /luong 5 số_tiền_lương")
     text, rows = view()
     return "\n".join(lines) + "\n\n" + text, rows

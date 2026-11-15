@@ -17,6 +17,10 @@ from datetime import date, datetime, timedelta
 import chungkhoan
 import kho
 from repositories import keys
+from domain.salary import Salary
+from repositories import assets as assets_repo
+from repositories import fund as fund_repo
+from repositories import salary as salary_repo
 from domain.gold import GoldLot, holdings_chi, sell_fifo
 from repositories import gold as gold_repo
 import phantich as pt
@@ -62,13 +66,11 @@ def short(x):
 
 
 def load():
-    data = kho.get(keys.ASSETS, {}) or {}
-    data.setdefault("items", [])
-    return data
+    return assets_repo.load()
 
 
 def save(data):
-    kho.put(keys.ASSETS, data)
+    assets_repo.save(data)
 
 
 def new_id(data):
@@ -150,9 +152,7 @@ def prices(kind, codes, fresh=False):
     if not codes:
         return {}, None, False
     fetch, minutes = SOURCES[kind]
-    key = keys.price_cache(kind)
-    store = kho.get(key, {}) or {}
-    saved, when = store.get("gia", {}), store.get("luc")
+    saved, when = assets_repo.price_cache(kind)
     if not fresh and when and all(c in saved for c in codes) and \
             (now_vn() - datetime.fromisoformat(when)).total_seconds() < minutes * 60:
         return saved, when, False
@@ -160,7 +160,7 @@ def prices(kind, codes, fresh=False):
         got = fetch(codes)  # mã nguồn không có (mã sai) thì không có trong got; không phải lỗi nguồn
         when = now_vn().isoformat(timespec="minutes")
         saved = {**saved, **got}
-        kho.put(key, {"gia": saved, "luc": when})
+        assets_repo.save_price_cache(kind, saved, when)
         return saved, when, False
     except Exception as e:
         print(f"[lỗi] giá {kind}: {e!r}", file=sys.stderr)
@@ -247,7 +247,7 @@ def valuation(day, fresh=False):
 def pending_orders():
     """Lệnh mua quỹ (/dautu) đã đặt, chưa khớp."""
     try:
-        cfg = kho.get(keys.FUND, {}) or {}
+        cfg = fund_repo.load()
     except Exception as e:
         print(f"[lỗi] lệnh quỹ chờ khớp: {e!r}", file=sys.stderr)
         return []
@@ -266,13 +266,11 @@ def snapshot(day, v):
     kinds = {}
     for kind, _, _, value, _, _ in v["rows"]:
         kinds[kind] = kinds.get(kind, 0) + value
-    kho.command("HSET", keys.ASSET_HISTORY, day.isoformat(), json.dumps({"rong": round(v["net"]), "loai": {
-        k: round(x) for k, x in kinds.items()}}))
+    assets_repo.save_snapshot(day.isoformat(), {"rong": round(v["net"]), "loai": {k: round(x) for k, x in kinds.items()}})
 
 
 def history():
-    flat = kho.command("HGETALL", keys.ASSET_HISTORY) or []
-    return sorted((k, json.loads(v)) for k, v in zip(flat[::2], flat[1::2]))
+    return assets_repo.history()
 
 
 def compare_line(day, net):
@@ -1039,31 +1037,31 @@ def luong(args):
     usage = ("Nhắc ngày nhận lương: /luong 10 25tr (ngày 10 hằng tháng, 25 triệu)\nTới ngày, bot hỏi đã nhận chưa, "
              "bấm một nút là ghi vào Thu nhập. Bỏ nhắc: /luong xoa")
     if not args:
-        s = kho.get(keys.SALARY)
-        return (f"💼 Đang nhắc lương ngày {s['ngay']} hằng tháng, {ct.vnd(s['tien'])}\n" + usage) if s else usage
+        s = salary_repo.load()
+        return (f"💼 Đang nhắc lương ngày {s.day} hằng tháng, {ct.vnd(s.amount)}\n" + usage) if s else usage
     if ct.plain(args[0]) == "xoa":
-        kho.delete(keys.SALARY)
+        salary_repo.clear()
         return "Đã bỏ nhắc lương"
     found = ct.parse_amount(" ".join(args[1:])) if len(args) > 1 else None
     if not args[0].isdigit() or not 1 <= int(args[0]) <= 31 or not found:
         return usage
-    kho.put(keys.SALARY, {"ngay": int(args[0]), "tien": found[0]})
+    salary_repo.save(Salary(int(args[0]), found[0]))
     return f"✅ Ngày {int(args[0])} hằng tháng bot sẽ hỏi đã nhận lương {ct.vnd(found[0])} chưa"
 
 
 def salary_due(day):
     """(tin nhắc, nút) nếu hôm nay trong 3 ngày từ ngày lương mà tháng này chưa ghi lương; None nếu không."""
-    s = kho.get(keys.SALARY)
+    s = salary_repo.load()
     if not s:
         return None
-    payday = min(s["ngay"], monthrange(day.year, day.month)[1])
+    payday = min(s.day, monthrange(day.year, day.month)[1])
     if not 0 <= day.day - payday <= 3:
         return None
     month = ct.between(day.replace(day=1), day)
     if any(e["nhom"] == ct.INCOME and "luong" in ct.plain(e["ghichu"]) for e in month):
         return None
     return (f"💼 {'Hôm nay ngày lương' if day.day == payday else f'Đã qua ngày lương {payday}'}: đã nhận chưa?",
-            [[(f"✅ Đã nhận {pt.short(s['tien'])}", f"ts:luong:{s['tien']}"), ("Chưa", "ts:chua")]])
+            [[(f"✅ Đã nhận {pt.short(s.amount)}", f"ts:luong:{s.amount}"), ("Chưa", "ts:chua")]])
 
 
 def maturity_notes(day):
