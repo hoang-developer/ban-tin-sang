@@ -6,7 +6,11 @@ import unittest
 import urllib.error
 import urllib.request
 
+from tests import harness as h
+
 from infrastructure import ai
+
+chat = h.REAL_AI_CHAT  # harness thay ai.chat bằng AI giả: dùng bản thật
 
 ENV = ("GEMINI_API_KEY", "AI_API_KEY", "AI_API_URL", "AI_MODEL", "GEMINI_MODEL", "AI_VISION_MODEL")
 
@@ -51,7 +55,7 @@ class May(unittest.TestCase):
     def test_khong_co_key(self):
         self.assertEqual((ai.key(), ai.providers()), ("", []))
         with self.assertRaises(RuntimeError) as err:
-            ai.chat("s", "u")
+            chat("s", "u")
         self.assertIn("chưa bật AI", str(err.exception))
 
     def test_nha_cung_cap(self):
@@ -65,7 +69,7 @@ class May(unittest.TestCase):
 
     def test_hoi_va_bo_phan_suy_nghi(self):
         os.environ["GEMINI_API_KEY"] = "g"
-        text, model = ai.chat("hệ thống", "câu hỏi")
+        text, model = chat("hệ thống", "câu hỏi")
         self.assertEqual((text, model), ('{"1": "an"}', "m-thật"))
         self.assertEqual(self.last_body["messages"][0], {"role": "system", "content": "hệ thống"})
         self.assertEqual(self.log[0][1], "gemini-3.5-flash-lite")  # model đầu tiên
@@ -73,14 +77,14 @@ class May(unittest.TestCase):
     def test_model_dau_loi_thi_thu_model_sau(self):
         os.environ["GEMINI_API_KEY"] = "g"
         self.mode = "first_fail"
-        ai.chat("s", "u")
+        chat("s", "u")
         self.assertEqual([x[1] for x in self.log], ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"])
 
     def test_loi_http_va_openrouter_tu_chuyen_model(self):
         os.environ.update(GEMINI_API_KEY="g", AI_API_KEY="o", AI_MODEL="x,y")
         self.mode = "http429"
         with self.assertRaises(RuntimeError) as err:
-            ai.chat("s", "u")
+            chat("s", "u")
         self.assertIn("AI báo lỗi 429: hết lượt", str(err.exception))
         hosts = [x[0] for x in self.log]
         self.assertEqual(hosts.count("generativelanguage.googleapis.com"), 3)  # thử hết model Gemini
@@ -88,14 +92,14 @@ class May(unittest.TestCase):
 
     def test_gui_kem_anh(self):
         os.environ["GEMINI_API_KEY"] = "g"
-        ai.chat("s", "u", image=(b"abc", "image/png"))
+        chat("s", "u", image=(b"abc", "image/png"))
         content = self.last_body["messages"][1]["content"]
         self.assertEqual(content[1]["image_url"]["url"], "data:image/png;base64,YWJj")
 
     def test_het_thoi_gian_cho(self):
         os.environ["GEMINI_API_KEY"] = "g"
         with self.assertRaises(RuntimeError) as err:
-            ai.chat("s", "u", budget=1)
+            chat("s", "u", budget=1)
         self.assertIn("hết thời gian chờ", str(err.exception))
         self.assertEqual(self.log, [])
 

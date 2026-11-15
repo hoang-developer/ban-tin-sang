@@ -18,6 +18,7 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta
 
 from domain.chitieu import classify as classify_rules
+from domain.chitieu.learn import MAX_LEARNED, NOISE, learn_key, pending  # noqa: F401
 from domain.chitieu import parse as parse_rules
 from domain.chitieu.categories import (AMBIGUOUS_PLAIN, CATEGORIES, GENERIC, KEYWORDS, plain_pattern,  # noqa: F401
                                        word_pattern)
@@ -31,7 +32,6 @@ from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
 from bantin import VN_TZ, vn_num
 
-MAX_LEARNED = 500  # số cụm từ học được tối đa
 MAX_GROUPS, MAX_WORDS = 20, 60  # số nhóm tự tạo, số từ khóa tự thêm cho mỗi nhóm
 
 NEED_STORE = "⚠️ Bot chi tiêu cần kho dữ liệu (Upstash Redis trên Vercel), xem README."
@@ -57,27 +57,7 @@ def today():
 # Lưu ở khóa chitieu:nhomrieng: {"moi": [mã nhóm tự tạo], "ten": {mã: tên}, "tu": {mã: [từ khóa]},
 # "an": [mã nhóm đã ẩn], "dem": số nhóm đã tạo}. Nhóm ẩn vẫn giữ tên để khoản cũ hiện đúng.
 
-_config = None  # đọc một lần mỗi lượt xử lý; reset() ở đầu mỗi tin nhắn, lượt bấm nút, lịch chạy
-
-
-def reset():
-    global _config
-    _config = None
-
-
-def config():
-    global _config
-    if _config is None:
-        if not kho.ready():
-            return {}
-        _config = groups_repo.load()
-    return _config
-
-
-def save_config(cfg):
-    global _config
-    groups_repo.save(cfg)  # đồng thời xóa các câu AI đã xếp (nhóm đã khác)
-    _config = cfg
+config, reset, save_config = groups_repo.config, groups_repo.reset, groups_repo.save
 
 
 def name(code, cfg=None):
@@ -143,105 +123,17 @@ from infrastructure import ai as ai_client  # noqa: E402
 env_list, gemini_key, openrouter_key = ai_client.env_list, ai_client.gemini_key, ai_client.openrouter_key
 ai_key, ai_models, ai_providers = ai_client.key, ai_client.openrouter_models, ai_client.providers
 ai_post, ai_chat, first_json = ai_client.post, ai_client.chat, ai_client.first_json
-AI_URL, AI_TIMEOUT = ai_client.AI_URL, ai_client.AI_TIMEOUT  # noqa: F401
+from services.chitieu import ai_sort, ledger as ledger_service  # noqa: E402
 
-
-def ai_prompt(learned=None):
-    """Lời dặn cho AI: các nhóm đang dùng (kể cả nhóm tự tạo) kèm vài từ khóa gợi ý, và những khoản
-    người dùng đã tự xếp làm ví dụ để AI đoán theo thói quen của người dùng."""
-    active = {c: g for c, g in groups().items() if c != INCOME}
-    lines = []
-    for code, (label, own, builtin) in active.items():
-        hint = ", ".join(list(dict.fromkeys(own + builtin))[:8])
-        lines.append(f"{code}: {bare(label)}" + (f" (vd: {hint})" if hint else ""))
-    examples = [f"{note} -> {code}" for note, code in list((learned or {}).items())[-30:] if code in active]
-    return ("Bạn phân loại khoản chi tiêu cá nhân của người Việt. Các nhóm (mã: tên):\n" + "\n".join(lines)
-            + ("\nNgười dùng này đã tự xếp như sau, hãy theo đúng thói quen đó:\n" + "\n".join(examples)
-               if examples else "")
-            + "\nTrả lời đúng một dòng JSON, khóa là số thứ tự, giá trị là mã nhóm, ví dụ "
-            '{"1": "an", "2": "xe"}. Chỉ chọn nhóm khi khá chắc chắn; không chắc thì dùng "khac" '
-            "(bot sẽ hỏi người dùng). Không giải thích.")
-
-
-def ai_request(notes, learned=None):
-    """Hỏi AI nhóm của các ghi chú: ({ghi chú: mã}, model đã trả lời). Lỗi mạng, hết lượt... thì báo lỗi."""
-    numbered = "\n".join(f"{i}. {note}" for i, note in enumerate(notes, 1))
-    text, model = ai_chat(ai_prompt(learned), numbered)
-    found = first_json(text)
-    if not isinstance(found, dict):
-        raise RuntimeError(f"AI trả lời không đúng dạng: {text[:100]!r}")
-    answer = {k: str(v).strip().lower() for k, v in found.items()}
-    active = groups()
-    return {note: answer[str(i)] for i, note in enumerate(notes, 1) if answer.get(str(i)) in active}, model
-
-
-def ask_ai(entries, learned=None):
-    """Khoản rơi vào Khác thì hỏi AI (có nhớ câu trả lời cũ); đánh dấu khoản do AI xếp. Trả về số khoản AI xếp."""
-    unknown = [e for e in entries if pending(e) and e["ghichu"] and not e.get("_chon")]
-    if not unknown or not ai_key():
-        return 0
-    cache = groups_repo.ai_cache()
-    ask = list(dict.fromkeys(e["ghichu"] for e in unknown if learn_key(e["ghichu"]) not in cache))
-    if ask:
-        try:
-            for note, code in ai_request(ask, learned)[0].items():
-                cache[learn_key(note)] = code
-            groups_repo.save_ai_cache(dict(list(cache.items())[-MAX_LEARNED:]))
-        except Exception as e:
-            print(f"[lỗi] xếp nhóm bằng AI: {e!r}", file=sys.stderr)
-    active, done = groups(), 0
-    for e in unknown:
-        code = cache.get(learn_key(e["ghichu"]), OTHER)
-        if code in active and code not in (OTHER, INCOME):  # khoản thu chỉ nhận khi người dùng tự ghi
-            e["nhom"], e["ai"] = code, True
-            done += 1
-    if done:
-        groups_repo.add_ai_guessed(done)
-    return done
-
-
-def ai_stats():
-    """(số khoản AI đã xếp, số khoản người dùng phải sửa lại)."""
-    return groups_repo.ai_stats()
+add, recent, learn_all, learn, tidy = (ledger_service.add, ledger_service.recent, ledger_service.learn_all,
+                                       ledger_service.learn, ledger_service.tidy)
+ai_prompt, ai_request, ask_ai, ai_stats = ai_sort.ai_prompt, ai_sort.ai_request, ai_sort.ask_ai, ai_sort.ai_stats
+quota_text, ai_status = ai_sort.quota_text, ai_sort.ai_status
 
 
 def ai_quota():
-    """(đã dùng, giới hạn) lượt model miễn phí hôm nay của key OpenRouter; None nếu không dùng OpenRouter."""
     return ai_client.quota()
-
-
-def quota_text():
-    """Lượt OpenRouter: 'đã dùng 12/50 lượt miễn phí hôm nay' hoặc báo hết lượt; rỗng nếu không dùng OpenRouter."""
-    try:
-        quota = ai_quota()
-    except urllib.error.HTTPError as e:
-        return "LỖI – key không hợp lệ, kiểm tra biến AI_API_KEY" if e.code == 401 else f"không xem được lượt dùng ({e})"
-    except Exception as e:
-        return f"không xem được lượt dùng ({e!r})"
-    if not quota:
-        return ""
-    used, limit = quota
-    return f"hôm nay đã dùng {used}/{limit} lượt miễn phí" + (
-        " – HẾT LƯỢT, 7h sáng mai có lại" if used >= limit else "")
-
-
-def ai_status(test=False):
-    """Một dòng tình trạng AI cho trang cài đặt. test=True thì thử xếp một khoản mẫu (tốn 1 lượt)."""
-    if not ai_key():
-        return "AI xếp nhóm: tắt (chưa có biến GEMINI_API_KEY hoặc AI_API_KEY)"
-    chain = " → ".join(f"{name_} ({', '.join(models)})" for name_, _, _, models in ai_providers())
-    if not test:
-        quota = quota_text()
-        return (f"AI xếp nhóm: bật, thử lần lượt {chain}" + (f". OpenRouter {quota}" if quota else "")
-                + ". Thêm ?thu=1 vào địa chỉ trang để thử gọi AI")
-    start = datetime.now()
-    try:
-        got, model = ai_request(["thay má phanh"])
-    except Exception as e:
-        return f"AI xếp nhóm ({chain}): LỖI – {e}"
-    seconds = (datetime.now() - start).total_seconds()
-    return (f"AI xếp nhóm: hoạt động ({model}, {seconds:.1f} giây), thử 'thay má phanh' → "
-            f"{name(got.get('thay má phanh', OTHER))}")
+AI_URL, AI_TIMEOUT = ai_client.AI_URL, ai_client.AI_TIMEOUT  # noqa: F401
 
 
 # ---- Lưu trữ: mỗi tháng một Redis hash, mỗi khoản một mục (id -> JSON) ---------------
@@ -265,79 +157,11 @@ def find(reference):
     return ledger_repo.find(ym, rid)
 
 
-def add(text, now):
-    """Ghi mọi khoản trong tin nhắn (mỗi dòng một khoản); trả về các khoản đã ghi."""
-    learned = kho.get(keys.LEARN, {})
-    entries = [e for e in (parse_line(line, now.date(), learned) for line in text.splitlines()) if e]
-    chosen = [(e["ghichu"], e["nhom"]) for e in entries if e.get("_chon") and e["nhom"] != OTHER]
-    if chosen:
-        learn_all(chosen)
-    ask_ai(entries, learned)
-    for e in entries:
-        e["id"] = ledger_repo.next_id()
-        e["gio"] = now.strftime("%H:%M")
-        save(e)
-    return entries
-
-
 def between(start, end):
     """Các khoản từ ngày start tới end (tính cả hai đầu)."""
     return ledger_repo.between(start, end)
 
 
-def recent(day, limit):
-    """Các khoản mới nhất của tháng này và tháng trước."""
-    prev = (day.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
-    items = load(prev) + load(day.strftime("%Y-%m"))
-    return sorted(items, key=lambda e: (e["ngay"], e.get("gio", ""), e["id"]), reverse=True)[:limit]
-
-
-# Số, ngày tháng trong ghi chú không giúp gì cho việc xếp nhóm: học "tiền đổ rác" thay vì
-# "tiền đổ rác tháng 11", để tháng sau ghi "tiền đổ rác tháng 12" bot vẫn nhận ra.
-NOISE = re.compile(r"(?<!\w)(?:(?:tháng|thang|quý|quy|năm|kỳ|ky|tuần|tuan|ngày|ngay|lần|đợt|dot|t|q)\s*)?"
-                   r"\d+(?:[/.\-]\d+)*(?!\w)")
-
-
-def learn_key(note):
-    key = " ".join(NOISE.sub(" ", norm(note)).split()).strip(" ,.:;-–")
-    return key if len(key) >= 2 else norm(note)
-
-
-def learn_all(pairs):
-    """Nhớ nhóm người dùng chọn cho các ghi chú [(ghi chú, mã)]."""
-    pairs = [(learn_key(note), code) for note, code in pairs if note]
-    if not pairs:
-        return
-    learned = kho.get(keys.LEARN, {})
-    for key, code in pairs:
-        learned.pop(key, None)
-        learned[key] = code
-    kho.put(keys.LEARN, dict(list(learned.items())[-MAX_LEARNED:]))
-
-
-def learn(note, code):
-    learn_all([(note, code)])
-
-
-def pending(e):
-    """Khoản đang ở Khác mà người dùng chưa chọn để nguyên: bot sẽ hỏi nhóm."""
-    return e["nhom"] == OTHER and not e.get("dekhac")
-
-
-def tidy(day):
-    """Xếp lại các khoản đang ở Khác (tháng này và tháng trước) theo từ khóa, cụm từ đã học mới nhất.
-    Trả về số khoản đã chuyển nhóm."""
-    table = rules(kho.get(keys.LEARN, {}))
-    prev = (day.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
-    moved = 0
-    for e in load(prev) + load(day.strftime("%Y-%m")):
-        if pending(e) and e["ghichu"]:
-            code = pick(e["ghichu"], table)
-            if code != OTHER:
-                e["nhom"] = code
-                save(e)
-                moved += 1
-    return moved
 
 
 # ---- Hiển thị ---------------------------------------------------------------------
