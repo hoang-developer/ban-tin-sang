@@ -9,7 +9,7 @@ import lich
 import menu
 import sono
 import thongbao
-import tietkiem
+from repositories.tietkiem import progress as tietkiem_repo
 
 
 def screen(name):
@@ -102,7 +102,7 @@ class BonMuc(unittest.TestCase):
         self.assertIn("m:tb:nhac", buttons)
         toast, body, buttons = h.press("m:tb:nhac")
         self.assertEqual(toast, "Đã tắt nhắc ghi chép 21h")
-        self.assertFalse(tietkiem.config()["nhac"])
+        self.assertFalse(tietkiem_repo.load()["nhac"])
         h.at(2026, 11, 13, 21, 5)
         self.assertIsNone(thongbao.evening(h.CLOCK["now"]))
 

@@ -8,7 +8,7 @@ from services.duphong import reserve as duphong
 from infrastructure import kho
 import sono
 import taisan as ts
-import tietkiem
+from repositories.tietkiem import progress as tietkiem_repo
 import troly
 
 
@@ -151,7 +151,7 @@ class TroLy(unittest.TestCase):
         text, _ = h.say("hôm nay không tiêu gì")  # hiểu bằng luật, không cần AI
         self.assertIn("không tiêu gì", text)
         self.assertEqual(h.AI.calls, [])
-        self.assertIn(h.CLOCK["now"].date().isoformat(), tietkiem.config()["khong_tieu"])
+        self.assertIn(h.CLOCK["now"].date().isoformat(), tietkiem_repo.load()["khong_tieu"])
         h.press("y:them:cho_vay")
         self.assertIsNotNone(troly.state(h.CHAT))
         h.say("/menu")

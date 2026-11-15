@@ -178,7 +178,7 @@ def home(day, now=None):
     main = part("tài khoản chính", lambda: ts.main_line(day))
     if main:
         lines.append(main)
-    saved = part("tiết kiệm", lambda: __import__("tietkiem").home_line(day))
+    saved = part("tiết kiệm", lambda: __import__("interface.tietkiem.progress", fromlist=["home_line"]).home_line(day))
     if saved:
         lines.append(saved)
     tasks = part("việc cần làm", lambda: todo(day, n, now)) or []
@@ -297,8 +297,8 @@ def answer_question(key, day):
 
 def notify_rows():
     """Nút bật/tắt thông báo, ghi trạng thái hiện tại."""
-    import tietkiem
-    remind = tietkiem.config().get("nhac", True)
+    from services.tietkiem import progress as tietkiem_service
+    remind = tietkiem_service.reminder_on()
     rows = [[(f"🔔 Nhắc ghi chép 21h: {'bật' if remind else 'tắt'}", "m:tb:nhac")]]
     try:
         cfg = ct.dautu().config()
@@ -319,11 +319,9 @@ def settings():
 
 def toggle(which):
     if which == "nhac":
-        import tietkiem
-        cfg = tietkiem.config()
-        cfg["nhac"] = not cfg.get("nhac", True)
-        tietkiem.save(cfg)
-        return "Đã " + ("bật" if cfg["nhac"] else "tắt") + " nhắc ghi chép 21h"
+        from services.tietkiem import progress as tietkiem_service
+        on = tietkiem_service.toggle_reminder()
+        return "Đã " + ("bật" if on else "tắt") + " nhắc ghi chép 21h"
     dt = ct.dautu()
     cfg = dt.config()
     cfg["baocao_toi"] = cfg.get("baocao_toi") is False
