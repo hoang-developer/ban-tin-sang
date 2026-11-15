@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 import duphong
 import kho
+from repositories import keys
 import sochitieu as ct
 import sono
 import taisan as ts
@@ -31,7 +32,7 @@ def short(x):
 
 def spending_estimate(day, group, debt_need):
     """(chi tiêu dự kiến tháng này không tính trả nợ, cách tính) — None nếu chưa có dữ liệu."""
-    budgets = kho.get(ct.K_BUDGET, {}) or {}
+    budgets = kho.get(keys.BUDGET, {}) or {}
     if budgets.get("tong"):  # ngân sách tổng tính mọi khoản chi, kể cả trả nợ
         return max(0, budgets["tong"] - debt_need), "ngân sách tổng"
     items = [e for e in ct.between(day - timedelta(days=89), day)
@@ -58,7 +59,7 @@ def numbers(day):
     income = sum(e["tien"] for e in month if e["nhom"] == ct.INCOME)
     basis = ""
     if not income:
-        salary = kho.get(ts.K_SALARY) or {}
+        salary = kho.get(keys.SALARY) or {}
         if salary.get("tien"):
             income, basis = salary["tien"], "lương dự kiến, chưa ghi"
         else:
@@ -214,7 +215,7 @@ def spendable(day, n=None):
     có, tháng này chưa thấy), chia đều cho hôm nay và các ngày còn lại. None nếu chưa tính được (chưa có thu nhập)."""
     import phantich as pt
     f = pt.forecast(day)
-    budgets = kho.get(ct.K_BUDGET, {}) or {}
+    budgets = kho.get(keys.BUDGET, {}) or {}
     if budgets.get("tong"):
         per_day, today_left = pt.allowance(f)
         return {"per_day": per_day, "today_left": today_left, "limit": budgets["tong"], "spent": f["spent"],

@@ -14,13 +14,12 @@ import math
 from datetime import date, timedelta
 
 import kho
+from repositories import keys
 import phantich as pt
 import sochitieu as ct
 import taisan as ts
 from bantin import vn_num
 
-KEY = "chitieu:duphong"  # {"thang": số tháng mục tiêu, "han": đạt trong bao nhiêu tháng, "bat_dau": ngày, "chi": tự đặt,
-#                          "nap": {"YYYY-MM": tổng đã nạp trong tháng}}
 FUND_NAME = "Quỹ dự phòng"
 ESSENTIAL = ["an", "cho", "xe", "nha", "khoe", "hoc", "giadinh"]  # cộng nhóm tự tạo tên "Trả nợ" nếu có
 MONTHS_CHOICES, DEADLINE_CHOICES = (3, 6, 9, 12), (6, 12, 18, 24)
@@ -28,11 +27,11 @@ MIN_DAYS = 14  # ít nhất 2 tuần ghi chép mới tự tính chi thiết yế
 
 
 def config():
-    return kho.get(KEY, {}) or {}
+    return kho.get(keys.RESERVE, {}) or {}
 
 
 def save(cfg):
-    kho.put(KEY, cfg)
+    kho.put(keys.RESERVE, cfg)
 
 
 def add_months(d, months):

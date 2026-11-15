@@ -11,10 +11,10 @@ import html
 import sys
 
 import kho
+from repositories import keys
 import sochitieu as ct
 from bantin import WEEKDAYS
 
-KEYBOARD_FLAG = "chitieu:banphim:2"  # đã gửi hàng nút cố định bản 4 mục chưa
 BOTTOM = {"🏠 Hôm nay": "home", "💰 Tiền của tôi": "tien", "🎯 Kế hoạch": "kh", "💬 Hỏi": "hoi"}
 OLD_BOTTOM = {"🏠 Menu": "home", "📊 Chi tiêu": "chi", "💼 Tài sản": "tien"}  # hàng nút cũ: vẫn chạy, gửi hàng mới
 NAV = [("🏠 Hôm nay", "m:home"), ("💰 Tiền của tôi", "m:tien"), ("🎯 Kế hoạch", "m:kh"), ("💬 Hỏi", "m:hoi")]
@@ -345,14 +345,14 @@ def screen(name, day):
 
 def with_keyboard(reply):
     """Lần đầu (hoặc khi còn hàng nút cũ): gửi thêm lời chào kèm hàng nút cố định dưới ô chat, rồi mới tới màn hình."""
-    if not kho.put_new(KEYBOARD_FLAG, True, 3 * 365 * 86400):
+    if not kho.put_new(keys.KEYBOARD_FLAG, True, 3 * 365 * 86400):
         return reply
     return {"messages": [(GREETING, bottom_keyboard()), reply]}
 
 
 def push_keyboard(send):
     """Hàng nút dưới ô chat vừa đổi mà chưa gửi: gửi lời chào kèm hàng nút mới (việc theo giờ gọi). True nếu đã gửi."""
-    if not kho.put_new(KEYBOARD_FLAG, True, 3 * 365 * 86400):
+    if not kho.put_new(keys.KEYBOARD_FLAG, True, 3 * 365 * 86400):
         return False
     send(GREETING, bottom_keyboard())
     return True
@@ -361,7 +361,7 @@ def push_keyboard(send):
 def start(args):
     if not kho.ready():
         return ct.NEED_STORE
-    kho.delete(KEYBOARD_FLAG)  # /start luôn gửi lại hàng nút (lỡ người dùng tắt)
+    kho.delete(keys.KEYBOARD_FLAG)  # /start luôn gửi lại hàng nút (lỡ người dùng tắt)
     return with_keyboard(home(ct.today()))
 
 

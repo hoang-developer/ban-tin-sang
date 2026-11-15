@@ -4,7 +4,7 @@ Một "việc" là một dict {"viec": loại, ...trường}. Ba đường vào 
 - tin nhắn tự do: AI phân loại câu thành việc (ask_ai), code kiểm tra lại từng trường;
 - ảnh: docanh nhờ AI đọc lệnh quỹ, đơn mua vàng, kết quả lệnh cổ phiếu thành việc (from_photo);
 - nút bấm: ➕ Thêm tài khoản, sổ tiết kiệm, khoản nợ... tạo việc trống rồi bot hỏi từng trường (start).
-Thiếu trường bắt buộc thì bot hỏi từng câu và nhớ đang hỏi dở việc gì (K_STATE, 15 phút). Việc ghi lại được ngay như
+Thiếu trường bắt buộc thì bot hỏi từng câu và nhớ đang hỏi dở việc gì (keys.conversation, 15 phút). Việc ghi lại được ngay như
 trước (khoản thu, trả nợ, xem màn hình, hỏi) thì làm luôn; việc khác hiện thẻ "Mình hiểu là…" với nút ✅ Đúng / ✏️ Sửa /
 ❌ Thôi, bấm ✅ mới ghi. Khoản chi thường ("cà phê 35k") không đi qua đây: vẫn ghi ngay như cũ (wants).
 Số liệu luôn do code tính và ghi bằng các hàm sẵn có (taisan, sono, duphong, dautu...); AI chỉ hiểu câu. AI lỗi hay
@@ -16,13 +16,10 @@ import sys
 from datetime import date, timedelta
 
 import kho
+from repositories import keys
 import sochitieu as ct
 from bantin import WEEKDAYS, vn_num
 
-K_STATE = "chitieu:cho:"  # việc đang làm dở của từng chat: {"viec": {...}, "hoi": trường đang hỏi, "sua": bool, "the": id}
-K_CARD = "chitieu:the:"  # thẻ chờ xác nhận: id -> việc
-K_CARD_ID = "chitieu:the:dem"
-K_PLAIN = "chitieu:hieu:chi"  # ghi chú AI đã xác định là khoản chi thường: lần sau ghi ngay, khỏi hỏi AI
 STATE_SECONDS, CARD_SECONDS = 900, 2 * 86400
 TRY_LIMIT = 40  # số lượt thử ?hieu= mỗi ngày trên trang tình trạng
 
@@ -182,7 +179,7 @@ def beyond_spending(text):
 
 
 def plain_notes():
-    return kho.get(K_PLAIN, []) or []
+    return kho.get(keys.PLAIN_NOTES, []) or []
 
 
 def remember_plain(text):
@@ -191,7 +188,7 @@ def remember_plain(text):
     key = ct.learn_key(e["ghichu"]) if e else ""
     notes = plain_notes()
     if key and key not in notes:
-        kho.put(K_PLAIN, (notes + [key])[-300:])
+        kho.put(keys.PLAIN_NOTES, (notes + [key])[-300:])
 
 
 def wants(text, names=None):
@@ -592,7 +589,7 @@ def ask_ai(text, day, context=None, personal=True, people=None, facts=None):
 # ---- Trạng thái hội thoại, thẻ xác nhận --------------------------------------------------
 
 def chat_key(chat):
-    return f"{K_STATE}{chat or 0}"
+    return keys.conversation(chat)
 
 
 def state(chat):
@@ -859,8 +856,8 @@ def start_many(jobs, chat, now):
         if missing(job):
             job["_nhom"] = {"ds": [None if k == i else j for k, j in enumerate(jobs)], "i": i}
             return advance(job, chat, now)
-    cid = kho.command("INCR", K_CARD_ID)
-    kho.put(f"{K_CARD}{cid}", {"viec": "_nhieu", "ds": jobs}, CARD_SECONDS)
+    cid = kho.command("INCR", keys.CARD_COUNTER)
+    kho.put(keys.card(cid), {"viec": "_nhieu", "ds": jobs}, CARD_SECONDS)
     lines = [f"{i}. {describe(job)}" for i, job in enumerate(jobs, 1)]
     return ("Mình hiểu là:\n" + "\n".join(lines),
             [[(f"✅ Đúng, làm cả {len(jobs)} việc", f"y:ok:{cid}"), ("❌ Thôi", f"y:huy:{cid}")]])
@@ -900,8 +897,8 @@ def answer(a):
 
 def card(a, chat, cid=None):
     """Thẻ "Mình hiểu là…": lưu việc, chờ bấm ✅ mới ghi."""
-    cid = cid or kho.command("INCR", K_CARD_ID)
-    kho.put(f"{K_CARD}{cid}", a, CARD_SECONDS)
+    cid = cid or kho.command("INCR", keys.CARD_COUNTER)
+    kho.put(keys.card(cid), a, CARD_SECONDS)
     rows = [[("✅ Đúng, ghi lại", f"y:ok:{cid}"), ("✏️ Sửa", f"y:sua:{cid}"), ("❌ Thôi", f"y:huy:{cid}")]]
     main = big_side_buy(a)
     if main:
@@ -1195,8 +1192,8 @@ def unsure(text, down=False):
     why = "AI đang bận nên mình chưa đọc được câu này" if down else "Mình chưa rõ câu này là việc gì"
     quoted = html.escape(text.strip()[:80])
     if ct.parse_amount(text):
-        cid = kho.command("INCR", K_CARD_ID)
-        kho.put(f"{K_CARD}{cid}", {"viec": "_chi", "cau": text.strip()[:300]}, CARD_SECONDS)
+        cid = kho.command("INCR", keys.CARD_COUNTER)
+        kho.put(keys.card(cid), {"viec": "_chi", "cau": text.strip()[:300]}, CARD_SECONDS)
         return (f"🤔 {why}: «{quoted}»\nNếu là một khoản chi thì bấm nút dưới. Việc khác (chuyển tiền, tài sản, nợ…) "
                 "thì bấm ➕ Thêm hoặc nhắn lại rõ hơn.",
                 [[("💸 Ghi là khoản chi", f"y:chi:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")],
@@ -1339,7 +1336,7 @@ def on_reply(text, now, chat):
         return "⚠️ AI đang bận nên chưa sửa được. Bấm ✅ trên thẻ nếu vẫn đúng, hoặc nhắn lại sau."
     if b["viec"] == a["viec"]:
         if st.get("the"):
-            kho.delete(f"{K_CARD}{st['the']}")  # thẻ cũ thay bằng thẻ đã sửa
+            kho.delete(keys.card(st['the']))  # thẻ cũ thay bằng thẻ đã sửa
         return advance({**a, **b}, chat, now)
     forget(chat)
     return handle(b, text, now, chat)
@@ -1406,14 +1403,14 @@ def on_button(arg, message, now):
             a[name] = opts[int(index)][0]
         return None, ("edit", lambda: advance(a, chat, now))
     cid, _, option = rest.partition(":")
-    a = kho.get(f"{K_CARD}{cid}")
+    a = kho.get(keys.card(cid))
     if a is None:
         return "Thẻ này đã xử lý hoặc hết hạn", None
     if kind == "huy":
-        kho.delete(f"{K_CARD}{cid}")
+        kho.delete(keys.card(cid))
         return "Đã bỏ", ("edit", lambda: "Đã bỏ, không ghi gì.")
     if kind == "chi" and a.get("viec") == "_chi":
-        kho.delete(f"{K_CARD}{cid}")
+        kho.delete(keys.card(cid))
         return "Đã ghi", ("edit", lambda: ct.record_text(a["cau"], now))
     if kind == "nguon":
         a["san"] = not a.get("san")
@@ -1422,11 +1419,11 @@ def on_button(arg, message, now):
         kho.put(chat_key(chat), {"viec": a, "sua": True, "the": cid}, STATE_SECONDS)
         return None, ("send", lambda: "✏️ Sửa chỗ nào? Nhắn phần đúng, ví dụ «giá 2tr5», «6 tháng» hay «ngày 9/11».")
     if kind == "ok" and a.get("viec") == "_nhieu":
-        kho.delete(f"{K_CARD}{cid}")
+        kho.delete(keys.card(cid))
         forget(chat)
         return "Đang làm…", ("edit", lambda: run_many(a["ds"], now, chat))
     if kind == "ok" and a.get("viec") in JOBS:
-        kho.delete(f"{K_CARD}{cid}")
+        kho.delete(keys.card(cid))
         forget(chat)
         return "Đang ghi…", ("edit", lambda: run(a, now, chat, option or None))
     return None, None
@@ -1437,8 +1434,8 @@ def try_text(text, day):
     text = (text or "").strip()[:200]
     if not text:
         return "Thêm câu cần thử: ?hieu=mua 2 chỉ vàng nhẫn hết 27tr"
-    used = kho.command("INCR", f"chitieu:hieu:thu:{day}")
-    kho.command("EXPIRE", f"chitieu:hieu:thu:{day}", 2 * 86400)
+    used = kho.command("INCR", keys.ai_usage(day))
+    kho.command("EXPIRE", keys.ai_usage(day), 2 * 86400)
     if used > TRY_LIMIT:
         return f"Hôm nay đã thử {TRY_LIMIT} câu, mai thử tiếp."
     lines = [f"Câu: {text}"]

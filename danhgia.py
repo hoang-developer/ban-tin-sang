@@ -10,6 +10,7 @@ import sys
 from datetime import date, datetime
 
 import kho
+from repositories import keys
 import sochitieu as ct
 
 DAY = date(2026, 11, 20)  # thứ Sáu
@@ -140,8 +141,8 @@ def short(a):
 def run(tu=0, n=8, nhom=None, budget=50):
     """Chấm câu [tu, tu+n) (lọc theo nhóm nếu có). Trả chữ: mỗi câu một dòng, dòng cuối là tổng."""
     import danhgia_cau
-    used = kho.command("INCR", f"chitieu:danhgia:{date.today()}")
-    kho.command("EXPIRE", f"chitieu:danhgia:{date.today()}", 2 * 86400)
+    used = kho.command("INCR", keys.benchmark_usage(date.today()))
+    kho.command("EXPIRE", keys.benchmark_usage(date.today()), 2 * 86400)
     if used > LIMIT:
         return f"Hôm nay đã chạy {LIMIT} lượt đo, mai chạy tiếp."
     rows = [c for c in danhgia_cau.CAU if not nhom or c[0] == nhom]

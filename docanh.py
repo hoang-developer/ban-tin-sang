@@ -15,11 +15,11 @@ import urllib.request
 from datetime import date, timedelta
 
 import kho
+from repositories import keys
 import sochitieu as ct
 import tg
 
 MAX_BYTES = 8_000_000  # ảnh Telegram đã nén thường dưới 500KB; file gửi nguyên bản có thể lớn hơn
-SEEN = "chitieu:anh:"  # ảnh đã ghi (theo mã ảnh của Telegram), tránh ghi trùng khi gửi lại
 
 
 def image_of(message):
@@ -46,9 +46,6 @@ KINDS = ("chi_tieu", "thu_nhap", "tra_no", "tra_the", "chuyen_noi_bo")
 SKIP_WHY = {"tra_the": "trả thẻ tín dụng: các khoản quẹt thẻ ghi riêng rồi, ghi nữa là trùng",
             "chuyen_noi_bo": "chuyển giữa các tài khoản của bạn, không phải thu chi",
             "da_ghi": "đã ghi trước đó"}
-PENDING = "chitieu:anhcho:"  # danh sách giao dịch đọc từ ảnh, chờ người dùng chọn rồi bấm Ghi
-DONE_TX = "chitieu:gd:"  # giao dịch đã ghi (ngày|số tiền|chiều): ảnh lịch sử chụp lại không ghi trùng
-OWNERS = "chitieu:chutk"  # tên chủ tài khoản bot đã nhận ra (người đứng tên ở các dòng trả thẻ tín dụng)
 
 
 def person(text):
@@ -60,14 +57,14 @@ def person(text):
 def owner_names(txs):
     """Tên chủ tài khoản: các tên đã nhớ, cộng tên người ở các dòng trả thẻ tín dụng trong ảnh này (ai trả nợ
     thẻ tín dụng thì thường chính là chủ thẻ). Nhớ lại cho các ảnh sau."""
-    names = list(kho.get(OWNERS, []) or [])
+    names = list(kho.get(keys.OWNERS, []) or [])
     for tx in txs:
         who = person(tx["noi_ban"])
         if tx["kieu"] == "tra_the" and who and who not in names:
             names.append(who)
     names = names[-5:]
-    if names != (kho.get(OWNERS, []) or []):
-        kho.put(OWNERS, names)
+    if names != (kho.get(keys.OWNERS, []) or []):
+        kho.put(keys.OWNERS, names)
     return names
 
 
@@ -128,7 +125,7 @@ def read_receipt(data, mime):
     """Nhờ AI đọc ảnh: {"loai", "giao_dich": [{tien, chieu, ngay, noi_dung, noi_ban, diem, nhom, kieu}], "model"}."""
     # Lúc Gemini đông có khi mất 10–20 giây/ảnh: chờ mỗi model tới 30 giây, tổng không quá 48 giây
     text, model = ct.ai_chat("Bạn đọc hóa đơn và màn hình giao dịch ngân hàng của người Việt, trả lời bằng JSON.",
-                             prompt(kho.get(OWNERS, []) or []), max_tokens=4000, image=(data, mime), timeout=30,
+                             prompt(kho.get(keys.OWNERS, []) or []), max_tokens=4000, image=(data, mime), timeout=30,
                              budget=48)
     raw = ct.first_json(text)
     if not isinstance(raw, dict):
@@ -154,7 +151,7 @@ def read_receipt(data, mime):
 
 
 def fingerprint(ngay, tien, chieu):
-    return f"{DONE_TX}{ngay}|{tien}|{chieu}"
+    return keys.done_transaction(ngay, tien, chieu)
 
 
 def receipt_date(text, today):
@@ -176,7 +173,7 @@ def photo(message, tok, now):
     file_id, unique, mime = image_of(message)
     if not ct.ai_key():
         return "📷 Đọc ảnh cần AI: thêm biến GEMINI_API_KEY trên Vercel rồi Redeploy (xem README). Giờ nhắn tay kiểu: cà phê 35k"
-    seen = SEEN + unique
+    seen = keys.image_seen(unique)
     if not kho.put_new(seen, True, 60 * 86400):
         return "📷 Ảnh này đã ghi rồi. Xem lại: /lichsu"
     try:
@@ -207,7 +204,7 @@ def photo(message, tok, now):
         tx["ngay"] = receipt_date(tx["ngay"], day).isoformat()
         tx["da_ghi"] = kho.get(fingerprint(tx["ngay"], tx["tien"], tx["chieu"])) is not None
         tx["chon"] = tx["kieu"] in ("chi_tieu", "thu_nhap", "tra_no") and not tx["da_ghi"]
-    kho.put(PENDING + unique, txs, 2 * 86400)
+    kho.put(keys.image_pending(unique), txs, 2 * 86400)
     return render_list(unique, txs, day)
 
 
@@ -249,10 +246,10 @@ def entry_from(tx, learned, active):
 
 
 def record(txs, now):
-    learned, active, out = kho.get(ct.K_LEARN, {}), ct.groups(), []
+    learned, active, out = kho.get(keys.LEARN, {}), ct.groups(), []
     for tx in txs:
         e = entry_from(tx, learned, active)
-        e["id"] = kho.command("INCR", ct.K_COUNTER)
+        e["id"] = kho.command("INCR", keys.COUNTER)
         e["gio"] = now.strftime("%H:%M")
         ct.save(e)
         kho.put(fingerprint(e["ngay"], e["tien"], tx["chieu"]), e["id"], 120 * 86400)
@@ -271,13 +268,13 @@ def single(tx, message, now, check_dup=True):
     if check_dup and kho.get(fingerprint(tx["ngay"], tx["tien"], tx["chieu"])) is not None:
         return (f"📷 Giao dịch {'+' if tx['chieu'] == 'thu' else '−'}{ct.vnd(tx['tien'])} ngày "
                 f"{tx['ngay'][8:]}/{tx['ngay'][5:7]} đã ghi trước đó. Xem lại: /lichsu")
-    learned = kho.get(ct.K_LEARN, {})
+    learned = kho.get(keys.LEARN, {})
     e = entry_from(tx, learned, ct.groups())
     if chosen and tx["chieu"] == "chi":
         e["nhom"] = chosen
         e.pop("ai", None)
         ct.learn(e["ghichu"], chosen)
-    e["id"] = kho.command("INCR", ct.K_COUNTER)
+    e["id"] = kho.command("INCR", keys.COUNTER)
     e["gio"] = now.strftime("%H:%M")
     ct.save(e)
     kho.put(fingerprint(e["ngay"], e["tien"], tx["chieu"]), e["id"], 120 * 86400)
@@ -306,7 +303,7 @@ def on_button(arg, message, now):
     kind, _, rest = arg.partition(":")
     day = now.date()
     if kind == "diem" and rest.isdigit():
-        e = {"id": kho.command("INCR", ct.K_COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
+        e = {"id": kho.command("INCR", keys.COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
              "tien": int(rest), "ghichu": "đổi điểm, voucher", "nhom": ct.INCOME}
         ct.save(e)
         rows = [row for row in ct.keyboard_rows(message) if not any(d.startswith("anh:diem") for _, d in row)]
@@ -314,23 +311,23 @@ def on_button(arg, message, now):
     if kind not in ("chon", "ghi", "bo"):
         return None, None
     unique, _, index = rest.rpartition(":") if kind == "chon" else (rest, "", "")
-    txs = kho.get(PENDING + unique)
+    txs = kho.get(keys.image_pending(unique))
     if txs is None:
         return "Danh sách này đã hết hạn hoặc đã ghi, gửi lại ảnh nhé", None
     if kind == "bo":
-        kho.delete(PENDING + unique)
-        kho.delete(SEEN + unique)  # gửi lại ảnh này được
+        kho.delete(keys.image_pending(unique))
+        kho.delete(keys.image_seen(unique))  # gửi lại ảnh này được
         return "Đã bỏ", ("edit", lambda: "📷 Đã bỏ danh sách, không ghi khoản nào")
     if kind == "chon":
         if not index.isdigit() or int(index) >= len(txs):
             return None, None
         txs[int(index)]["chon"] = not txs[int(index)]["chon"]
-        kho.put(PENDING + unique, txs, 2 * 86400)
+        kho.put(keys.image_pending(unique), txs, 2 * 86400)
         return None, ("edit", lambda: render_list(unique, txs, day))
     chosen = [tx for tx in txs if tx["chon"]]
     if not chosen:
         return "Chưa chọn khoản nào", None
-    kho.delete(PENDING + unique)
+    kho.delete(keys.image_pending(unique))
     entries = record(chosen, now)
     extra = [f"📷 Ghi từ ảnh, bỏ qua {len(txs) - len(chosen)} giao dịch không chọn"]
     debt_lines, debt_rows = ct.debt_after(entries, day)  # có khoản trả nợ: trừ dư nợ trong /no

@@ -16,14 +16,11 @@ from datetime import date, datetime, timedelta
 
 import chungkhoan
 import kho
+from repositories import keys
 import phantich as pt
 import sochitieu as ct
 from bantin import VN_TZ, gold_prices, vn_num
 
-K_ASSETS = "chitieu:taisan"  # {"items": [...], "dem": số đã cấp, "lailo": [lãi/lỗ đã bán]}
-K_HISTORY = "chitieu:taisan:lichsu"  # hash: ngày -> {"rong": tài sản ròng, "loai": {loại: giá trị}}
-K_GOLD = "vivang"  # ví vàng của bot bản tin: [{"loai": "sjc"|"nhan", "luong": lượng, "gia": triệu/lượng}]
-K_SALARY = "chitieu:luong"  # {"ngay": ngày nhận lương, "tien": số tiền}
 SELL_TAX = 0.001  # thuế thu nhập cá nhân khi bán chứng khoán: 0,1% giá trị bán
 BROKER_FEE = 0.0  # DNSE miễn phí giao dịch; công ty khác thường thu 0,1–0,35% mỗi chiều
 TYPES = {"tien": "🏦 Tiền, tài khoản", "tietkiem": "🐷 Tiết kiệm", "etf": "🧺 ETF", "cp": "📈 Cổ phiếu", "quy": "💹 Quỹ mở",
@@ -63,13 +60,13 @@ def short(x):
 
 
 def load():
-    data = kho.get(K_ASSETS, {}) or {}
+    data = kho.get(keys.ASSETS, {}) or {}
     data.setdefault("items", [])
     return data
 
 
 def save(data):
-    kho.put(K_ASSETS, data)
+    kho.put(keys.ASSETS, data)
 
 
 def new_id(data):
@@ -151,7 +148,7 @@ def prices(kind, codes, fresh=False):
     if not codes:
         return {}, None, False
     fetch, minutes = SOURCES[kind]
-    key = f"chitieu:gia:{kind}"
+    key = keys.price_cache(kind)
     store = kho.get(key, {}) or {}
     saved, when = store.get("gia", {}), store.get("luc")
     if not fresh and when and all(c in saved for c in codes) and \
@@ -191,7 +188,7 @@ def gold_name(kind):
 def valuation(day, fresh=False):
     """Định giá mọi tài sản: dict gồm các dòng theo loại, tổng tài sản, tổng nợ, tài sản ròng, ghi chú giá."""
     data = load()
-    items, gold = data["items"], kho.get(K_GOLD, []) or []
+    items, gold = data["items"], kho.get(keys.GOLD, []) or []
     by_kind = {}
     for it in items:
         by_kind.setdefault(it["loai"], []).append(it)
@@ -248,7 +245,7 @@ def valuation(day, fresh=False):
 def pending_orders():
     """Lệnh mua quỹ (/dautu) đã đặt, chưa khớp."""
     try:
-        cfg = kho.get("chitieu:dautu", {}) or {}
+        cfg = kho.get(keys.FUND, {}) or {}
     except Exception as e:
         print(f"[lỗi] lệnh quỹ chờ khớp: {e!r}", file=sys.stderr)
         return []
@@ -267,12 +264,12 @@ def snapshot(day, v):
     kinds = {}
     for kind, _, _, value, _, _ in v["rows"]:
         kinds[kind] = kinds.get(kind, 0) + value
-    kho.command("HSET", K_HISTORY, day.isoformat(), json.dumps({"rong": round(v["net"]), "loai": {
+    kho.command("HSET", keys.ASSET_HISTORY, day.isoformat(), json.dumps({"rong": round(v["net"]), "loai": {
         k: round(x) for k, x in kinds.items()}}))
 
 
 def history():
-    flat = kho.command("HGETALL", K_HISTORY) or []
+    flat = kho.command("HGETALL", keys.ASSET_HISTORY) or []
     return sorted((k, json.loads(v)) for k, v in zip(flat[::2], flat[1::2]))
 
 
@@ -457,9 +454,9 @@ def add_gold(args):
         return None
     if not 0 < taels <= 1000:
         return None
-    items = kho.get(K_GOLD, []) or []
+    items = kho.get(keys.GOLD, []) or []
     items.append({"loai": kind, "luong": taels, "gia": paid, **({"ngay": bought.isoformat()} if bought else {})})
-    kho.put(K_GOLD, items)
+    kho.put(keys.GOLD, items)
     return f"✅ Đã thêm {lenh.amount_text(taels)} {gold_name(kind).lower()} vào ví vàng (dùng chung với bot bản tin)"
 
 
@@ -511,7 +508,7 @@ def gain_text(gain, cost):
 def gold_lines(rows):
     """Vàng: mỗi loại một bảng chữ đều cột (<pre>): mỗi lần mua một dòng (ngày, số chỉ, giá mua một chỉ, lãi/lỗ),
     dòng Tổng (vốn trung bình), dòng Hôm nay (giá cửa hàng mua vào). Chấm màu ở cuối dòng để không lệch cột."""
-    gold = kho.get(K_GOLD, []) or []
+    gold = kho.get(keys.GOLD, []) or []
     lots = {}
     for _, rid, _, value, cost, _ in rows:
         g = gold[int(rid[1:])]
@@ -612,11 +609,11 @@ def edit_list():
 
 def remove(rid):
     if rid.startswith("v"):
-        items = kho.get(K_GOLD, []) or []
+        items = kho.get(keys.GOLD, []) or []
         index = int(rid[1:])
         if index < len(items):
             items.pop(index)
-            kho.put(K_GOLD, items)
+            kho.put(keys.GOLD, items)
             return True
         return False
     data = load()
@@ -749,7 +746,7 @@ def trade(text, now, pay_main=True):
              + (f"🟢 <b>lãi {ct.vnd(round(gain))}</b>" if gain >= 0 else f"🔴 <b>lỗ {ct.vnd(round(-gain))}</b>")
              + f" ({gain / cost * 100:+.1f}%)".replace(".", ",")]
     if gain > 0:  # phần lãi là thu nhập đầu tư; phần vốn chỉ là đổi cổ phiếu ra tiền
-        entry = {"id": kho.command("INCR", ct.K_COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
+        entry = {"id": kho.command("INCR", keys.COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
                  "tien": round(gain), "ghichu": f"lãi bán {qty} {code}", "nhom": ct.INCOME,
                  "khong_tk": True}  # tiền bán đã cộng cả vào tài khoản bên dưới, không cộng lần nữa
         ct.save(entry)
@@ -783,7 +780,7 @@ def can_be_main(it):
 
 def pin_balance(it, amount):
     """Chốt số dư thật: tính lại từ đây (các khoản ghi trước lúc này đã nằm trong số dư)."""
-    it.update(tien=int(amount), moc=int(kho.get(ct.K_COUNTER) or 0), moc_ngay=ct.today().isoformat(), chuyen=[])
+    it.update(tien=int(amount), moc=int(kho.get(keys.COUNTER) or 0), moc_ngay=ct.today().isoformat(), chuyen=[])
 
 
 def main_flows(it, day=None):
@@ -906,7 +903,7 @@ def realize(data, now, code, qty, price, gain, note):
                                          "lai": round(gain)})
     data["lailo"] = data["lailo"][-200:]
     if gain > 0:
-        ct.save({"id": kho.command("INCR", ct.K_COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
+        ct.save({"id": kho.command("INCR", keys.COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
                  "tien": round(gain), "ghichu": note, "nhom": ct.INCOME, "khong_tk": True})
 
 
@@ -917,7 +914,7 @@ def gain_line(gain, cost):
 
 def sell_gold(chi, received, now, kind=None, to_main=True):
     """Bán vàng: lấy dần từ các lần mua cũ nhất (cùng loại nếu có nói). chi=None: bán hết. Trả câu báo."""
-    gold = kho.get(K_GOLD, []) or []
+    gold = kho.get(keys.GOLD, []) or []
     lots = [g for g in gold if not kind or g["loai"] == kind]
     have = sum(g["luong"] for g in lots) * 10
     if not lots or have <= 0:
@@ -933,7 +930,7 @@ def sell_gold(chi, received, now, kind=None, to_main=True):
         left = round(left - take, 6)
         if left <= 0:
             break
-    kho.put(K_GOLD, [g for g in gold if g["luong"] > 1e-6])
+    kho.put(keys.GOLD, [g for g in gold if g["luong"] > 1e-6])
     data = load()
     gain = received - cost if cost else 0
     if cost:
@@ -1055,21 +1052,21 @@ def luong(args):
     usage = ("Nhắc ngày nhận lương: /luong 10 25tr (ngày 10 hằng tháng, 25 triệu)\nTới ngày, bot hỏi đã nhận chưa, "
              "bấm một nút là ghi vào Thu nhập. Bỏ nhắc: /luong xoa")
     if not args:
-        s = kho.get(K_SALARY)
+        s = kho.get(keys.SALARY)
         return (f"💼 Đang nhắc lương ngày {s['ngay']} hằng tháng, {ct.vnd(s['tien'])}\n" + usage) if s else usage
     if ct.plain(args[0]) == "xoa":
-        kho.delete(K_SALARY)
+        kho.delete(keys.SALARY)
         return "Đã bỏ nhắc lương"
     found = ct.parse_amount(" ".join(args[1:])) if len(args) > 1 else None
     if not args[0].isdigit() or not 1 <= int(args[0]) <= 31 or not found:
         return usage
-    kho.put(K_SALARY, {"ngay": int(args[0]), "tien": found[0]})
+    kho.put(keys.SALARY, {"ngay": int(args[0]), "tien": found[0]})
     return f"✅ Ngày {int(args[0])} hằng tháng bot sẽ hỏi đã nhận lương {ct.vnd(found[0])} chưa"
 
 
 def salary_due(day):
     """(tin nhắc, nút) nếu hôm nay trong 3 ngày từ ngày lương mà tháng này chưa ghi lương; None nếu không."""
-    s = kho.get(K_SALARY)
+    s = kho.get(keys.SALARY)
     if not s:
         return None
     payday = min(s["ngay"], monthrange(day.year, day.month)[1])
@@ -1088,7 +1085,7 @@ def maturity_notes(day):
     for it in load()["items"]:
         if it["loai"] == "tietkiem" and it.get("ky"):
             interest, maturity = accrued(it, day)
-            if 0 <= (maturity - day).days <= 3 and kho.put_new(f"chitieu:nhac:daohan:{it['id']}:{maturity}", True,
+            if 0 <= (maturity - day).days <= 3 and kho.put_new(keys.saving_maturity_reminder(it['id'], maturity), True,
                                                                10 * 86400):
                 notes.append(f"🐷 Sổ {html.escape(it['ten'])} {short(it['tien'])} đáo hạn {maturity:%d/%m}"
                              f" (lãi ~{short(interest)})")
@@ -1234,7 +1231,7 @@ def on_button(arg, message, now):
         return ("Đã xóa" if gone else "Mục này đã xóa rồi"), ("edit", edit_list)
     if arg.startswith("luong:"):
         amount = int(arg[6:])
-        entry = {"id": kho.command("INCR", ct.K_COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
+        entry = {"id": kho.command("INCR", keys.COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
                  "tien": amount, "ghichu": f"lương tháng {day.month}", "nhom": ct.INCOME}
         ct.save(entry)
         done = f"✅ Đã ghi lương tháng {day.month}: {ct.vnd(amount)} vào 💰 Thu nhập"
