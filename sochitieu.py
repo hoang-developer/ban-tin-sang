@@ -17,75 +17,22 @@ import urllib.request
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 
+from domain.chitieu import classify as classify_rules
+from domain.chitieu import parse as parse_rules
+from domain.chitieu.categories import (AMBIGUOUS_PLAIN, CATEGORIES, GENERIC, KEYWORDS, plain_pattern,  # noqa: F401
+                                       word_pattern)
 from domain.chitieu.kinds import INCOME, OTHER  # noqa: F401
+from domain.chitieu.parse import DATE, DAY_WORDS, TAG  # noqa: F401
 from domain.common.money import MONEY, QUANTITY, UNITS, money, money_count, parse_amount, to_number  # noqa: F401
 from domain.common.text import norm, plain  # noqa: F401
 from infrastructure import kho
 from repositories import keys
+from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
 from bantin import VN_TZ, vn_num
 
-# ---- Nhóm chi tiêu --------------------------------------------------------------
-# mã -> (tên, từ khóa). Từ khóa so khớp nguyên từ; nhiều từ cùng khớp thì lấy cụm dài nhất
-# ("tiền nước" thắng "nước"). Gõ không dấu cũng nhận ra.
-CATEGORIES = {
-    "an": ("🍜 Ăn uống", [
-        "ăn", "ăn sáng", "ăn trưa", "ăn tối", "ăn đêm", "ăn vặt", "cơm", "cơm văn phòng", "phở", "bún", "miến",
-        "mì", "mỳ", "hủ tiếu", "bánh mì", "bánh cuốn", "bánh", "bánh ngọt", "xôi", "cháo", "lẩu", "nướng", "gà",
-        "vịt", "bò", "pizza", "burger", "kfc", "lotteria", "jollibee", "mcdonald", "cà phê", "cafe", "coffee",
-        "highlands", "highland", "starbucks", "starbuck", "phúc long", "katinat", "trà", "trà sữa", "trà đá",
-        "nước", "nước ngọt", "nước suối", "nước lọc", "nước mía", "nước ép", "sinh tố", "bia", "rượu", "nhậu", "chè", "kem", "sữa chua", "hoa quả", "trái cây",
-        "đồ ăn", "nhà hàng", "quán", "buffet", "grabfood", "shopeefood", "baemin", "gofood", "đặt đồ ăn",
-        "bim bim", "snack", "kẹo", "liên hoan", "tiệc"]),
-    "cho": ("🛒 Đi chợ, siêu thị", [
-        "chợ", "đi chợ", "siêu thị", "winmart", "vinmart", "bách hóa xanh", "coopmart", "co.op", "aeon", "big c",
-        "lotte mart", "mega market", "tạp hóa", "rau", "thịt", "cá", "tôm", "trứng", "gạo", "mắm", "dầu ăn",
-        "gia vị", "sữa", "đồ khô", "thực phẩm", "nước giặt", "bột giặt", "giấy vệ sinh", "nước rửa bát",
-        "dầu gội", "sữa tắm", "kem đánh răng", "đồ dùng"]),
-    "xe": ("🛵 Đi lại", [
-        "xăng", "đổ xăng", "grab", "grabbike", "grabcar", "be", "xanh sm", "taxi", "gojek", "xe ôm", "gửi xe",
-        "trông xe", "đỗ xe", "vé xe", "xe khách", "xe buýt", "bus", "tàu", "vé tàu", "máy bay", "vé máy bay",
-        "metro", "xe", "xe máy", "ô tô", "oto", "rửa xe", "sửa xe", "thay dầu", "thay nhớt", "bảo dưỡng",
-        "bảo dưỡng xe", "vá xe", "lốp", "phí đường", "cầu đường", "vetc", "epass", "đăng kiểm", "bảo hiểm xe", "phạt nguội", "nộp phạt"]),
-    "nha": ("🏠 Nhà cửa, hóa đơn", [
-        "tiền nhà", "thuê nhà", "tiền phòng", "tiền trọ", "trọ", "điện", "tiền điện", "hóa đơn điện",
-        "tiền nước", "hóa đơn nước", "internet", "wifi", "tiền mạng", "cước", "điện thoại", "nạp điện thoại",
-        "nạp tiền điện thoại", "4g", "gas", "bình gas", "phí quản lý", "phí dịch vụ", "chung cư", "sửa nhà",
-        "sửa điện", "thợ", "đồ gia dụng", "nồi", "chảo", "giường", "tủ", "bàn ghế", "điều hòa", "máy giặt",
-        "tủ lạnh", "truyền hình", "k+", "viettel", "vnpt", "fpt"]),
-    "mua": ("🛍️ Mua sắm", [
-        "mua", "quần", "áo", "quần áo", "váy", "giày", "dép", "túi", "ví", "đồng hồ", "kính", "mỹ phẩm", "son",
-        "nước hoa", "skincare", "shopee", "lazada", "tiki", "tiktok shop", "sendo", "uniqlo", "zara",
-        "mua điện thoại", "laptop", "máy tính", "tai nghe", "ốp lưng", "sạc", "đồ điện tử", "phụ kiện",
-        "trang sức", "cây cảnh", "đồ trang trí", "cắt tóc", "làm tóc", "gội đầu", "làm nail", "spa"]),
-    "khoe": ("💊 Sức khỏe", [
-        "thuốc", "nhà thuốc", "pharmacity", "long châu", "khám", "khám bệnh", "bệnh viện", "phòng khám",
-        "nha khoa", "răng", "xét nghiệm", "tiêm", "vắc xin", "vitamin", "thực phẩm chức năng", "bảo hiểm",
-        "bảo hiểm y tế", "gym", "phòng tập", "yoga", "bơi", "massage", "khẩu trang", "kính mắt"]),
-    "choi": ("🎬 Giải trí, du lịch", [
-        "phim", "xem phim", "rạp", "cgv", "lotte cinema", "bhd", "netflix", "spotify", "youtube",
-        "youtube premium", "apple music", "icloud", "google one", "chatgpt", "game", "nạp game", "steam",
-        "karaoke", "bi a", "bida", "concert", "vé xem", "du lịch", "khách sạn", "homestay", "resort", "tour",
-        "vé tham quan", "dã ngoại", "picnic", "cắm trại", "đi chơi"]),
-    "hoc": ("📚 Học tập", [
-        "học phí", "tiền học", "đóng học", "học", "học thêm", "lớp", "khóa học", "sách", "vở", "bút",
-        "văn phòng phẩm", "giáo trình", "udemy", "coursera", "tiếng anh", "ielts", "lệ phí thi"]),
-    "qua": ("🎁 Hiếu hỷ, quà tặng", [
-        "đám cưới", "cưới", "mừng cưới", "sinh nhật", "quà", "tặng", "biếu", "đám ma", "đám hiếu", "phúng",
-        "viếng", "lì xì", "mừng tuổi", "từ thiện", "ủng hộ", "hoa", "đi lễ", "lễ chùa", "công đức"]),
-    "giadinh": ("👨‍👩‍👧 Gia đình, con cái", [
-        "cho con", "của con", "con đi học", "cho bé", "bỉm", "tã", "sữa bột", "đồ chơi", "gửi bố mẹ",
-        "biếu bố mẹ", "bố mẹ", "ông bà", "giúp việc", "osin", "trông trẻ", "nhà trẻ", "mầm non", "thú cưng",
-        "cho chó", "cho mèo", "thức ăn cho chó", "thức ăn cho mèo", "pate"]),
-    "khac": ("📦 Khác", []),
-    "thu": ("💰 Thu nhập", [
-        "lương", "nhận lương", "thưởng", "tiền thưởng", "hoa hồng", "lãi tiết kiệm", "cổ tức", "bán",
-        "thu nhập", "được cho", "được tặng", "hoàn tiền", "cashback", "freelance", "làm thêm"]),
-}
-GENERIC = {"mua", "ăn", "quán", "học", "bánh", "nước", "xe"}  # từ chung chung: chỉ dùng khi không có từ nào rõ hơn
 MAX_LEARNED = 500  # số cụm từ học được tối đa
 MAX_GROUPS, MAX_WORDS = 20, 60  # số nhóm tự tạo, số từ khóa tự thêm cho mỗi nhóm
-# ---------------------------------------------------------------------------------
 
 NEED_STORE = "⚠️ Bot chi tiêu cần kho dữ liệu (Upstash Redis trên Vercel), xem README."
 
@@ -106,25 +53,6 @@ def today():
 
 # ---- Đọc tin nhắn ----------------------------------------------------------------
 
-def word_pattern(word):
-    return re.compile(rf"(?<!\w){re.escape(word)}(?!\w)")
-
-
-# Bỏ dấu rồi trùng với chữ thường gặp: "chợ"/"cho", "cá"/"ca", "quà"/"qua", "vở"/"vợ", "gà"/"ga"(gas)...
-# Câu gõ không dấu thì không dùng các dạng này để đoán nhóm.
-AMBIGUOUS_PLAIN = {"cho", "ca", "qua", "ta", "tu", "vo", "noi", "bo", "ga", "but", "che", "tang", "tra"}
-
-
-def plain_pattern(word):
-    bare = plain(word)
-    return None if bare in AMBIGUOUS_PLAIN and bare != norm(word) else word_pattern(bare)
-
-
-# (mẫu có dấu, mẫu không dấu hoặc None, điểm, mã nhóm); điểm là độ dài cụm, từ chung chung điểm thấp
-KEYWORDS = [(word_pattern(norm(k)), plain_pattern(k), 0.5 if norm(k) in GENERIC else len(norm(k)), code)
-            for code, (_, words) in CATEGORIES.items() for k in words]
-
-
 # ---- Nhóm tự chỉnh: người dùng thêm nhóm, thêm từ khóa, đổi tên, ẩn nhóm ngay trong Telegram (/nhom) ----
 # Lưu ở khóa chitieu:nhomrieng: {"moi": [mã nhóm tự tạo], "ten": {mã: tên}, "tu": {mã: [từ khóa]},
 # "an": [mã nhóm đã ẩn], "dem": số nhóm đã tạo}. Nhóm ẩn vẫn giữ tên để khoản cũ hiện đúng.
@@ -142,146 +70,62 @@ def config():
     if _config is None:
         if not kho.ready():
             return {}
-        _config = kho.get(keys.GROUPS, {})
+        _config = groups_repo.load()
     return _config
 
 
 def save_config(cfg):
     global _config
-    kho.put(keys.GROUPS, cfg)
+    groups_repo.save(cfg)  # đồng thời xóa các câu AI đã xếp (nhóm đã khác)
     _config = cfg
-    kho.delete(keys.AI_CACHE)  # nhóm đã khác: các câu AI trả lời trước đó không còn đúng danh sách nhóm
 
 
 def name(code, cfg=None):
     """Tên nhóm kèm biểu tượng ('🍜 Ăn uống'), kể cả nhóm đã ẩn; mã lạ thì là Khác."""
-    cfg = config() if cfg is None else cfg
-    return cfg.get("ten", {}).get(code) or CATEGORIES.get(code, CATEGORIES[OTHER])[0]
+    return classify_rules.name(code, config() if cfg is None else cfg)
 
 
-def bare(label):
-    """'🍜 Ăn uống' -> 'Ăn uống'."""
-    return label.split(" ", 1)[-1]
+bare = classify_rules.bare
 
 
 def groups(cfg=None):
     """Các nhóm đang dùng, theo thứ tự hiện trên nút: mã -> (tên, từ khóa tự thêm, từ khóa có sẵn)."""
-    cfg = config() if cfg is None else cfg
-    hidden = set(cfg.get("an", []))
-    order = [c for c in CATEGORIES if c not in (OTHER, INCOME)] + list(cfg.get("moi", [])) + [OTHER, INCOME]
-    return {c: (name(c, cfg), cfg.get("tu", {}).get(c, []), CATEGORIES.get(c, ("", []))[1])
-            for c in order if c not in hidden}
+    return classify_rules.groups(config() if cfg is None else cfg)
 
 
 def rules(learned=None, cfg=None):
     """Bảng so khớp (mẫu có dấu, mẫu không dấu, điểm, mã): cụm từ đã học > từ khóa tự thêm > có sẵn."""
-    active = groups(cfg)
-    learned_rules = [(word_pattern(k), word_pattern(plain(k)), 100 + len(k), code)
-                     for k, code in (learned or {}).items() if code in active]
-    own = [(word_pattern(norm(k)), plain_pattern(k), len(norm(k)) + 0.5, code)  # +0.5: thắng từ có sẵn trùng
-           for code, (_, words, _) in active.items() for k in words]
-    return learned_rules + own + [r for r in KEYWORDS if r[3] in active]
+    return classify_rules.rules(learned, config() if cfg is None else cfg)
 
 
-def pick(note, table):
-    """Câu có dấu chỉ so với từ khóa có dấu ("cho Lan" không phải "chợ", "trả" không phải "trà");
-    câu gõ không dấu so với từ khóa đã bỏ dấu ("cho be" là "cho bé", thắng "be" gọi xe).
-    Nhiều cụm cùng khớp thì lấy cụm điểm cao nhất (dài nhất)."""
-    text = norm(note)
-    typed_plain = text == plain(text)
-    found = [(score, code) for exact, bare_word, score, code in table
-             if (bare_word if typed_plain else exact) and (bare_word if typed_plain else exact).search(text)]
-    return max(found, key=lambda x: x[0])[1] if found else OTHER
+pick = classify_rules.pick
 
 
 def classify(note, learned=None, cfg=None):
     """Mã nhóm của ghi chú. Cụm từ đã học (người dùng sửa nhóm) thắng từ khóa."""
-    return pick(note, rules(learned, cfg))
+    return classify_rules.classify(note, learned, config() if cfg is None else cfg)
 
 
 def find_group(text, include_hidden=False, cfg=None):
     """Tên nhóm người dùng gõ ('ăn uống', 'di lai', 'ăn', 'trả nợ') -> mã, None nếu không có nhóm nào."""
-    cfg = config() if cfg is None else cfg
-    key = plain(re.sub(r"[^\w\s]", " ", text))
-    key = " ".join(key.split())
-    if not key:
-        return None
-    codes = list(groups(cfg)) + ([c for c in CATEGORIES if c in cfg.get("an", [])]
-                                 + [c for c in cfg.get("moi", []) if c in cfg.get("an", [])] if include_hidden else [])
-    best = None
-    for code in codes:
-        label = " ".join(plain(re.sub(r"[^\w\s]", " ", bare(name(code, cfg)))).split())
-        score = 3 if label == key else 2 if label.startswith(key) else 1 if re.search(
-            rf"(?<!\w){re.escape(key)}", label) else 0
-        if score and (best is None or score > best[0]):
-            best = (score, code)
-    return best[1] if best else None
+    return classify_rules.find_group(text, config() if cfg is None else cfg, include_hidden)
 
 
-DATE = re.compile(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?:/(\d{2}|\d{4}))?(?![\d/])")
-DAY_WORDS = {"hôm nay": 0, "hôm qua": -1, "hôm kia": -2}
-
-def parse_date(text, day):
-    """Ngày ghi trong câu ('hôm qua', '02/11'): (ngày, câu đã bỏ phần ngày)."""
-    t = norm(text)
-    for words, offset in DAY_WORDS.items():
-        for form in (words, plain(words)):
-            if word_pattern(form).search(t):
-                return day + timedelta(days=offset), word_pattern(form).sub(" ", t)
-    m = DATE.search(t)
-    if m:
-        year = int(m[3]) + (2000 if m[3] and len(m[3]) == 2 else 0) if m[3] else day.year
-        try:
-            d = date(year, int(m[2]), int(m[1]))
-            if not m[3] and d > day:
-                d = d.replace(year=year - 1)  # 25/12 nhắn hồi tháng 1 là năm trước
-            return d, t[:m.start()] + " " + t[m.end():]
-        except ValueError:
-            pass
-    return day, t
-
-
-TAG = re.compile(r"#\s*([^#\d\n]+)")  # "đóng họ 1tr #tiết kiệm": tự chọn nhóm khi ghi
+parse_date = parse_rules.parse_date
 
 
 def read_tag(line):
-    """'#nhóm' trong dòng: (mã nhóm, tên nhóm chưa có, dòng đã bỏ phần #nhóm). Tên nhóm có thể nhiều chữ
-    ("#tiết kiệm"); #nhóm đứng giữa câu thì lấy cụm chữ dài nhất trùng tên một nhóm, phần sau trả về ghi chú."""
-    tag = TAG.search(line)
-    words = tag[1].split() if tag else []
-    if not words:
-        return None, None, line
-    before, after = line[:tag.start()], line[tag.end():]
-    for n in range(len(words), 0, -1):
-        code = find_group(" ".join(words[:n]))
-        if code:
-            return code, None, " ".join([before, *words[n:], after])
-    if not after.strip() and classify(" ".join(words)) != OTHER:  # "#cafe", "#xe": từ khóa của một nhóm
-        return classify(" ".join(words)), None, before
-    n = len(words) if not after.strip() else 1  # không có nhóm nào: ở cuối dòng thì lấy hết, giữa câu lấy 1 chữ
-    return None, " ".join(words[:n]).strip(" .,;:"), " ".join([before, *words[n:], after])
+    """'#nhóm' trong dòng: (mã nhóm, tên nhóm chưa có, dòng đã bỏ phần #nhóm)."""
+    return parse_rules.read_tag(line, config())
 
 
 def parse_line(line, day, learned=None):
     """Một dòng tin nhắn -> khoản chi/thu (chưa có id), None nếu không có số tiền."""
-    line = line.strip()
-    income = line.startswith("+")
-    chosen, missing, line = read_tag(line)
-    when, text = parse_date(line.lstrip("+").strip(), day)
-    found = parse_amount(text)
-    if not found:
-        return None
-    amount, start, end = found
-    note = " ".join((text[:start] + " " + text[end:]).split()).strip(" ,.:;-–")
-    e = {"ngay": when.isoformat(), "tien": amount, "ghichu": note,
-         "nhom": INCOME if income else chosen or classify(note, learned)}
-    if missing:
-        e["_tag"] = missing  # chưa có nhóm tên này: nhắc tạo nhóm
-    if chosen and not income:
-        e["_chon"] = True  # người dùng ghi #nhóm: không hỏi AI, nhớ cho lần sau
-        if chosen == OTHER:
-            e["dekhac"] = True
-    return e
+    return parse_rules.parse_line(line, day, learned, config())
+
+
+
+
 
 
 # ---- Xếp nhóm bằng AI (tùy chọn) ------------------------------------------------------
@@ -294,110 +138,12 @@ def parse_line(line, day, learned=None):
 #   model cách nhau dấu phẩy thì OpenRouter tự chuyển. AI_API_URL đổi được sang nhà cung cấp khác.
 # AI lỗi hết thì khoản vào Khác và bot hỏi người dùng.
 
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-# 05/11/2026: 3.1 Flash-Lite cũng đúng 13/13, đọc đúng ảnh hóa đơn và lịch sử giao dịch (1–2 giây); nằm ở nhóm máy
-# chủ khác nên lúc 3.5 báo quá tải (503) vẫn trả lời được
-GEMINI_MODELS = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.5-flash"
-AI_URL = "https://openrouter.ai/api/v1/chat/completions"
-# Chọn ngày 04/11/2026: thử 13 khoản lạ, Nemotron 3 Ultra đúng 12, Dots 3 đúng 12 (dự phòng).
-# Không thêm openrouter/free: nó chọn ngẫu nhiên model miễn phí, có lần chỉ đúng 7/13.
-AI_MODELS = "nvidia/nemotron-3-ultra-550b-a55b:free,dots-studio/dots-3-note-preview:free"
-AI_TIMEOUT = 25  # giây; model miễn phí có "suy nghĩ" trước khi trả lời nên chậm, quá thì thôi
-# Đọc ảnh: model Gemini ở trên đều xem được ảnh; trên OpenRouter phải dùng model riêng (thử 04/11/2026:
-# Nemotron 3.5 Super VL đọc đúng số tiền 6/6 ảnh mẫu)
-AI_VISION_MODELS = "nvidia/nemotron-3.5-super-vl:free"
+from infrastructure import ai as ai_client  # noqa: E402
 
-
-def env_list(name, default):
-    return [m.strip() for m in os.environ.get(name, default).split(",") if m.strip()]
-
-
-def gemini_key():
-    return os.environ.get("GEMINI_API_KEY", "").strip()
-
-
-def openrouter_key():
-    return os.environ.get("AI_API_KEY", "").strip()
-
-
-def ai_key():
-    """Có AI không (Gemini hoặc OpenRouter)."""
-    return gemini_key() or openrouter_key()
-
-
-def ai_models():
-    """Các model OpenRouter (hoặc nhà cung cấp AI_API_URL)."""
-    return env_list("AI_MODEL", AI_MODELS)
-
-
-def ai_providers(vision=False):
-    """[(tên, địa chỉ, key, các model)] theo thứ tự thử: Gemini trước, OpenRouter dự phòng.
-    vision=True: model xem được ảnh."""
-    out = []
-    if gemini_key():
-        out.append(("Gemini", GEMINI_URL, gemini_key(), env_list("GEMINI_MODEL", GEMINI_MODELS)))
-    if openrouter_key():
-        url = os.environ.get("AI_API_URL", AI_URL)
-        models = env_list("AI_VISION_MODEL", AI_VISION_MODELS) if vision else ai_models()
-        out.append(("OpenRouter" if "openrouter.ai" in url else "AI", url, openrouter_key(), models))
-    return out
-
-
-def ai_post(payload, url=None, key=None, timeout=AI_TIMEOUT):
-    req = urllib.request.Request(url or os.environ.get("AI_API_URL", AI_URL), data=json.dumps(payload).encode(), headers={
-        "Content-Type": "application/json", "Authorization": f"Bearer {key or ai_key()}", "X-Title": "ban-tin-sang"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        body = (e.read() or b"").decode(errors="replace")
-        try:
-            message = json.loads(body)["error"]["message"]
-        except (ValueError, KeyError, TypeError):
-            message = body[:200]
-        raise RuntimeError(f"AI báo lỗi {e.code}: {message}") from None
-
-
-def ai_chat(system, user, max_tokens=2000, image=None, timeout=AI_TIMEOUT, budget=45):
-    """Hỏi AI một lượt: (câu trả lời đã bỏ phần "suy nghĩ", model đã trả lời). Thử lần lượt từng nhà cung cấp,
-    từng model; tất cả đều lỗi (mạng, bận, hết lượt...) thì báo lỗi. image=(bytes, kiểu ảnh) để gửi kèm ảnh.
-    timeout: chờ mỗi model tối đa bao lâu; budget: tổng thời gian cho mọi lần thử (Vercel cắt hàm ở 60 giây)."""
-    started = datetime.now()
-    if image:
-        data, mime = image
-        user = [{"type": "text", "text": user}, {"type": "image_url", "image_url": {
-            "url": f"data:{mime};base64,{base64.b64encode(data).decode()}"}}]
-    errors = []
-    for provider, url, key, models in ai_providers(vision=bool(image)):
-        # OpenRouter tự chuyển model khi nhận danh sách "models"; nơi khác thì bot tự thử từng model
-        tries = [(models[0], {"models": models})] if "openrouter.ai" in url and len(models) > 1 else \
-            [(m, {}) for m in models]
-        for model, extra in tries:
-            left = budget - (datetime.now() - started).total_seconds()
-            if left < 5:
-                errors.append(f"{provider} {model}: hết thời gian chờ")
-                continue
-            payload = {
-                # Model có "suy nghĩ" tiêu nhiều token trước khi trả lời; ít quá thì câu trả lời bị cắt rỗng
-                "model": model, "temperature": 0, "max_tokens": max_tokens, **extra,
-                "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
-            try:
-                res = ai_post(payload, url, key, min(timeout, left))
-                text = res["choices"][0]["message"].get("content") or ""
-                return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip(), res.get("model", model)
-            except Exception as e:
-                print(f"[lỗi] AI {provider} {model}: {e!r}", file=sys.stderr)
-                errors.append(f"{provider} {model}: {e}")
-    raise RuntimeError("; ".join(errors) or "chưa bật AI (thiếu GEMINI_API_KEY hoặc AI_API_KEY)")
-
-
-def first_json(text):
-    """Đối tượng JSON đầu tiên trong câu trả lời của AI (bỏ qua chữ, khối ```json bao quanh)."""
-    start = text.find("{")
-    try:
-        return json.JSONDecoder().raw_decode(text[start:])[0] if start >= 0 else None
-    except ValueError:
-        return None
+env_list, gemini_key, openrouter_key = ai_client.env_list, ai_client.gemini_key, ai_client.openrouter_key
+ai_key, ai_models, ai_providers = ai_client.key, ai_client.openrouter_models, ai_client.providers
+ai_post, ai_chat, first_json = ai_client.post, ai_client.chat, ai_client.first_json
+AI_URL, AI_TIMEOUT = ai_client.AI_URL, ai_client.AI_TIMEOUT  # noqa: F401
 
 
 def ai_prompt(learned=None):
@@ -434,13 +180,13 @@ def ask_ai(entries, learned=None):
     unknown = [e for e in entries if pending(e) and e["ghichu"] and not e.get("_chon")]
     if not unknown or not ai_key():
         return 0
-    cache = kho.get(keys.AI_CACHE, {})
+    cache = groups_repo.ai_cache()
     ask = list(dict.fromkeys(e["ghichu"] for e in unknown if learn_key(e["ghichu"]) not in cache))
     if ask:
         try:
             for note, code in ai_request(ask, learned)[0].items():
                 cache[learn_key(note)] = code
-            kho.put(keys.AI_CACHE, dict(list(cache.items())[-MAX_LEARNED:]))
+            groups_repo.save_ai_cache(dict(list(cache.items())[-MAX_LEARNED:]))
         except Exception as e:
             print(f"[lỗi] xếp nhóm bằng AI: {e!r}", file=sys.stderr)
     active, done = groups(), 0
@@ -450,27 +196,18 @@ def ask_ai(entries, learned=None):
             e["nhom"], e["ai"] = code, True
             done += 1
     if done:
-        kho.command("HINCRBY", keys.AI_STATS, "doan", done)
+        groups_repo.add_ai_guessed(done)
     return done
 
 
 def ai_stats():
     """(số khoản AI đã xếp, số khoản người dùng phải sửa lại)."""
-    flat = kho.command("HGETALL", keys.AI_STATS) or []
-    stats = dict(zip(flat[::2], flat[1::2]))
-    return int(stats.get("doan", 0)), int(stats.get("sua", 0))
+    return groups_repo.ai_stats()
 
 
 def ai_quota():
-    """(đã dùng, giới hạn) lượt gọi model miễn phí hôm nay của key OpenRouter (không tốn lượt);
-    None nếu không dùng OpenRouter. Lượt tính lại lúc 0h giờ quốc tế, tức 7h sáng ở Việt Nam."""
-    if not openrouter_key() or "openrouter.ai" not in os.environ.get("AI_API_URL", AI_URL):
-        return None
-    req = urllib.request.Request("https://openrouter.ai/api/v1/key",
-                                 headers={"Authorization": f"Bearer {openrouter_key()}"})
-    with urllib.request.urlopen(req, timeout=10) as r:
-        used = (json.loads(r.read())["data"].get("free_model_daily_requests") or {})
-    return (used["used"], used["limit"]) if "used" in used and "limit" in used else None
+    """(đã dùng, giới hạn) lượt model miễn phí hôm nay của key OpenRouter; None nếu không dùng OpenRouter."""
+    return ai_client.quota()
 
 
 def quota_text():
