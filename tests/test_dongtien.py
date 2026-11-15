@@ -7,7 +7,7 @@ from tests import harness as h
 
 from interface.duphong import reserve as duphong
 from repositories.duphong import reserve as reserve_repo
-import kehoach
+from interface.kehoach import plan as kehoach
 from infrastructure import kho
 import menu
 import sochitieu as ct

@@ -110,7 +110,7 @@ def on_button(arg, message, now):
             return toast, None
         title = message.get("text") or ""
         if title.startswith("📋"):
-            import kehoach
+            from interface.kehoach import plan as kehoach
             return toast, ("edit", lambda: kehoach.plan(day))
         if title.startswith("🏠"):
             import menu

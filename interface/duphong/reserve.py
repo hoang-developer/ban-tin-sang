@@ -77,7 +77,7 @@ def on_button(arg, message, now):
         if title.startswith("🛟 Quỹ dự phòng"):  # nút trên tin quỹ: vẽ lại tin
             return toast, ("edit", lambda: text(day))
         if title.startswith("📋"):  # nút trên tin chia lương: vẽ lại tin đó
-            import kehoach
+            from interface.kehoach import plan as kehoach
             return toast, ("edit", lambda: kehoach.plan(day))
         rows = [[b for b in row if not b[1].startswith("dp:nap")] for row in ct.keyboard_rows(message)]
         return toast, ("buttons", lambda: [row for row in rows if row])  # nút dưới tin "Đã ghi lương": bỏ nút đó

@@ -62,7 +62,7 @@ def evening(now):
 
 def today_line(day):
     """'💸 Hôm nay chi 85k · trong mức (dư 246k)' theo con số mỗi ngày được tiêu."""
-    import kehoach
+    from interface.kehoach import plan as kehoach
     group = ct.sono().debt_group()[0]
     spent = sum(e["tien"] for e in ct.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()
                 and e["nhom"] not in (ct.INCOME, group) and not e.get("no"))
