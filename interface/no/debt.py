@@ -109,7 +109,7 @@ def on_button(arg, message, now):
         if common.title_starts(message, "📋"):
             return toast, ("edit", lambda: kehoach.plan(day))
         if common.title_starts(message, "🏠"):
-            import menu  # nạp muộn để né vòng với menu (hết khi menu được tách)
+            from interface.menu import screens as menu
             return toast, ("edit", lambda: menu.home(day))
         if common.title_starts(message, "💳"):
             return toast, ("edit", lambda: view(day))

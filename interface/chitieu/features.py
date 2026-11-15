@@ -23,7 +23,7 @@ def kehoach():
     return module
 
 def menu():
-    import menu as module  # menu nút bấm, tổng quan, hướng dẫn
+    from interface.menu import screens as module  # menu nút bấm, tổng quan, hướng dẫn
     return module
 
 def dautu():

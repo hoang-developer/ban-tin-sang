@@ -9,7 +9,7 @@ from interface.duphong import reserve as duphong
 from repositories.duphong import reserve as reserve_repo
 from interface.kehoach import plan as kehoach
 from infrastructure import kho
-import menu
+from interface.menu import screens as menu
 import sochitieu as ct
 from interface.no import debt as sono
 from interface.taisan import assets as ts

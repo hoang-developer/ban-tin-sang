@@ -359,7 +359,7 @@ def ban_phim_moi(now, chat):
     tok = chitieu.token()
     if not tok or not between(now, (7, 0), (22, 0)):
         return None
-    import menu
+    from interface.menu import screens as menu
     owners = list(chitieu.owner_chats())
     sent = menu.push_keyboard(lambda text, markup: [tg.send(o, text, markup, tok=tok) for o in owners])
     return "đã gửi hàng nút mới" if sent else None

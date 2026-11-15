@@ -138,7 +138,7 @@ riêng cho AI).
 **Kiểm thử** ([tests/](tests)): `python -m unittest discover -s tests -t .` chạy bot trong bộ nhớ (kho, Telegram, Fmarket,
 AI đều giả lập; NAV thật của VMEEF, VFF trong `tests/data`), GitHub tự chạy mỗi lần đẩy code.
 
-**Menu: 4 mục** ([menu.py](menu.py)), cũng là 4 nút cố định dưới ô chat (bot gửi lần đầu, hoặc khi bạn bấm nút của
+**Menu: 4 mục** ([interface/menu/screens.py](interface/menu/screens.py)), cũng là 4 nút cố định dưới ô chat (bot gửi lần đầu, hoặc khi bạn bấm nút của
 hàng cũ):
 
 - **🏠 Hôm nay** (`/menu`, `/start`): hôm nay đã chi gì, còn được tiêu bao nhiêu, tháng này đã chi/thu, tài khoản

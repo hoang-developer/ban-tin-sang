@@ -205,6 +205,7 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.11 `canhbao.py` tách: luật báo ở `domain/canhbao/rules`, các bước kiểm tra ở `services/canhbao/checks`, chữ ở `presentation/canhbao/view`, chạy và gửi ở `interface/canhbao/runner` (workflow chạy `python3 -m interface.canhbao.runner`; file gốc còn 13) | xong, chờ deploy |
 | 6.12 `chungkhoan.py` tách (`infrastructure/stockfeeds`, `domain/chungkhoan`, `services/chungkhoan`, `presentation/chungkhoan`, `interface/chungkhoan`); 6.13 `tintuc.py` và `thoitiet.py` tách theo cùng khuôn (`*/tintuc`, `*/thoitiet`); file gốc còn 10 | xong, chờ deploy |
 | 6.14 `thongbao.py` → `interface/thongbao/digest.py` (gộp tin sáng/tối, thuộc lớp giao diện); `danhgia.py`, `danhgia_cau.py` → `interface/danhgia/{benchmark,questions}.py` (công cụ đo bot hiểu câu); file gốc còn 7 | xong, chờ deploy |
+| 6.15 `menu.py` tách: chữ và nút ở `presentation/menu/view`, màn hình và nút bấm ở `interface/menu/screens` (đọc từ nhiều chức năng nên ở lớp giao diện); file gốc còn 6 | xong, chờ deploy |
 | 6.8… dọn `sochitieu.py` khi các module còn lại (`troly`, `menu`, `phantich`, `docanh`...) bỏ `ct.`; rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
 | Cuối: dọn | chưa |
 
