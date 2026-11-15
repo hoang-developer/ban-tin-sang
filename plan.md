@@ -30,7 +30,7 @@ infrastructure/               cổng ra ngoài: kho (Redis), telegram, AI (Gemin
 ```
 
 Chức năng (tên thư mục trong mỗi lớp): `chitieu` (sổ thu chi, ngân sách, nhóm), `phantich` (hỏi đáp, báo cáo chi tiêu),
-`taisan`, `vang`, `dautu`, `tietkiem`, `duphong`, `no`, `kehoach`, `doichieu`, `troly` (AI hiểu câu, thẻ xác nhận),
+`taisan`, `vang`, `dautu`, `tietkiem`, `duphong`, `no`, `luong`, `kehoach`, `doichieu`, `troly` (AI hiểu câu, thẻ xác nhận),
 `anh` (đọc ảnh), `menu`, `bantin` (bot bản tin: bản tin sáng, giá, chứng khoán, nhận định, lịch). Thư mục chỉ tạo khi có file đầu tiên.
 
 Phụ thuộc chỉ đi một chiều (test kiến trúc canh, xem mục 3):
@@ -137,12 +137,13 @@ Xong khi: không file nào ngoài repo dùng `keys.COUNTER`, `keys.ledger_month`
 toàn bộ lệnh ghi Redis trong test giống `main` từng lệnh.
 
 ### Bước 5: dựng khung lớp và luật phụ thuộc, chuyển `infrastructure`
-- Test kiến trúc `tests/test_kientruc.py`: quét import bằng AST, báo đỏ khi một file trong lớp import sai chiều (bảng mục 2);
-  file còn ở gốc (cũ) chưa bị kiểm tra, nhưng test có **số file ở gốc tối đa** chỉ được giảm qua từng bước (ratchet).
-- `infrastructure/`: `kho.py`, `telegram.py`, `ai.py` (tách khỏi `sochitieu`), nguồn giá/tin/thời tiết. `repositories/store.py` và
-  các repo hiện có (`gold`, `assets`, `ledger`, `salary`, `fund`) xếp vào `repositories/<chức năng>/`, `domain/gold.py`,
-  `domain/salary.py` vào `domain/<chức năng>/`.
-- Viết lại import bằng script; thêm test import thử mọi module (cả `api/*.py`).
+- `tests/test_kientruc.py`: quét import bằng AST, báo đỏ khi một file trong lớp import sai chiều (bảng mục 2) hoặc lớp mới
+  import module cũ còn ở gốc; số file ở gốc tối đa (`ROOT_PY_MAX`) chỉ được giảm qua từng bước (ratchet); import thử mọi module, cả `api/*.py`.
+- `infrastructure/`: `kho.py`, `telegram.py` (hai module chỉ dùng thư viện chuẩn, chuyển nguyên). Khung gọi AI (`ai_chat`…) và nguồn
+  giá/tin/thời tiết đang lẫn với logic trong `sochitieu.py`, `chungkhoan.py`…: tách cùng chức năng sở hữu chúng ở bước 6…, không chuyển nguyên file.
+- Repo và domain đã có xếp vào thư mục chức năng: `repositories/{vang,taisan,chitieu,luong,dautu}/`, `domain/{vang,luong}/`.
+  `repositories/keys.py` và `repositories/store.py` ở gốc của lớp (dùng chung mọi chức năng).
+- Viết lại import bằng script (31 file).
 
 Xong khi: `kho.py`, `tg.py` không còn ở gốc; test kiến trúc xanh; test và lệnh ghi Redis giống `main`.
 
@@ -172,7 +173,7 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 2 `GoldRepo` | xong, đã deploy ([#53](https://github.com/hoang-developer/ban-tin-sang/pull/53)) |
 | 3 `AssetRepo`, `SalaryRepo`, `FundRepo` | xong, đã deploy ([#54](https://github.com/hoang-developer/ban-tin-sang/pull/54)) |
 | 4 `LedgerRepo` | xong, đã deploy ([#55](https://github.com/hoang-developer/ban-tin-sang/pull/55)) |
-| 5 Khung lớp, luật phụ thuộc, `infrastructure` | tiếp theo |
+| 5 Khung lớp, luật phụ thuộc, `infrastructure` | đang làm |
 | 6… Từng chức năng vào đúng lớp | chưa |
 | Cuối: dọn | chưa |
 
@@ -202,10 +203,10 @@ Hoàn tác: mỗi bước là một PR riêng, `git revert` được.
 
 | Chỉ số | Lúc đầu | Hiện tại | Đích |
 |---|---|---|---|
-| File `.py` ở gốc repo (không tính `api/`) | 26 | 26 | 0 |
+| File `.py` ở gốc repo (không tính `api/`) | 26 | 24 | 0 |
 | File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 18 (143) | 1 (`repositories/store.py`) |
 | Chuỗi khóa Redis viết cứng ngoài `keys.py` | ~20 | 0 | 0 |
 | Hàm nạp muộn né import vòng | 9 | 9 | 0 |
 | Hàm nghiệp vụ trả HTML | nhiều | nhiều | 0 |
-| Vi phạm chiều phụ thuộc giữa các lớp (test kiến trúc) | chưa đo | chưa đo | 0 |
+| Vi phạm chiều phụ thuộc giữa các lớp (test kiến trúc) | chưa đo | 0 | 0 |
 | Bộ đo 113 câu | 98–100 | chưa đo lại | ≥ 98 |

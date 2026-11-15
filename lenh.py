@@ -11,12 +11,12 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 
 import amlich
-import kho
+from infrastructure import kho
 from repositories import keys
-from domain.gold import GoldLot
-from repositories import gold as gold_repo
+from domain.vang.gold import GoldLot
+from repositories.vang import gold as gold_repo
 import nhandinh
-import tg
+from infrastructure import telegram as tg
 from bantin import BUTTONS as BANTIN_BUTTONS
 from bantin import VN_TZ, WEEKDAYS, build_message, gold, gold_prices, index_history, section, vn_num
 from canhbao import KEYWORDS, normalize

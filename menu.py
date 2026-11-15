@@ -10,7 +10,7 @@ Bấm nút thì mở ngay trong tin đó, có nút ⬅️ Hôm nay. /huongdan: m
 import html
 import sys
 
-import kho
+from infrastructure import kho
 from repositories import keys
 import sochitieu as ct
 from bantin import WEEKDAYS

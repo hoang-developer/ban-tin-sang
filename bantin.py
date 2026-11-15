@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import amlich
-import tg
+from infrastructure import telegram as tg
 
 # ---- Cấu hình -------------------------------------------------------------
 VN_TZ = timezone(timedelta(hours=7))  # Việt Nam không đổi giờ mùa hè

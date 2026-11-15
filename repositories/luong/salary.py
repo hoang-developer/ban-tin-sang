@@ -1,5 +1,5 @@
 """SalaryRepo: ngày và số tiền lương để nhắc hằng tháng (khóa keys.SALARY)."""
-from domain.salary import Salary
+from domain.luong.salary import Salary
 from repositories import keys, store
 
 

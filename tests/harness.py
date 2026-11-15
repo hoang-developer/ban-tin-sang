@@ -15,7 +15,7 @@ os.environ["TELEGRAM_CHAT_ID"] = "1"
 os.environ["GEMINI_API_KEY"] = "test"
 os.environ.pop("AI_API_KEY", None)
 
-import kho  # noqa: E402
+from infrastructure import kho  # noqa: E402
 
 STORE = {}
 
@@ -65,7 +65,7 @@ import bantin  # noqa: E402
 import dautu  # noqa: E402
 import sochitieu as ct  # noqa: E402
 import taisan as ts  # noqa: E402
-import tg  # noqa: E402
+from infrastructure import telegram as tg  # noqa: E402
 
 VN_TZ = bantin.VN_TZ
 CLOCK = {"now": datetime(2026, 11, 13, 9, 0, tzinfo=VN_TZ)}

@@ -16,10 +16,10 @@ import re
 import sys
 from datetime import date, datetime, timedelta
 
-import kho
+from infrastructure import kho
 from repositories import keys
-from repositories import fund as fund_repo
-from repositories import salary as salary_repo
+from repositories.dautu import fund as fund_repo
+from repositories.luong import salary as salary_repo
 import phantich as pt
 import sochitieu as ct
 import taisan as ts

@@ -7,6 +7,13 @@ from pathlib import Path
 from repositories import keys
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def source_files(outside=()):
+    """Mọi file .py của app (không tính tests, .git), bỏ các thư mục trong outside."""
+    return [p for p in sorted(ROOT.rglob("*.py"))
+            if not {"tests", ".git", "__pycache__"} & set(p.relative_to(ROOT).parts)
+            and not any(part in outside for part in p.relative_to(ROOT).parts)]
 GOLDEN = {  # chép từ main trước khi refactor
     keys.COUNTER: "chitieu:dem", keys.LEARN: "chitieu:hoc", keys.BUDGET: "chitieu:ngansach",
     keys.GROUPS: "chitieu:nhomrieng", keys.AI_CACHE: "chitieu:ai", keys.AI_STATS: "chitieu:ai:thongke",
@@ -59,7 +66,7 @@ class Khoa(unittest.TestCase):
     def test_code_khong_viet_khoa_truc_tiep(self):
         """kho.get/put/put_new/delete/command và remembered() phải nhận khóa từ repositories.keys, không phải chuỗi."""
         bad = []
-        for path in list(ROOT.glob("*.py")) + list((ROOT / "api").glob("*.py")):
+        for path in source_files():
             if path.name in ("kho.py", "danhgia_cau.py"):
                 continue
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
@@ -80,8 +87,8 @@ class Khoa(unittest.TestCase):
     def test_khong_con_chuoi_khoa_chitieu_ngoai_keys(self):
         """Hằng như K_X = "chitieu:..." hay f"chitieu:..." chỉ được nằm trong repositories/keys.py."""
         bad = []
-        for path in list(ROOT.glob("*.py")) + list((ROOT / "api").glob("*.py")):
-            if path.name == "danhgia_cau.py":
+        for path in source_files():
+            if path.name == "danhgia_cau.py" or path == ROOT / "repositories" / "keys.py":
                 continue
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.startswith("chitieu:"):
@@ -91,7 +98,7 @@ class Khoa(unittest.TestCase):
     def test_khoa_da_co_repo_chi_repo_duoc_dung(self):
         """Dữ liệu đã có repository (ví vàng, tài sản, lịch sử tài sản, giá, lương, quỹ, sổ thu chi) chỉ đi qua repo."""
         pattern = re.compile(r"keys\.(GOLD|ASSETS|ASSET_HISTORY|SALARY|FUND|price_cache|COUNTER|ledger_month)\b")
-        bad = [f"{path.name}: {m.group(0)}" for path in list(ROOT.glob("*.py")) + list((ROOT / "api").glob("*.py"))
+        bad = [f"{path.name}: {m.group(0)}" for path in source_files(outside=("repositories",))
                for m in pattern.finditer(path.read_text(encoding="utf-8"))]
         self.assertEqual(bad, [], "dùng repositories.<tên> thay vì gọi kho với khóa này")
 

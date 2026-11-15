@@ -7,7 +7,7 @@ from tests import harness as h
 
 import duphong
 import kehoach
-import kho
+from infrastructure import kho
 import menu
 import sochitieu as ct
 import sono

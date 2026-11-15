@@ -10,10 +10,10 @@ from urllib.parse import parse_qs
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import các file ở thư mục gốc
 
-import kho  # noqa: E402
+from infrastructure import kho  # noqa: E402
 from repositories import keys  # noqa: E402
 import lich  # noqa: E402
-import tg  # noqa: E402
+from infrastructure import telegram as tg  # noqa: E402
 from bantin import VN_TZ  # noqa: E402
 
 

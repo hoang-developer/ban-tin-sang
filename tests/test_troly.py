@@ -5,7 +5,7 @@ import unittest
 from tests import harness as h
 
 import duphong
-import kho
+from infrastructure import kho
 import sono
 import taisan as ts
 import tietkiem

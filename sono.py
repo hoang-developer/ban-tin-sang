@@ -15,10 +15,10 @@ import re
 import unicodedata
 from calendar import monthrange
 
-import kho
+from infrastructure import kho
 from repositories import keys
-from repositories import ledger as ledger_repo
-from repositories import salary as salary_repo
+from repositories.chitieu import ledger as ledger_repo
+from repositories.luong import salary as salary_repo
 import phantich as pt
 import sochitieu as ct
 import taisan as ts

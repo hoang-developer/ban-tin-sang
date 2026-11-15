@@ -17,9 +17,9 @@ import sys
 from datetime import date, timedelta
 
 import duphong
-import kho
+from infrastructure import kho
 from repositories import keys
-from repositories import salary as salary_repo
+from repositories.luong import salary as salary_repo
 import sochitieu as ct
 import sono
 import taisan as ts

@@ -4,7 +4,7 @@ import unittest
 from tests import harness as h
 from tests.test_dongtien import setup_month
 
-import kho
+from infrastructure import kho
 import lich
 import menu
 import sono

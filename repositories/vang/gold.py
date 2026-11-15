@@ -1,6 +1,6 @@
 """GoldRepo: ví vàng (khóa keys.GOLD, dùng chung với bot bản tin). Thứ tự danh sách là mã dòng ("v0", "v1"…)
 ở màn hình tài sản, nên mọi thao tác giữ nguyên thứ tự."""
-from domain.gold import GoldLot
+from domain.vang.gold import GoldLot
 from repositories import keys, store
 
 
