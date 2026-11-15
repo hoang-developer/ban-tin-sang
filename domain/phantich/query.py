@@ -87,7 +87,7 @@ def rule_spec(question, day, cfg, learned):
             "lon_nhat" if has("lon nhat", "to nhat", "dat nhat", "khoan nao") else
             "theo_ngay" if has("ngay nao") else
             "nhom" if has("nhom nao", "vao dau", "tieu gi", "chi gi", "nhieu nhat") else
-            "liet_ke" if has("liet ke", "nhung khoan", "cac khoan", "may lan", "nhung lan", "cac lan") else "tong")
+            "liet_ke" if has("liet ke", "nhung khoan", "cac khoan", "may lan", "nhung lan", "cac lan", "bao nhieu lan", "bao nhieu khoan") else "tong")
     spec = {"kieu": kind, "tu": start, "den": end, "nhom": [], "tu_khoa": [],
             "thu": has("thu nhap", "thu vao", "luong", "kiem duoc", "thu duoc")}
     if kind == "so_sanh":
@@ -143,10 +143,20 @@ def same_period(spec):
     return start2, end2
 
 
+def has_word(note, word):
+    """Ghi chú có từ này (đầu từ)? Gõ có dấu thì khớp đúng dấu ("phở" không khớp "phớ" của tào phớ);
+    gõ không dấu thì khớp không phân biệt dấu."""
+    word, note = norm(word), norm(note)
+    if word == plain(word) or note == plain(note):  # một bên không dấu: không biết dấu đúng, so không dấu
+        text, word = plain(note), plain(word)
+    else:
+        text = note
+    return bool(re.search(rf"(?<!\w){re.escape(word)}", text))
+
+
 def matches(e, spec):
     if spec["thu"] != (e["nhom"] == INCOME):
         return False
     if spec["nhom"] and e["nhom"] not in spec["nhom"]:
         return False
-    note = plain(e["ghichu"] or "")
-    return not spec["tu_khoa"] or any(re.search(rf"(?<!\w){re.escape(plain(w))}", note) for w in spec["tu_khoa"])
+    return not spec["tu_khoa"] or any(has_word(e["ghichu"] or "", w) for w in spec["tu_khoa"])

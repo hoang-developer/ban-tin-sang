@@ -115,6 +115,14 @@ class CauHoi(unittest.TestCase):
         cmp_spec = query.clean_spec({"kieu": "so_sanh", "tu": "2026-10-01", "den": "2026-10-20"}, DAY, CFG)
         self.assertEqual((cmp_spec["tu2"], cmp_spec["den2"]), (date(2026, 9, 1), date(2026, 9, 20)))
 
+    def test_khop_dung_dau(self):
+        self.assertTrue(query.has_word("phở bò kèm trứng", "phở"))
+        self.assertFalse(query.has_word("tào phớ", "phở"))  # "phớ" khác "phở"
+        self.assertFalse(query.has_word("chè đỗ đen tào phớ gánh", "phở"))
+        self.assertTrue(query.has_word("pho bo", "phở"))  # ghi chú không dấu: không biết dấu đúng
+        self.assertTrue(query.has_word("tào phớ", "pho"))  # gõ không dấu: khớp mọi dấu
+        self.assertTrue(query.has_word("Phở Bò", "phở"))
+
     def test_khop_khoan(self):
         spec = {"thu": False, "nhom": ["an"], "tu_khoa": ["cafe"]}
         self.assertTrue(query.matches({"nhom": "an", "ghichu": "Cafe sáng"}, spec))
@@ -175,6 +183,23 @@ class DichVu(unittest.TestCase):
         self.assertEqual(notes, ["• điểm một", "• điểm hai", "• điểm ba", "💡 gợi ý"])
         ai_client.chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
         self.assertEqual(service.commentary_notes("x", "y"), [])
+
+
+class HoiTheoDau(unittest.TestCase):
+    def setUp(self):
+        h.reset()
+        h.at(2026, 11, 15, 12)
+        self.real = ai_client.chat
+        self.addCleanup(lambda: setattr(ai_client, "chat", self.real))
+        ai_client.chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
+        for note in ("phở bò 40k", "tào phớ 25k", "phở bò kèm trứng 74k", "ăn tào phớ 24k", "chè đỗ đen tào phớ gánh 18k"):
+            ledger.add(note, h.CLOCK["now"])
+
+    def test_an_pho_khong_lan_tao_pho(self):
+        text = analysis.hoi("tháng này ăn phở bao nhiêu lần và hết bao nhiêu tiền?", date(2026, 11, 15))
+        self.assertIn("Tổng: <b>114.000đ</b> · 2 khoản", text)
+        self.assertNotIn("tào phớ", text)
+        self.assertIn("phở bò kèm trứng", text)
 
 
 class ManHinh(unittest.TestCase):
