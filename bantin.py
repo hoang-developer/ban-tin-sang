@@ -15,7 +15,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import amlich
+from domain.amlich import lunar as amlich
 from infrastructure import telegram as tg
 from domain.common.dates import WEEKDAYS  # noqa: F401
 from domain.common.format import vn_num  # noqa: F401

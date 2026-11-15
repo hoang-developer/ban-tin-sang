@@ -8,7 +8,7 @@ import sys
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
-import amlich
+from domain.amlich import lunar as amlich
 import canhbao
 from infrastructure import kho
 from repositories import keys

@@ -10,7 +10,7 @@ import re
 import sys
 from datetime import date, datetime, timedelta, timezone
 
-import amlich
+from domain.amlich import lunar as amlich
 from infrastructure import kho
 from repositories import keys
 from domain.vang.gold import GoldLot

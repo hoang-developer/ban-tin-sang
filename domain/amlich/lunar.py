@@ -1,7 +1,7 @@
 """Lịch âm Việt Nam (múi giờ +7), theo thuật toán của Hồ Ngọc Đức.
 
-Xem thử: python amlich.py             (hôm nay)
-         python amlich.py 17/2/2026   (một ngày dương lịch)
+Xem thử: python -m domain.amlich.lunar             (hôm nay)
+         python -m domain.amlich.lunar 17/2/2026   (một ngày dương lịch)
 """
 import math
 import sys
