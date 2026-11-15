@@ -9,7 +9,7 @@ import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from domain.amlich import lunar as amlich
-import canhbao
+from interface.canhbao import runner as canhbao
 from infrastructure import kho
 from repositories import keys
 from repositories.vang import gold as gold_repo
@@ -61,7 +61,7 @@ def ban_tin_sang(now, chat):
 
 
 def canh_bao(now, chat):
-    """Các cảnh báo của canhbao.py, trạng thái lưu trong kho thay cho state.json."""
+    """Các cảnh báo của interface/canhbao/runner.py, trạng thái lưu trong kho thay cho state.json."""
     if not between(now, (6, 0), (22, 0)):
         return None
     state = kho.get(keys.ALERT_STATE, {})

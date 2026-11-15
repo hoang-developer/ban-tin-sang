@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from infrastructure.web import fetch
 from interface.bantin.bulletin import news as headlines
-from canhbao import KEYWORD_FEEDS, normalize
+from domain.canhbao.rules import KEYWORD_FEEDS, normalize
 from chungkhoan import google_news, published_at
 
 # ---- Cấu hình -------------------------------------------------------------
@@ -73,7 +73,7 @@ def search(keyword, hours):
 
 
 def search_feeds(keyword):
-    """Dự phòng khi Google News lỗi: tìm trong tiêu đề RSS các báo của canhbao.py."""
+    """Dự phòng khi Google News lỗi: tìm trong tiêu đề RSS các báo của interface/canhbao/runner.py."""
     word = normalize(keyword.strip('"'))
     found = []
     for source, url in KEYWORD_FEEDS:

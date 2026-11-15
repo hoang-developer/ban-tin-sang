@@ -11,7 +11,7 @@ from infrastructure.clock import VN_TZ
 from infrastructure.web import fetch_json
 from interface.bantin.bulletin import section, weather
 from services.bantin.data import hourly
-from canhbao import rain_outlook
+from interface.canhbao.runner import rain_outlook
 
 
 def find_place(name):

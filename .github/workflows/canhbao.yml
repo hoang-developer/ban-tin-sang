@@ -1,7 +1,7 @@
 name: Cảnh báo
 
 # Cảnh báo và các việc theo giờ chạy trên Vercel (/api/tick): cron-job.org gọi mỗi 15 phút,
-# lịch này chỉ gọi dự phòng. Vercel chưa sẵn sàng (chưa có kho dữ liệu...) thì chạy canhbao.py
+# lịch này chỉ gọi dự phòng. Vercel chưa sẵn sàng (chưa có kho dữ liệu...) thì chạy interface/canhbao/runner.py
 # ngay tại đây như trước.
 on:
   schedule:
@@ -36,7 +36,7 @@ jobs:
           key: canhbao-${{ github.run_id }}
           restore-keys: canhbao-
       - if: steps.tick.outcome == 'failure'
-        run: python3 canhbao.py
+        run: python3 -m interface.canhbao.runner
       - if: always() && steps.tick.outcome == 'failure'
         uses: actions/cache/save@v4
         with:

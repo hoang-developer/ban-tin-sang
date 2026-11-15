@@ -202,6 +202,7 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.8e `chitieu`: định tuyến bot (bảng lệnh, trả lời tin nhắn, nút bấm) ở `interface/chitieu/{bot,features}`, `sochitieu.py` chỉ còn tên cũ dùng tạm (174 dòng) | xong, chờ deploy |
 | 6.9 `phantich`: số liệu và câu hỏi ở `domain/phantich`, đọc sổ ở `services/phantich` + `repositories/chitieu/analysis`, màn hình ở `presentation/phantich`, lệnh ở `interface/phantich`, vẽ biểu đồ ở `infrastructure/quickchart` (xóa `phantich.py`, file gốc còn 16) | xong, chờ deploy |
 | 6.10 `amlich` vào `domain/amlich`; `bantin.py` tách: thời tiết/vàng/chỉ số/RSS ở `infrastructure/{openmeteo,marketdata,web}`, gợi ý ở `domain/bantin`, lấy số liệu ở `services/bantin/data`, chữ ở `presentation/bantin/view`, ghép và gửi ở `interface/bantin/bulletin` (workflow chạy `python3 -m interface.bantin.bulletin`; file gốc còn 14) | xong, chờ deploy |
+| 6.11 `canhbao.py` tách: luật báo ở `domain/canhbao/rules`, các bước kiểm tra ở `services/canhbao/checks`, chữ ở `presentation/canhbao/view`, chạy và gửi ở `interface/canhbao/runner` (workflow chạy `python3 -m interface.canhbao.runner`; file gốc còn 13) | xong, chờ deploy |
 | 6.8… dọn `sochitieu.py` khi các module còn lại (`troly`, `menu`, `phantich`, `docanh`...) bỏ `ct.`; rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
 | Cuối: dọn | chưa |
 
