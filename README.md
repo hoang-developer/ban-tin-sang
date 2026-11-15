@@ -7,7 +7,7 @@ Bot Telegram riêng: bản tin mỗi sáng, bản tin tối, cảnh báo tức t
   chạy bộ), giá vàng, chứng khoán phiên trước, tin nổi bật. Dưới tin có nút 🔄 Cập nhật, 📈 VN30,
   🌧️ Mưa lúc nào?.
 - **Bot trên Vercel** ([api/telegram.py](api/telegram.py)) trả lời lệnh, và mỗi 15 phút chạy các việc theo
-  giờ ([api/tick.py](api/tick.py), [lich.py](lich.py)): bản tin sáng, cảnh báo, bảng điện ghim, đoán
+  giờ ([api/tick.py](api/tick.py), [interface/lich/jobs.py](interface/lich/jobs.py)): bản tin sáng, cảnh báo, bảng điện ghim, đoán
   xanh/đỏ, nhắc ngày, tin cổ tức, bản tin tối. Cài theo mục **Cài bot lên Vercel**.
 - **Bot chi tiêu** ([api/chitieu.py](api/chitieu.py), [sochitieu.py](sochitieu.py)): một bot Telegram thứ hai,
   nhắn "cà phê 35k" là bot ghi lại và tự xếp nhóm. Xem mục **Bot chi tiêu**.

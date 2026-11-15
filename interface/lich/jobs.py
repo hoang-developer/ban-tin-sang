@@ -5,13 +5,14 @@ Mỗi việc tự xem đã tới giờ chưa; việc ngày một lần được 
 import html
 import re
 import sys
-import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from domain.amlich import lunar as amlich
+from domain.lich.schedule import DIVIDEND_WORDS, between, normalize, trading_day  # noqa: F401
 from interface.canhbao import runner as canhbao
 from infrastructure import kho
 from repositories import keys
+from repositories.lich.jobs import done_today, mark_done  # noqa: F401
 from repositories.vang import gold as gold_repo
 import lenh
 from interface.nhandinh import analysis as nhandinh
@@ -27,26 +28,6 @@ from interface.bantin.bulletin import BUTTONS as BANTIN_BUTTONS
 from interface.bantin.bulletin import build_message, section, stocks, weather
 from services.bantin.data import gold_prices, hourly, index_history
 from interface.chungkhoan.stock import change, color, dong, google_news, index_rows, quotes
-
-# Từ khóa nhận ra tin quyền lợi cổ đông (so khớp sau khi đưa về chữ thường)
-DIVIDEND_WORDS = ["cổ tức", "chốt quyền", "chốt danh sách", "không hưởng quyền", "phát hành thêm",
-                  "thưởng cổ phiếu", "cổ phiếu thưởng"]
-
-
-def between(now, start, end):
-    return start <= (now.hour, now.minute) < end
-
-
-def trading_day(now):
-    return now.weekday() < 5
-
-
-def done_today(job, now):
-    return kho.get(keys.job_done(job, now.date())) is not None
-
-
-def mark_done(job, now):
-    kho.put(keys.job_done(job, now.date()), True, 3 * 86400)
 
 
 # ---- Các việc --------------------------------------------------------------------
@@ -200,10 +181,6 @@ def nhac_ngay(now, chat):
         tg.send(chat, "\n".join(lines))
     mark_done("nhac_ngay", now)
     return f"{len(lines)} lời nhắc"
-
-
-def normalize(text):
-    return unicodedata.normalize("NFC", text).lower()
 
 
 def co_tuc(now, chat):
