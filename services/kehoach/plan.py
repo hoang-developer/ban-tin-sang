@@ -5,7 +5,9 @@ Số liệu trả dạng dict theo khóa (xem domain/kehoach/plan.py); kết qu�
 import sys
 from datetime import timedelta
 
-import sochitieu as ct  # module cũ ở gốc: sổ chi tiêu, nhóm
+from domain.chitieu.kinds import INCOME
+from domain.chitieu.learn import pending as pending_count
+from repositories.chitieu import ledger as ledger_repo
 from domain.kehoach import plan as rules
 from domain.kehoach.plan import DoAllResult, StepResult
 from domain.no import debt as debt_rules
@@ -28,8 +30,8 @@ def spending_estimate(day, group, debt_need):
     budget_total = budget_repo.load().get("tong")
     if budget_total:
         return rules.estimate_spend(budget_total, debt_need, [], day, None)
-    items = [e for e in ct.between(day - timedelta(days=89), day)
-             if e["nhom"] not in (ct.INCOME, group) and not e.get("no")]
+    items = [e for e in ledger_repo.between(day - timedelta(days=89), day)
+             if e["nhom"] not in (INCOME, group) and not e.get("no")]
     return rules.estimate_spend(None, debt_need, items, day, reserve_repo.load().get("chi"))
 
 
@@ -47,8 +49,8 @@ def numbers(day):
     ym = debt_rules.month_of(day)
     data = assets_repo.load()
     group = debt_service.debt_group()[0]
-    month = ct.load(ym)
-    income = sum(e["tien"] for e in month if e["nhom"] == ct.INCOME)
+    month = ledger_repo.load(ym)
+    income = sum(e["tien"] for e in month if e["nhom"] == INCOME)
     basis = ""
     if not income:
         salary = salary_repo.load()
@@ -61,7 +63,7 @@ def numbers(day):
     debts = rules.month_debts(debt_service.debts(data), ym)  # (khoản nợ, phải trả kỳ này, đã trả kỳ này)
     debt_need = sum(need for _, need, _ in debts)
     debt_left = sum(debt_rules.month_left(d, ym) for d, _, _ in debts)
-    spending = [e for e in month if e["nhom"] not in (ct.INCOME, group) and not e.get("no")]
+    spending = [e for e in month if e["nhom"] not in (INCOME, group) and not e.get("no")]
     spent = sum(e["tien"] for e in spending)
     spent_today = sum(e["tien"] for e in spending if e["ngay"] == day.isoformat())
     spend, spend_basis = spending_estimate(day, group, debt_need)
@@ -115,8 +117,8 @@ def steps(n):
 def next_actions(day, n=None):
     """Các việc nên làm ngay (chưa cắt còn 3): xem domain.kehoach.plan.urgent_items."""
     n = n or numbers(day)
-    month_has_income = any(e["nhom"] == ct.INCOME for e in ct.load(n["ym"]))
-    pending = sum(ct.pending(e) for e in ct.load(n["ym"]))
+    month_has_income = any(e["nhom"] == INCOME for e in ledger_repo.load(n["ym"]))
+    pending = sum(pending_count(e) for e in ledger_repo.load(n["ym"]))
     return rules.urgent_items(n, month_has_income, pending)
 
 

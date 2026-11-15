@@ -2,7 +2,7 @@
 import html
 from datetime import date
 
-import sochitieu as ct  # module cũ ở gốc: nút ⬅️ Hôm nay
+from presentation.chitieu.view import BACK
 from domain.common.format import short as short_vnd, vnd
 from domain.taisan.kinds import TYPES
 from domain.taisan.text import gold_name, qty_text, short
@@ -23,7 +23,7 @@ USAGE = ("💼 <b>Khai báo tài sản</b> (số tiền viết kiểu 25tr, 1t�
          "Xem: /taisan · Sửa, xóa: /taisan xoa · Khám sức khỏe tài chính: /suckhoe")
 BUTTONS = [[("📊 Biểu đồ", "ts:bd"), ("🩺 Khám sức khỏe", "ts:sk")],
            [("🗂 Sửa, xóa", "ts:ds"), ("🔄 Cập nhật giá", "ts:xem")],
-           [("🏦 Tài khoản chính", "ts:chinh"), ("➕ Thêm", "y:them"), ct.BACK]]
+           [("🏦 Tài khoản chính", "ts:chinh"), ("➕ Thêm", "y:them"), BACK]]
 
 def gain_text(gain, cost):
     """'🟢 +190k (+8%)' / '🔴 −146k (−10%)'."""
@@ -176,7 +176,7 @@ def main_view(it, income, spend, balance):
                   f"{html.escape(x['ghi'])}" for x in moves[-5:][::-1]]
     lines.append("<i>Lệch với app ngân hàng thì bấm cập nhật số dư thật</i>")
     return "\n".join(lines), [[("✏️ Cập nhật số dư thật", "y:them:tai_khoan:chinh")],
-                              [("🔁 Đổi tài khoản chính", "ts:chon"), ("💼 Tài sản", "m:ts"), ct.BACK]]
+                              [("🔁 Đổi tài khoản chính", "ts:chon"), ("💼 Tài sản", "m:ts"), BACK]]
 
 def choose_main_view(options):
     """Màn hình chọn tài khoản chính. options: [(mục, số dư đang hiện)] của các tài khoản có thể chọn."""
@@ -184,7 +184,7 @@ def choose_main_view(options):
              "Bot tự cộng thu, trừ chi, trừ tiền chuyển sang quỹ, đầu tư, tiết kiệm, trả nợ."]
     if not options:
         lines.append("Chưa có tài khoản: nhắn «tài khoản Techcombank còn 14tr» hoặc bấm nút.")
-        return "\n".join(lines), [[("➕ Thêm tài khoản", "y:them:tai_khoan"), ct.BACK]]
+        return "\n".join(lines), [[("➕ Thêm tài khoản", "y:them:tai_khoan"), BACK]]
     rows = [[(("✅ " if it.get("chinh") else "") + f"{it['ten']} ({short(shown)})",
               f"ts:chinh:{it['id']}")] for it, shown in options[:6]]
-    return "\n".join(lines), rows + [[("➕ Tài khoản khác", "y:them:tai_khoan"), ct.BACK]]
+    return "\n".join(lines), rows + [[("➕ Tài khoản khác", "y:them:tai_khoan"), BACK]]

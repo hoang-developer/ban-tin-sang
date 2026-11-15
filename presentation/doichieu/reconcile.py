@@ -1,7 +1,7 @@
 """Đối chiếu tài sản tháng: dựng tin Telegram (HTML) và nút từ kết quả của service. Không logic nghiệp vụ, không đọc kho."""
 import html
 
-import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
+from presentation.chitieu.view import BACK
 from domain.taisan import text as taisan_text
 from domain.doichieu.reconcile import UNITS, color, total_gap
 
@@ -33,7 +33,7 @@ def screen_view(day, state):
     """(tin, nút) của màn hình đối chiếu tháng: mỗi ngăn một dòng và một hàng nút."""
     if not state.entries:
         return ("🔄 Chưa có tài sản nào để đối chiếu. Nhắn kiểu «tài khoản VCB còn 30tr».",
-                [[("➕ Thêm", "y:them"), ct.BACK]])
+                [[("➕ Thêm", "y:them"), BACK]])
     lines = [f"🔄 <b>Đối chiếu tài sản {day.month}/{day.year}</b>",
              "<i>Mở app ngân hàng, Fmarket… so từng dòng: khớp bấm ✅, lệch bấm ✏️ rồi nhắn số thật</i>"]
     rows, left = [], 0
@@ -57,7 +57,7 @@ def screen_view(day, state):
                      + (f" · còn {left} ngăn" if left else " · 🎉 xong"))
     if left > 1:
         rows.append([("✅ Khớp hết phần còn lại", "dc:het")])
-    return "\n".join(lines), rows + [[("💰 Tiền của tôi", "m:tien"), ct.BACK]]
+    return "\n".join(lines), rows + [[("💰 Tiền của tôi", "m:tien"), BACK]]
 
 
 def set_value_view(r):

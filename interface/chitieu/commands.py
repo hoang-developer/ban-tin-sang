@@ -23,6 +23,8 @@ from repositories.chitieu import budget as budget_repo
 from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
 from services.chitieu import ai_sort, ledger
+from services.chitieu.groups import (MAX_GROUPS, MAX_WORDS, NHOM_USAGE, add_words, after_change,  # noqa: F401
+                                     nhom_them)
 
 MAX_GROUPS, MAX_WORDS = 20, 60  # số nhóm tự tạo, số từ khóa tự thêm cho mỗi nhóm
 ai_key = ai_client.key
@@ -92,60 +94,9 @@ def ngansach(args):
     label = budget_label(code)
     return "\n".join([f"🎯 Ngân sách {label}: {vnd(found[0])}/tháng"] + budget_lines([code], today()))
 
-NHOM_USAGE = ("<b>Tự chỉnh nhóm</b>\n"
-              "• Tạo nhóm: /nhom them 🏦 Trả nợ: trả nợ, trả góp, vay\n"
-              "• Thêm từ khóa: /nhom tukhoa Ăn uống: bún chả, bánh tráng\n"
-              "• Đổi tên: /nhom doiten Đi lại: 🚗 Xe cộ\n"
-              "• Ẩn nhóm không dùng: /nhom xoa Học tập\n"
-              "• Chọn nhóm ngay khi ghi: đóng họ 1tr #trả nợ\n"
-              "• Xếp các khoản đang ở Khác: /chuaxep")
 
-def add_words(cfg, code, words):
-    """Thêm từ khóa cho một nhóm; từ khóa đó có ở nhóm tự chỉnh khác thì chuyển sang nhóm này,
-    cụm từ đã học trùng hẳn từ khóa đó (học từ lần sửa cũ) thì bỏ để từ khóa mới có tác dụng."""
-    if words:
-        learned = groups_repo.learned()
-        kept = {k: c for k, c in learned.items() if k not in words or c == code}
-        if len(kept) != len(learned):
-            groups_repo.save_learned(kept)
-    cfg.setdefault("tu", {})
-    for other, own in cfg["tu"].items():
-        if other != code:
-            own[:] = [w for w in own if w not in words]
-    cfg["tu"][code] = list(dict.fromkeys(cfg["tu"].get(code, []) + words))[-MAX_WORDS:]
-    cfg["tu"] = {c: w for c, w in cfg["tu"].items() if w}
 
-def after_change(cfg, text):
-    save_config(cfg)
-    moved = ledger.tidy(today())
-    return text + (f"\n↪️ Đã xếp lại {moved} khoản đang ở Khác theo nhóm mới" if moved else "")
 
-def nhom_them(rest):
-    head, words = labels.split_spec(rest)
-    cfg = json.loads(json.dumps(config()))  # bản sao để sửa
-    label = labels.make_label(head) if head else None
-    code = find_group(head, include_hidden=True, cfg=cfg) if label else None
-    if code and plain(bare(name(code, cfg))) != plain(bare(label)):
-        code = None  # chỉ khớp một phần tên ("Ăn" với "Ăn uống"): tạo nhóm mới
-    if code:
-        was_hidden = code in cfg.get("an", [])
-        cfg["an"] = [c for c in cfg.get("an", []) if c != code]
-        add_words(cfg, code, words)
-        text = (f"✅ Đã dùng lại nhóm {name(code, cfg)}" if was_hidden else f"Nhóm {name(code, cfg)} đã có")
-        return after_change(cfg, text + (f", thêm từ khóa: {html.escape(', '.join(words))}" if words else ""))
-    if not label:
-        return NHOM_USAGE
-    if len(cfg.get("moi", [])) >= MAX_GROUPS:
-        return f"Đã có {MAX_GROUPS} nhóm tự tạo, ẩn bớt nhóm không dùng (/nhom xoa tên nhóm) rồi tạo tiếp"
-    cfg["dem"] = cfg.get("dem", 0) + 1
-    code = f"r{cfg['dem']}"
-    cfg.setdefault("moi", []).append(code)
-    cfg.setdefault("ten", {})[code] = label
-    add_words(cfg, code, words)
-    text = f"✅ Đã tạo nhóm {html.escape(label)}" + (
-        f", từ khóa: {html.escape(', '.join(words))}" if words else
-        f"\nThêm từ khóa để bot tự xếp: /nhom tukhoa {html.escape(bare(label))}: từ khóa 1, từ khóa 2")
-    return after_change(cfg, text)
 
 def nhom_tukhoa(rest):
     head, words = labels.split_spec(rest)

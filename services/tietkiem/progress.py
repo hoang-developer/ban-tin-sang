@@ -5,7 +5,8 @@ Trả kết quả có cấu trúc (domain.tietkiem.progress), không trả chữ
 import sys
 from datetime import date, timedelta
 
-import sochitieu as ct  # module cũ ở gốc: đọc sổ chi tiêu
+from domain.chitieu.kinds import INCOME
+from repositories.chitieu import ledger as ledger_repo
 from domain.tietkiem import progress as rules
 from domain.tietkiem.progress import InvestMove, Milestones, NoSpend, PeriodInfo
 from domain.dautu.plan import is_active
@@ -31,8 +32,8 @@ def days_data(cfg, today):
     start = date.fromisoformat(cfg["bat_dau"])
     if today < start:
         return {}, set(), []
-    entries = ct.between(start, today)
-    small, logged = rules.collect_days(cfg, today, entries, debt_group(), ct.INCOME)
+    entries = ledger_repo.between(start, today)
+    small, logged = rules.collect_days(cfg, today, entries, debt_group(), INCOME)
     return small, logged, entries
 
 
@@ -49,7 +50,7 @@ def real_saved(cfg, entries):
     except Exception as e:
         print(f"[lỗi] đầu tư trong /tietkiem: {e!r}", file=sys.stderr)
     group = debt_group()
-    out["tra_no"] = sum(e["tien"] for e in entries if e["nhom"] != ct.INCOME and rules.is_debt(e, group))
+    out["tra_no"] = sum(e["tien"] for e in entries if e["nhom"] != INCOME and rules.is_debt(e, group))
     return out
 
 
@@ -68,7 +69,7 @@ def claim_milestones(p):
 
 def after_record(entries, day):
     """(Progress, Milestones) để thêm dòng dưới tin "Đã ghi"; None nếu chưa cần (chỉ thu nhập, hoặc trước ngày bắt đầu)."""
-    if not any(e["nhom"] != ct.INCOME for e in entries):
+    if not any(e["nhom"] != INCOME for e in entries):
         return None
     p = summary(day)
     if day < p.start:
@@ -88,7 +89,7 @@ def mark_no_spend(day_iso, today):
     if not cfg["bat_dau"] <= day_iso <= today.isoformat() or (today - date.fromisoformat(day_iso)).days > 1:
         return NoSpend("ngoai_pham_vi")
     when = "hôm nay" if day_iso == today.isoformat() else "hôm qua"
-    if any(e["ngay"] == day_iso and e["nhom"] != ct.INCOME for e in ct.load(day_iso[:7])):
+    if any(e["ngay"] == day_iso and e["nhom"] != INCOME for e in ledger_repo.load(day_iso[:7])):
         return NoSpend("da_co_chi", when)
     if day_iso not in cfg["khong_tieu"]:
         cfg["khong_tieu"] = sorted(cfg["khong_tieu"] + [day_iso])[-1000:]

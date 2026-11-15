@@ -8,7 +8,8 @@ from datetime import date, timedelta
 
 from domain.phantich import numbers as phantich_numbers
 from services.phantich import analysis as phantich_service
-import sochitieu as ct  # module cũ ở gốc
+from repositories.chitieu import ledger as ledger_repo
+from services.chitieu import groups as chitieu_groups
 from repositories.taisan import assets as assets_repo
 from services.taisan import accounts, flows
 from services.taisan import valuation as valuation_service
@@ -18,8 +19,8 @@ from repositories.duphong import reserve as reserve_repo
 
 
 def essential_groups():
-    codes = [c for c in rules.ESSENTIAL if c in ct.groups()]
-    debt = ct.find_group("trả nợ")
+    codes = [c for c in rules.ESSENTIAL if c in chitieu_groups.groups()]
+    debt = chitieu_groups.find_group("trả nợ")
     return codes + ([debt] if debt and debt not in codes else [])
 
 
@@ -27,7 +28,7 @@ def essential(day):
     """(chi thiết yếu/tháng, {nhóm: chi/tháng}, số ngày dữ liệu). Nhóm hằng ngày bỏ khoản đột biến; tiền nhà, hóa
     đơn, trả nợ... tính đủ vì tháng nào cũng có."""
     codes = essential_groups()
-    items = [e for e in phantich_numbers.spending(ct.between(day - timedelta(days=89), day)) if e["nhom"] in codes]
+    items = [e for e in phantich_numbers.spending(ledger_repo.between(day - timedelta(days=89), day)) if e["nhom"] in codes]
     if not items:
         return 0, {}, 0
     daily = [c for c in phantich_service.daily_groups() if c in codes] + [c for c in ("khoe", "giadinh") if c in codes]
@@ -55,7 +56,7 @@ def status(day):
     """ReserveStatus của quỹ tại ngày day."""
     essentials = essential(day)
     rows = fund_rows(day)
-    labels = {c: ct.name(c) for c in essentials[1]}
+    labels = {c: chitieu_groups.name(c) for c in essentials[1]}
     other = any(not accounts.same_name(n, rules.FUND_NAME) for n, _ in rows)
     return rules.build_status(reserve_repo.load(), day, essentials, rows, flows.monthly_flows(day), labels, other)
 
@@ -63,7 +64,7 @@ def status(day):
 def fund_item(data):
     item = next((it for it in data["items"] if it["loai"] == "tien" and accounts.same_name(it["ten"], rules.FUND_NAME)), None)
     if item is None:
-        item = {"id": assets_repo.new_id(data), "loai": "tien", "ten": rules.FUND_NAME, "tien": 0, "ngay": ct.today().isoformat(),
+        item = {"id": assets_repo.new_id(data), "loai": "tien", "ten": rules.FUND_NAME, "tien": 0, "ngay": chitieu_groups.today().isoformat(),
                 "duphong": True}
         data["items"].append(item)
     item["duphong"] = True

@@ -1,7 +1,7 @@
 """Kế hoạch tài chính: dựng tin Telegram (HTML) và nút từ số liệu của service. Không logic nghiệp vụ, không đọc kho."""
 import html
 
-import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
+from presentation.chitieu.view import BACK
 from domain.taisan import text as taisan_text
 from domain.duphong.reserve import MIN_DAYS
 from domain.kehoach.plan import INVEST, STEP_MIN
@@ -83,7 +83,7 @@ def main_note(main, left, total):
 def confirm_view(day, todo, invest_fund, main, balance):
     """(tin hỏi lại, nút) trước khi làm hết kế hoạch. todo: các việc còn lại; rỗng thì báo đã làm hết."""
     if not todo:
-        return "✅ Kế hoạch tháng này đã làm hết rồi.", [[("📋 Chia lương", "kh:chia"), ct.BACK]]
+        return "✅ Kế hoạch tháng này đã làm hết rồi.", [[("📋 Chia lương", "kh:chia"), BACK]]
     total = sum(x[2] for x in todo)
     icons = {"no": "💳", "dp": "🛟", "dt": "📈"}
     lines = [f"✅ <b>Làm hết kế hoạch tháng {day.month}?</b>"] + [
@@ -146,7 +146,7 @@ def roadmap_view(day, n, r, actions):
     lines += [f"• {a}" for a in next_action_lines(actions)]
     rows = [[("📋 Chia lương tháng này", "kh:chia")],
             [("🛟 Quỹ dự phòng", "dp:xem"), ("💳 Sổ nợ", "no:xem")],
-            [("📈 Đầu tư", "dt:xem"), ("🩺 Khám sức khỏe", "ts:sk"), ct.BACK]]
+            [("📈 Đầu tư", "dt:xem"), ("🩺 Khám sức khỏe", "ts:sk"), BACK]]
     return "\n".join(lines), rows
 
 
@@ -203,7 +203,7 @@ def plan_view(day, n, s, step, main, balance, todo):
         rows.append([(f"📈 Để {short(n['invest_left'])} vào quỹ chờ {n['invest']['ma']}", f"dt:nap:{int(n['invest_left'])}")])
     if not main:
         rows.append([("🏦 Chọn tài khoản chính", "ts:chon")])
-    rows.append([("🎯 Lộ trình", "kh:lt"), ct.BACK])
+    rows.append([("🎯 Lộ trình", "kh:lt"), BACK])
     return "\n".join(lines), rows
 
 

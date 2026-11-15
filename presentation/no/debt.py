@@ -2,7 +2,7 @@
 import html
 
 from domain.common.format import short as format_short
-import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
+from presentation.chitieu.view import BACK
 from domain.taisan import text as taisan_text
 from domain.no.debt import Ask, month_left, month_of, paid_in, schedule, ym_text
 
@@ -113,10 +113,10 @@ def after_record_view(events):
 def view_view(state, day):
     """(tin, nút) của màn hình sổ nợ (state: ViewState)."""
     items, done = state.items, state.done
-    back = [("🗂 Sửa, xóa", "no:ds"), ("➕ Thêm khoản nợ", "y:them:no_moi"), ct.BACK]
+    back = [("🗂 Sửa, xóa", "no:ds"), ("➕ Thêm khoản nợ", "y:them:no_moi"), BACK]
     if not items and not done:
         return ("💳 Chưa có khoản nợ nào. Bấm ➕ để thêm, hoặc nhắn câu thường, ví dụ: «vay anh Nam 10tr, mỗi tháng trả "
-                "2tr, không lãi».", [[("➕ Thêm khoản nợ", "y:them:no_moi"), ct.BACK]])
+                "2tr, không lãi».", [[("➕ Thêm khoản nợ", "y:them:no_moi"), BACK]])
     total, monthly = sum(d["tien"] for d in items), state.monthly
     lines = [f"💳 <b>Sổ nợ: còn {short(total)}</b>" + (f" · trả {short(monthly)}/tháng" if monthly else "")]
     for i, d in enumerate(items, 1):

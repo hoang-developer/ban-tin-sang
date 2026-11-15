@@ -2,7 +2,7 @@
 from datetime import timedelta
 
 from domain.common.format import short as format_short
-import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
+from presentation.chitieu.view import BACK
 
 USAGE = ("💚 /tietkiem: chi lặt vặt so với trước khi dùng bot, chuỗi ngày ghi chép, đã để dành thật\n"
          "/tietkiem khongtieu: hôm nay không tiêu gì (giữ chuỗi; ghi bù hôm qua: /tietkiem khongtieu hôm qua)\n"
@@ -56,7 +56,7 @@ def buttons(p, day, invest_fund=None):
             move.append((f"📈 {money(p.movable)} → quỹ chờ {invest_fund}", f"tk:chuyen:dt:{p.movable}"))
         move.append((f"🛟 {money(p.movable)} → quỹ dự phòng", f"tk:chuyen:dp:{p.movable}"))
         rows.append(move)
-    rows.append([("🔄 Cập nhật", "tk:xem"), ct.BACK])
+    rows.append([("🔄 Cập nhật", "tk:xem"), BACK])
     return rows
 
 

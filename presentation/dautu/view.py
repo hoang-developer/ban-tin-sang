@@ -1,7 +1,7 @@
 """Màn hình /dautu: chữ và nút dựng từ số liệu đã tính (không đọc kho, không gọi mạng)."""
 from datetime import date, timedelta
 
-import sochitieu as ct  # module cũ ở gốc: nút ⬅️ Hôm nay
+from presentation.chitieu.view import BACK
 from domain.common.format import vn_num, vnd
 from domain.dautu.calendar import ym_of, ym_text
 from domain.dautu.plan import SWITCH_DAYS, WATCH, gop_of, side, them_of
@@ -130,7 +130,7 @@ def buttons(cfg, s, sess, final, side_phien):
     if not s["skip"] and not s["ordered"]:
         rows.append([("⏸ Tạm dừng tháng này", f"dt:bo:{s['ym']}")])
     rows.append([("🔄 Cập nhật", "dt:xem"), ("📊 Biểu đồ", "dt:bd"), ("🧾 Lệnh", "dt:ls")])
-    rows.append([("🎯 Kế hoạch", "kh:lt"), ct.BACK])
+    rows.append([("🎯 Kế hoạch", "kh:lt"), BACK])
     return rows
 
 
@@ -195,7 +195,7 @@ def history_view(cfg):
             lines.append(f"• {when}: {money(o['tien'])} · chờ khớp")
     fixable = list(dict.fromkeys(o.get("quy", cfg["ma"]) for o in orders
                                  if o["trang_thai"] == "khop" and o.get("loai") != "doi"))
-    return "\n".join(lines), [[fix_button(code)] for code in fixable[-2:]] + [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
+    return "\n".join(lines), [[fix_button(code)] for code in fixable[-2:]] + [[("📈 Đầu tư", "dt:xem"), BACK]]
 
 
 def fix_button(code):
