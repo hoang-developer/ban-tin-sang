@@ -4,7 +4,9 @@ from datetime import date
 
 from tests import harness as h
 
-import sochitieu as ct
+from domain.chitieu.refs import ref
+from interface.chitieu import context as chitieu_ctx
+from repositories.chitieu import ledger as ledger_repo
 from domain.no import debt as rules
 from domain.no.debt import DebtHealth, DeclareResult, Payment
 from presentation.no import debt as pview
@@ -158,14 +160,14 @@ class Service(unittest.TestCase):
         d = self.declare(nay=True).debt
         r = service.pay(d["id"], 2_000_000, h.CLOCK["now"])
         self.assertEqual((r.status, r.payment.left, r.entry["no"], r.entry["tien"]), ("ok", 8_000_000, d["id"], 2_000_000))
-        self.assertEqual(ct.find(ct.ref(r.entry))["ghichu"], "trả nợ bác Vân")
+        self.assertEqual(chitieu_ctx.find(ref(r.entry))["ghichu"], "trả nợ bác Vân")
         self.assertEqual(service.by_id(None, d["id"])["tien"], 8_000_000)
         self.assertEqual(service.pay(99, 1, h.CLOCK["now"]).status, "het_hoac_xoa")
 
     def test_gan_roi_bo_tru(self):
         d = self.declare().debt
         e = {"id": ledger_repo.next_id(), "ngay": "2026-11-10", "gio": "10:00", "tien": 1_000_000, "ghichu": "x", "nhom": "khac"}
-        ct.save(e)
+        ledger_repo.save(e)
         payment = service.assign(e, d["id"], self.day)
         self.assertEqual((payment.left, e["no"]), (9_000_000, d["id"]))
         self.assertIsNone(service.assign(e, d["id"], self.day))  # đã trừ rồi

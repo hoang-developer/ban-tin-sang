@@ -15,7 +15,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import 
 
 from interface.docanh import photo as docanh  # noqa: E402
 from infrastructure import kho  # noqa: E402
-import sochitieu as chitieu  # noqa: E402 (file lõi đặt tên khác file này để khỏi import nhầm)
+from interface.chitieu import bot as chitieu_bot  # noqa: E402
+from interface.chitieu import context as chitieu_ctx  # noqa: E402
+from repositories.chitieu import groups as groups_repo  # noqa: E402
+from services.chitieu import ai_sort  # noqa: E402
 from infrastructure import telegram as tg  # noqa: E402
 from infrastructure.clock import VN_TZ  # noqa: E402
 
@@ -23,7 +26,7 @@ from infrastructure.clock import VN_TZ  # noqa: E402
 def handle_message(message, tok):
     chat_id = (message.get("chat") or {}).get("id")
     text = message.get("text") or ""
-    if str(chat_id) not in chitieu.owner_chats():
+    if str(chat_id) not in chitieu_ctx.owner_chats():
         if chat_id and text.startswith("/"):
             tg.send(chat_id, f"Bot này là bot riêng. Chat ID của bạn: {chat_id}\n"
                              "Nếu bạn là chủ bot: thêm số này vào CHITIEU_CHAT_ID trên Vercel rồi Redeploy.",
@@ -40,7 +43,7 @@ def handle_message(message, tok):
         if image:  # ảnh hóa đơn, màn hình chuyển khoản (chữ kèm ảnh là ghi chú / #nhóm)
             reply = docanh.photo(message, tok, datetime.now(VN_TZ))
         else:
-            reply = chitieu.answer(text, datetime.now(VN_TZ), chat_id)
+            reply = chitieu_bot.answer(text, datetime.now(VN_TZ), chat_id)
     except Exception as e:
         print(f"[lỗi] trả lời {text or 'ảnh'!r}: {e!r}", file=sys.stderr)
         reply = "⚠️ Bot gặp lỗi, thử lại sau nhé."
@@ -49,10 +52,10 @@ def handle_message(message, tok):
 
 def handle_button(query, tok):
     chat_id = ((query.get("message") or {}).get("chat") or {}).get("id")
-    if str(chat_id) not in chitieu.owner_chats():
+    if str(chat_id) not in chitieu_ctx.owner_chats():
         tg.call("answerCallbackQuery", tok, callback_query_id=query["id"])
         return
-    tg.handle_button(query, chitieu.on_button, datetime.now(VN_TZ), tok)
+    tg.handle_button(query, chitieu_bot.on_button, datetime.now(VN_TZ), tok)
 
 
 def try_page(environ):
@@ -60,12 +63,12 @@ def try_page(environ):
     query = urllib.parse.parse_qs(environ.get("QUERY_STRING", ""))
     if "danhgia" in query and kho.ready():  # đo bot hiểu tin nhắn tới đâu (interface/danhgia/benchmark.py)
         from interface.danhgia import benchmark as danhgia
-        chitieu.reset()
+        groups_repo.reset()
         return danhgia.page(query)
     if "hieu" not in query or not kho.ready():
         return None
     from interface.troly import assistant as troly
-    chitieu.reset()
+    groups_repo.reset()
     return troly.try_text(query["hieu"][0], datetime.now(VN_TZ).date())
 
 
@@ -76,14 +79,14 @@ def status_page(environ, tok):
     if not tok:
         return ("Chưa có biến CHITIEU_BOT_TOKEN trên Vercel. Tạo bot qua @BotFather, thêm token vào biến đó "
                 "rồi Redeploy (xem README, mục Bot chi tiêu).\n"
-                + chitieu.ai_status(test="thu=1" in environ.get("QUERY_STRING", "")))
-    if not chitieu.owner_chats():
+                + ai_sort.ai_status(test="thu=1" in environ.get("QUERY_STRING", "")))
+    if not chitieu_ctx.owner_chats():
         return "Thiếu TELEGRAM_CHAT_ID (hoặc CHITIEU_CHAT_ID) trên Vercel. Thêm vào rồi Redeploy."
     host = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL") or environ.get("HTTP_HOST")
     try:
         tg.call("setWebhook", tok, url=f"https://{host}/api/chitieu",
                 secret_token=tg.derived_secret("webhook", tok), allowed_updates=["message", "callback_query"])
-        tg.call("setMyCommands", tok, commands=chitieu.MENU)
+        tg.call("setMyCommands", tok, commands=chitieu_bot.MENU)
         info = tg.call("getWebhookInfo", tok)
         me = tg.call("getMe", tok)
     except Exception as e:
@@ -92,9 +95,9 @@ def status_page(environ, tok):
              f"Tin nhắn đang chờ: {info.get('pending_update_count', 0)}"]
     if info.get("last_error_message"):
         lines.append(f"Lỗi gần nhất từ Telegram: {info['last_error_message']}")
-    lines += [f"Chỉ trả lời chat ID: {', '.join(chitieu.owner_chats())}",
+    lines += [f"Chỉ trả lời chat ID: {', '.join(chitieu_ctx.owner_chats())}",
               f"Kho dữ liệu: {'đã kết nối' if kho.ready() else 'chưa có (xem README)'}",
-              chitieu.ai_status(test="thu=1" in environ.get("QUERY_STRING", "")), "", f"Xong! Vào Telegram nhắn @{me.get('username')}: cà phê 35k"]
+              ai_sort.ai_status(test="thu=1" in environ.get("QUERY_STRING", "")), "", f"Xong! Vào Telegram nhắn @{me.get('username')}: cà phê 35k"]
     return "\n".join(lines)
 
 
@@ -106,7 +109,7 @@ def respond(start_response, status, text):
 
 
 def app(environ, start_response):
-    tok = chitieu.token()
+    tok = chitieu_ctx.token()
     if environ["REQUEST_METHOD"] != "POST":
         return respond(start_response, "200 OK", status_page(environ, tok))
     secret = environ.get("HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN", "").encode()

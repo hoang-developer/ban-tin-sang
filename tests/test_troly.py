@@ -4,6 +4,8 @@ import unittest
 
 from tests import harness as h
 
+from domain.common.money import parse_amount
+
 from services.duphong import reserve as duphong
 from infrastructure import kho
 from interface.no import debt as sono
@@ -227,9 +229,9 @@ class TroLy(unittest.TestCase):
         cases = {"1tr287k": 1_287_000, "1tr287": 1_287_000, "1tr2": 1_200_000, "1287k": 1_287_000, "cà phê 35": 35_000,
                  "gửi 6 tháng 50tr": 50_000_000, "cơm 2 người 120k": 120_000, "2 vỉ vàng 0,1 chỉ hết 2tr476": 2_476_000,
                  "tháng 11 19,1tr": 19_100_000}
-        self.assertEqual({t: h.ct.parse_amount(t)[0] for t in cases}, cases)
+        self.assertEqual({t: parse_amount(t)[0] for t in cases}, cases)
         for t in ("0.1 chỉ", "lãi 4,7%", "6 tháng"):
-            self.assertIsNone(h.ct.parse_amount(t), t)
+            self.assertIsNone(parse_amount(t), t)
 
 
 if __name__ == "__main__":

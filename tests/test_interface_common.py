@@ -3,7 +3,7 @@ import unittest
 
 from tests import harness as h
 
-import sochitieu as ct
+from presentation.chitieu import view as cview
 from infrastructure import kho
 from interface import common
 
@@ -29,7 +29,7 @@ class Chung(unittest.TestCase):
         real = kho.ready
         kho.ready = lambda: False
         try:
-            self.assertEqual(work(2), ct.NEED_STORE)
+            self.assertEqual(work(2), cview.NEED_STORE)
             self.assertFalse(common.ready())
         finally:
             kho.ready = real

@@ -3,7 +3,6 @@ import unittest
 
 from tests import harness as h
 
-import sochitieu as ct
 from infrastructure import ai as ai_client
 from interface import common
 from interface.chitieu import bot
@@ -20,7 +19,6 @@ class Bang(unittest.TestCase):
         self.assertEqual([m["command"] for m in bot.MENU], bot.VISIBLE)
         self.assertEqual(bot.period_kind([]), "thang")
         self.assertEqual((bot.period_kind(["10"]), bot.period_kind(["tuan"]), bot.period_kind(["homnay"])), ("10", "tuan", "ngay"))
-        self.assertIs(ct.respond, bot.respond)  # sochitieu giữ tên cũ
 
     def test_nut_cua_tin(self):
         message = {"reply_markup": {"inline_keyboard": [[{"text": "a", "callback_data": "doi:2026-10:3"}, {"text": "b", "callback_data": "m:home"}]]}}
@@ -34,9 +32,9 @@ class Tra(unittest.TestCase):
     def setUp(self):
         h.reset()
         h.at(2026, 10, 20, 10)
-        real_ct, real_ai = ct.ai_chat, ai_client.chat
-        self.addCleanup(lambda: (setattr(ct, "ai_chat", real_ct), setattr(ai_client, "chat", real_ai)))
-        ai_client.chat = ct.ai_chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
+        real_ai = ai_client.chat
+        self.addCleanup(lambda: setattr(ai_client, "chat", real_ai))
+        ai_client.chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
         self.now = h.CLOCK["now"]
 
     def test_ghi_khoan_va_lenh(self):

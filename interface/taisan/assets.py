@@ -12,7 +12,10 @@ import html
 import re
 import sys
 
-import sochitieu as ct  # module cũ ở gốc: ngày hôm nay, khóa AI, trò chuyện với AI, gợi ý chia lương
+from domain.chitieu.kinds import INCOME
+from domain.common.text import plain
+from infrastructure import ai as ai_client
+from interface.chitieu import bot as chitieu_bot
 from domain.common.dates import add_months  # noqa: F401
 from domain.common.format import vnd
 from domain.common.money import number, parse_amount  # noqa: F401
@@ -68,7 +71,7 @@ def new_id(data):
 
 @common.needs_store
 def taisan(args):
-    word = ct.plain(args[0]) if args else ""
+    word = plain(args[0]) if args else ""
     if word in ("xoa", "sua"):
         return edit_list()
     if word in ("bieudo", "bd"):
@@ -189,7 +192,7 @@ def health(day):
     if v["rows"]:
         lines.insert(1, f"Tài sản ròng {short(v['net'])}" + (f" · nợ {short(v['debts'])}" if v["debts"] else ""))
     advice = []
-    if ct.ai_key():
+    if ai_client.key():
         facts = re.sub(r"<[^>]+>", "", html.unescape("\n".join(lines)))
         system = ("Bạn là trợ lý khám sức khỏe tài chính cá nhân, viết tiếng Việt có dấu, ngắn gọn, xưng \"bạn\". "
                   "Chỉ dựa vào số liệu được cho, không bịa số. Không khuyên mua hay bán mã cổ phiếu, quỹ, tiền số cụ "
@@ -197,7 +200,7 @@ def health(day):
                   "trọng nhất; 2–3 dòng bắt đầu bằng \"✅ \" là việc nên làm cụ thể có con số (ví dụ để dành thêm "
                   "3tr/tháng thì sau 8 tháng đủ quỹ dự phòng 6 tháng).")
         try:
-            answer, _ = ct.ai_chat(system, facts)
+            answer, _ = ai_client.chat(system, facts)
             for raw in answer.splitlines():
                 raw = raw.strip()
                 if raw.startswith(("•", "✅")) and len(advice) < 5:
@@ -210,7 +213,7 @@ def health(day):
 
 
 def on_button(arg, message, now):
-    """Nút "ts:...": (thông báo nhỏ, việc tiếp theo) như sochitieu.on_button."""
+    """Nút "ts:...": (thông báo nhỏ, việc tiếp theo) như interface/chitieu/bot.on_button."""
     day = now.date()
     if arg == "xem":
         return "Đang cập nhật giá…", ("edit", lambda: overview(day, fresh=True))
@@ -237,10 +240,10 @@ def on_button(arg, message, now):
     if arg.startswith("luong:"):
         amount = int(arg[6:])
         entry = {"id": ledger_repo.next_id(), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
-                 "tien": amount, "ghichu": f"lương tháng {day.month}", "nhom": ct.INCOME}
+                 "tien": amount, "ghichu": f"lương tháng {day.month}", "nhom": INCOME}
         ledger_repo.save(entry)
         done = f"✅ Đã ghi lương tháng {day.month}: {vnd(amount)} vào 💰 Thu nhập"
-        hint = ct.salary_fund_hint([entry], day)  # gợi ý chia lương: trả nợ, chi tiêu, quỹ dự phòng
+        hint = chitieu_bot.salary_fund_hint([entry], day)  # gợi ý chia lương: trả nợ, chi tiêu, quỹ dự phòng
         return "Đã ghi lương", ("edit", lambda: (done + "\n" + hint[0], [hint[1]]) if hint else done)
     if arg == "chua":
         return "Mai bot hỏi lại", ("edit", lambda: "Chưa nhận lương: mai bot hỏi lại (tối đa 3 ngày)")

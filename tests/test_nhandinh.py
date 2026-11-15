@@ -72,8 +72,8 @@ class Luat(unittest.TestCase):
 class DichVu(unittest.TestCase):
     def setUp(self):
         h.reset()
-        self.real = (ai_client.chat, h.ct.ai_chat)
-        self.addCleanup(lambda: (setattr(ai_client, "chat", self.real[0]), setattr(h.ct, "ai_chat", self.real[1])))
+        self.real = (ai_client.chat, None)
+        self.addCleanup(lambda: (setattr(ai_client, "chat", self.real[0])))
 
     def test_ai_chi_giu_dong_dung_dang_va_ma_that(self):
         ai_client.chat = lambda *a, **k: ("🔥 Thép +1%\n- 🎯 AAA tăng, 2 CTCK\n🎯 ZZZ lạ mã ngoài dữ liệu\nkhông biểu tượng\n⚠️ Rủi ro <b>", "m")

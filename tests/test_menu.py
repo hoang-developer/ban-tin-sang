@@ -34,7 +34,7 @@ class BonMuc(unittest.TestCase):
     def test_nut_cu_van_chay_va_gui_hang_nut_moi_mot_lan(self):
         kho.put("chitieu:banphim", True)  # người dùng cũ: đã có hàng nút bản trước
         with kho.memo():
-            reply = h.ct.answer("📊 Chi tiêu", h.CLOCK["now"], h.CHAT)
+            reply = h.chitieu_bot.answer("📊 Chi tiêu", h.CLOCK["now"], h.CHAT)
         greeting, keyboard = reply["messages"][0]  # lần đầu: kèm lời chào và hàng nút mới
         self.assertIn("Bốn nút dưới ô chat", greeting)
         self.assertEqual(keyboard["keyboard"][0][0]["text"], "🏠 Hôm nay")
@@ -121,7 +121,7 @@ class BonMuc(unittest.TestCase):
 
     def test_tin_dau_tien_sau_cap_nhat_kem_hang_nut_moi(self):
         with kho.memo():
-            reply = h.ct.answer("cà phê 35k", h.CLOCK["now"], h.CHAT)
+            reply = h.chitieu_bot.answer("cà phê 35k", h.CLOCK["now"], h.CHAT)
         self.assertIn("Bốn nút dưới ô chat", reply["messages"][0][0])
         self.assertIn("Đã ghi", h.parts(reply)[0])
         text, _ = h.say("🎯 Kế hoạch")  # lần sau không gửi lại

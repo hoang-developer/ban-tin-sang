@@ -53,13 +53,13 @@ def lichsu(args):
 
 def delete(reference):
     """Xóa một khoản; trả về khoản đã xóa, None nếu đã xóa từ trước."""
-    import sochitieu as ct  # module cũ ở gốc: sổ nợ (nạp muộn để né vòng)
+    from interface.chitieu import features
     gone = ledger.find(reference)
     if gone:
         ledger_repo.remove(gone["ngay"][:7], gone["id"])
         if gone.get("no"):  # khoản trả nợ: cộng lại dư nợ
             try:
-                ct.sono().undo(gone)
+                features.sono().undo(gone)
             except Exception as e:
                 print(f"[lỗi] hoàn dư nợ khi xóa khoản: {e!r}", file=sys.stderr)
     return gone

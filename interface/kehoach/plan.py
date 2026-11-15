@@ -4,7 +4,9 @@ Các hàm ở đây giữ tên và dạng giá trị trả về mà các màn h�
 """
 import sys
 
-import sochitieu as ct  # module cũ ở gốc: đọc lệnh, ngày hôm nay
+from domain.chitieu.kinds import INCOME
+from domain.common.text import plain
+from interface.chitieu import context as chitieu_ctx
 from interface import common
 from presentation.kehoach import plan as pview
 from services.kehoach import plan as service
@@ -42,7 +44,7 @@ def plan(day):
 
 def salary_hint(entries, day):
     """Vừa ghi lương: (dòng gợi ý chia lương, hàng nút); None nếu không có lương hoặc chưa có gì để chia."""
-    salary = [e for e in entries if e["nhom"] == ct.INCOME and "luong" in ct.plain(e.get("ghichu") or "")]
+    salary = [e for e in entries if e["nhom"] == INCOME and "luong" in plain(e.get("ghichu") or "")]
     if not salary or not common.ready():
         return None
     n = service.numbers(day)
@@ -73,10 +75,10 @@ def do_all(now):
 
 @common.needs_store
 def kehoach(args):
-    word = ct.plain(args[0]) if args else ""
+    word = plain(args[0]) if args else ""
     if word in ("chia", "luong", "chialuong", "thang"):
-        return plan(ct.today())
-    return roadmap(ct.today())
+        return plan(chitieu_ctx.today())
+    return roadmap(chitieu_ctx.today())
 
 
 def on_button(arg, message, now):

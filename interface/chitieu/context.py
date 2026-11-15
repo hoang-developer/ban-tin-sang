@@ -1,5 +1,7 @@
 """Ngữ cảnh lượt xử lý của bot chi tiêu: các hàm xếp nhóm, hiển thị, báo cáo tự lấy cấu hình nhóm hiện tại của người dùng
 (đọc một lần mỗi lượt), để các lệnh và màn hình gọi gọn như trước."""
+import os
+
 from domain.chitieu import classify as classify_rules
 from domain.chitieu import income as income_rules
 from domain.chitieu import parse as parse_rules
@@ -11,6 +13,7 @@ from domain.common import format as format_text
 from infrastructure import clock
 from presentation.chitieu import view as cview
 from repositories.chitieu import groups as groups_repo
+from repositories.chitieu import ledger as ledger_repo
 from services.chitieu import budget as budget_service
 from services.chitieu import report as report_service
 
@@ -19,6 +22,22 @@ config, reset, save_config = groups_repo.config, groups_repo.reset, groups_repo.
 
 def today():
     return clock.now_vn().date()
+
+
+def token():
+    return os.environ.get("CHITIEU_BOT_TOKEN", "").strip()
+
+
+def owner_chats():
+    """Chat được dùng bot: CHITIEU_CHAT_ID (nhiều người thì cách nhau dấu phẩy), mặc định TELEGRAM_CHAT_ID."""
+    ids = os.environ.get("CHITIEU_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID", "")
+    return [x.strip() for x in ids.split(",") if x.strip()]
+
+
+def find(reference):
+    """'2026-11:12' -> khoản đó, None nếu đã xóa."""
+    ym, _, rid = reference.partition(":")
+    return ledger_repo.find(ym, rid)
 
 
 def name(code, cfg=None):

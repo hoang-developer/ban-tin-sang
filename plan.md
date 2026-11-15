@@ -212,6 +212,8 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.19 `lenh.py` → `interface/lenh/bot.py`; giới hạn, mẫu số tiền/thời gian, đơn vị vàng, đổi tiền ra chữ ở `domain/lenh`, câu đoán xanh/đỏ và mức giá báo ở `presentation/lenh`; giá trị nhập ví vàng dùng chung cho `services/taisan/declare`; file gốc còn 2 (troly, sochitieu) | xong, chờ deploy |
 | 6.20 `troly.py` → `interface/troly/assistant.py`; khuôn việc (`F`), chữ báo hiệu, mẫu câu trả lời ngắn ở `domain/troly/spec`, ví dụ và menu ➕ ở `presentation/troly`; JOBS, AI hiểu câu, trạng thái hội thoại, thẻ xác nhận còn trong assistant.py (tách tiếp ở mục dọn dẹp); file gốc còn 1 (sochitieu) | xong, chờ deploy |
 | 7.1 dọn `sochitieu`, giai đoạn A: `presentation/*` và `services/*` không còn import `sochitieu` (nút ⬅️ lấy ở `presentation/chitieu/view`, sổ ở `repositories/chitieu`, nhóm chi ở `services/chitieu/groups` mới); `LEGACY_IMPORTS` bớt 12 mục | xong, chờ deploy |
+| 7.2 dọn `sochitieu`, giai đoạn B: các file `interface/*` và `api/chitieu` không còn import `sochitieu` (dùng `interface/chitieu/{context,bot,commands,features}` và các module đúng lớp); `token`, `owner_chats`, `find` chuyển vào `interface/chitieu/context`; `LEGACY_IMPORTS` về rỗng | xong, chờ deploy |
+| 7.3 dọn `sochitieu`, giai đoạn C: test/harness không còn dùng `sochitieu`, xóa `sochitieu.py` (thêm `interface/chitieu/preview` thay cho chạy thử trên máy); **gốc repo không còn file .py nào**, `ROOT_PY_MAX = 0`, `LEGACY_IMPORTS` rỗng | xong, chờ deploy |
 | 6.8… dọn `sochitieu.py` khi các module còn lại (`troly`, `menu`, `phantich`, `docanh`...) bỏ `ct.`; rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
 | Cuối: dọn | chưa |
 

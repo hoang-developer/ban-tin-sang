@@ -1,5 +1,5 @@
 """Đối chiếu tài sản tháng: lệnh /doichieu, nút dc:, tin sáng ngày 15, việc cần làm ở 🏠 Hôm nay."""
-import sochitieu as ct  # module cũ ở gốc: ngày hôm nay
+from interface.chitieu import context as chitieu_ctx
 from domain.doichieu.reconcile import color  # noqa: F401 (các module khác gọi qua đây)
 from interface import common
 from presentation.doichieu import reconcile as view
@@ -33,7 +33,7 @@ def todo(day):
 
 
 def doichieu(args):
-    return screen(ct.today())
+    return screen(chitieu_ctx.today())
 
 
 def on_button(arg, message, now):

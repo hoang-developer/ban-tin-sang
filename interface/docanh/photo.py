@@ -17,7 +17,13 @@ from presentation.docanh import view
 from repositories.chitieu import groups as groups_repo
 from repositories.docanh import receipts as repo
 from services.docanh import receipts
-import sochitieu as ct
+from domain.common.format import vnd
+from domain.common.text import norm
+from interface import common
+from interface.chitieu import bot as chitieu_bot
+from interface.chitieu import context as chitieu_ctx
+from interface.chitieu import features
+from presentation.chitieu import view as cview
 
 
 def image_of(message):
@@ -35,7 +41,7 @@ def photo(message, tok, now):
     """Ghi khoản từ ảnh trong tin nhắn; trả câu trả lời (chữ, hoặc (chữ, nút)). Ảnh nhiều giao dịch thì hiện danh
     sách để chọn trước khi ghi."""
     if not kho.ready():
-        return ct.NEED_STORE
+        return cview.NEED_STORE
     groups_repo.reset()
     file_id, unique, mime = image_of(message)
     if not ai.key():
@@ -50,7 +56,7 @@ def photo(message, tok, now):
         return view.UNREADABLE
     if info["loai"] == "tai_san" and info.get("viec"):
         # lệnh quỹ, đơn mua vàng, kết quả lệnh cổ phiếu: hỏi trường còn thiếu rồi xin xác nhận trước khi ghi
-        reply = ct.troly().from_photo(info["viec"], (message.get("chat") or {}).get("id"), now)
+        reply = features.troly().from_photo(info["viec"], (message.get("chat") or {}).get("id"), now)
         if reply is not None:
             repo.release_image(unique)  # chưa ghi gì cho tới khi bấm ✅; gửi lại ảnh này vẫn được
             return reply
@@ -72,10 +78,10 @@ def single(tx, message, now, check_dup=True):
     """Ảnh một khoản (hóa đơn, một giao dịch): ghi luôn."""
     day = now.date()
     caption = (message.get("caption") or "").strip()
-    chosen, missing, rest = ct.read_tag(caption) if caption else (None, None, "")
+    chosen, missing, rest = chitieu_ctx.read_tag(caption) if caption else (None, None, "")
     tx["ngay"] = receipt_date(tx["ngay"], day).isoformat()
-    if ct.norm(rest):
-        tx["noi_dung"] = ct.norm(rest)
+    if norm(rest):
+        tx["noi_dung"] = norm(rest)
     if check_dup and repo.recorded(tx["ngay"], tx["tien"], tx["chieu"]) is not None:
         return view.duplicate(tx)
     e = receipts.record_one(tx, now, chosen)
@@ -83,18 +89,18 @@ def single(tx, message, now, check_dup=True):
     extra = [f"📷 Đọc từ ảnh{seen_from}, kiểm tra lại số tiền và ngày nhé"]
     if missing:
         extra.append(f"⚠️ Chưa có nhóm «{html.escape(missing)}», tạo bằng: /nhom them {html.escape(missing)}")
-    debt_lines, debt_rows = ct.debt_after([e], day)  # chuyển khoản trả nợ: trừ dư nợ
+    debt_lines, debt_rows = chitieu_bot.debt_after([e], day)  # chuyển khoản trả nợ: trừ dư nợ
     extra += debt_lines
     try:
-        extra += ct.phantich().after_record([e], day)
+        extra += features.phantich().after_record([e], day)
     except Exception as err:
         print(f"[lỗi] phân tích sau khi ghi ảnh: {err!r}", file=sys.stderr)
-    text, rows = ct.entries_message([e], day, extra=extra)
+    text, rows = chitieu_ctx.entries_message([e], day, extra=extra)
     rows = (rows or []) + debt_rows
     if tx["diem"] and tx["chieu"] == "chi" and tx["diem"] < tx["tien"] * 1.01:
-        text += (f"\n🎁 Có {ct.vnd(tx['diem'])} trả bằng voucher/điểm thưởng. Điểm đổi từ chi tiêu (thẻ tín dụng…) "
+        text += (f"\n🎁 Có {vnd(tx['diem'])} trả bằng voucher/điểm thưởng. Điểm đổi từ chi tiêu (thẻ tín dụng…) "
                  "nên ghi là khoản thu:")
-        rows = rows + [[(f"➕ Ghi {ct.vnd(tx['diem'])} vào Thu nhập", f"anh:diem:{tx['diem']}")]]
+        rows = rows + [[(f"➕ Ghi {vnd(tx['diem'])} vào Thu nhập", f"anh:diem:{tx['diem']}")]]
     return text, rows
 
 
@@ -105,8 +111,8 @@ def on_button(arg, message, now):
     day = now.date()
     if kind == "diem" and rest.isdigit():
         receipts.record_points(int(rest), day, now)
-        rows = [row for row in ct.keyboard_rows(message) if not any(d.startswith("anh:diem") for _, d in row)]
-        return f"Đã ghi {ct.vnd(int(rest))} vào Thu nhập", ("buttons", lambda: rows)
+        rows = [row for row in common.keyboard_rows(message) if not any(d.startswith("anh:diem") for _, d in row)]
+        return f"Đã ghi {vnd(int(rest))} vào Thu nhập", ("buttons", lambda: rows)
     if kind not in ("chon", "ghi", "bo"):
         return None, None
     unique, _, index = rest.rpartition(":") if kind == "chon" else (rest, "", "")
@@ -129,16 +135,16 @@ def on_button(arg, message, now):
     repo.delete_pending(unique)
     entries = receipts.record(chosen, now)
     extra = [f"📷 Ghi từ ảnh, bỏ qua {len(txs) - len(chosen)} giao dịch không chọn"]
-    debt_lines, debt_rows = ct.debt_after(entries, day)  # có khoản trả nợ: trừ dư nợ trong /no
+    debt_lines, debt_rows = chitieu_bot.debt_after(entries, day)  # có khoản trả nợ: trừ dư nợ trong /no
     extra += debt_lines
     try:
-        extra += ct.phantich().after_record(entries, day)
+        extra += features.phantich().after_record(entries, day)
     except Exception as err:
         print(f"[lỗi] phân tích sau khi ghi ảnh: {err!r}", file=sys.stderr)
 
     def done():
-        text, rows = ct.entries_message(entries, day, extra=extra)
+        text, rows = chitieu_ctx.entries_message(entries, day, extra=extra)
         rows = (rows or []) + debt_rows
-        hint = ct.salary_fund_hint(entries, day)  # ảnh có lương: gợi ý chia lương (trả nợ, quỹ dự phòng...)
+        hint = chitieu_bot.salary_fund_hint(entries, day)  # ảnh có lương: gợi ý chia lương (trả nợ, quỹ dự phòng...)
         return (text + "\n" + hint[0], rows + [hint[1]]) if hint else (text, rows)
     return f"Đã ghi {len(entries)} khoản", ("edit", done)

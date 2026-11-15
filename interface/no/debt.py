@@ -3,7 +3,10 @@
 Các hàm ở đây giữ tên và dạng giá trị trả về mà các màn hình khác (kế hoạch chia lương, menu, khám sức khỏe, tin sáng,
 ghi chi tiêu) đang gọi: kết quả của service được presentation dựng thành chữ.
 """
-import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày hôm nay, tìm khoản chi, hàng nút
+from domain.common.money import parse_amount
+from domain.common.text import plain
+from interface import common
+from interface.chitieu import context as chitieu_ctx
 from domain.no import debt as rules
 from interface import common
 from interface.kehoach import plan as kehoach
@@ -65,8 +68,8 @@ def after_record(entries, day):
 
 @common.needs_store
 def no_cmd(args):
-    day = ct.today()
-    word = ct.plain(args[0]) if args else ""
+    day = chitieu_ctx.today()
+    word = plain(args[0]) if args else ""
     if not args:
         return view(day)
     if word in ("xoa", "sua", "ds"):
@@ -75,7 +78,7 @@ def no_cmd(args):
         return pview.USAGE
     if word == "tra" and len(args) > 1:  # /no tra chú Tư 5tr
         rest = " ".join(args[1:])
-        found = ct.parse_amount(rest)
+        found = parse_amount(rest)
         d = service.find_for_command(rest)
         if not found or not d:
             return "Trả nợ: /no tra <tên khoản nợ> <số tiền>, ví dụ /no tra chú Tư 5tr"
@@ -113,10 +116,10 @@ def on_button(arg, message, now):
             return toast, ("edit", lambda: menu.home(day))
         if common.title_starts(message, "💳"):
             return toast, ("edit", lambda: view(day))
-        rows = [row for row in ct.keyboard_rows(message) if not any(d == f"no:{arg}" for _, d in row)]
+        rows = [row for row in common.keyboard_rows(message) if not any(d == f"no:{arg}" for _, d in row)]
         return toast, ("buttons", lambda: rows)
     reference = rest.rpartition(":")[0] if kind == "gan" else rest
-    e = ct.find(reference) if kind in ("gan", "kg", "bo") else None
+    e = chitieu_ctx.find(reference) if kind in ("gan", "kg", "bo") else None
     if kind in ("gan", "kg", "bo") and e is None:
         return "Khoản chi này đã xóa rồi", None
     keep = common.without_rows(message, (f"no:gan:{reference}:", f"no:kg:{reference}", f"no:bo:{reference}"))

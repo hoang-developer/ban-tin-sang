@@ -17,7 +17,20 @@ from datetime import date, timedelta
 
 from infrastructure import kho
 from repositories import keys
-import sochitieu as ct
+from domain.chitieu.kinds import INCOME
+from domain.chitieu.learn import learn_key
+from domain.common.format import vnd
+from domain.common.money import MONEY
+from domain.common.money import money as read_money
+from domain.common.money import money_count
+from domain.common.money import parse_amount
+from domain.common.text import plain
+from infrastructure import ai as ai_client
+from interface.chitieu import bot as chitieu_bot
+from interface.chitieu import commands as chitieu_commands
+from interface.chitieu import context as chitieu_ctx
+from interface.chitieu import features
+from repositories.chitieu import ledger as ledger_repo
 from domain.common.dates import WEEKDAYS
 from domain.common.format import vn_num
 from domain.troly.spec import (BEYOND, BEYOND_RE, CARD_SECONDS, CASH_IN, F, FILLER, GOLD_PRICE, NO_SPEND, PERIODS,  # noqa: F401
@@ -31,7 +44,7 @@ from presentation.troly.view import ADD_MENU, EXAMPLES
 
 def debt_choices():
     try:
-        return [(d["ten"], d["ten"]) for d in ct.sono().active()][:6]
+        return [(d["ten"], d["ten"]) for d in features.sono().active()][:6]
     except Exception as e:
         print(f"[lỗi] danh sách nợ: {e!r}", file=sys.stderr)
         return []
@@ -39,7 +52,7 @@ def debt_choices():
 
 def saving_choices():
     try:
-        return [(it["ten"], it["ten"]) for it in ct.taisan().load()["items"] if it["loai"] == "tietkiem"][:6]
+        return [(it["ten"], it["ten"]) for it in features.taisan().load()["items"] if it["loai"] == "tietkiem"][:6]
     except Exception as e:
         print(f"[lỗi] danh sách sổ: {e!r}", file=sys.stderr)
         return []
@@ -47,8 +60,8 @@ def saving_choices():
 
 def loan_choices():
     try:
-        return [(it["ten"][4:-4].strip() or it["ten"], it["ten"]) for it in ct.taisan().load()["items"]
-                if it["loai"] == "khac" and ct.plain(it["ten"]).startswith("cho ")][:6]
+        return [(it["ten"][4:-4].strip() or it["ten"], it["ten"]) for it in features.taisan().load()["items"]
+                if it["loai"] == "khac" and plain(it["ten"]).startswith("cho ")][:6]
     except Exception as e:
         print(f"[lỗi] danh sách cho vay: {e!r}", file=sys.stderr)
         return []
@@ -148,8 +161,8 @@ def plain_notes():
 
 def remember_plain(text):
     """AI bảo đây là khoản chi thường: nhớ ghi chú (đã bỏ số, ngày) để lần sau ghi ngay."""
-    e = ct.parse_line(text, ct.today())
-    key = ct.learn_key(e["ghichu"]) if e else ""
+    e = chitieu_ctx.parse_line(text, chitieu_ctx.today())
+    key = learn_key(e["ghichu"]) if e else ""
     notes = plain_notes()
     if key and key not in notes:
         kho.put(keys.PLAIN_NOTES, (notes + [key])[-300:])
@@ -158,39 +171,39 @@ def remember_plain(text):
 def wants(text, names=None):
     """Tin này cần hiểu bằng AI (không phải khoản chi thường)? Chưa bật AI thì không: bot chạy như trước."""
     t = text.strip()
-    if not ct.ai_key() or not t or "\n" in t or t[0] in "+/" or "#" in t:
+    if not ai_client.key() or not t or "\n" in t or t[0] in "+/" or "#" in t:
         return False
-    if not ct.parse_amount(t):
+    if not parse_amount(t):
         return True  # không có số tiền: không phải khoản chi
-    if not (mentions(t, TRIGGER_RE) or ct.money_count(t) >= 2 or names_in(t, names)):
+    if not (mentions(t, TRIGGER_RE) or money_count(t) >= 2 or names_in(t, names)):
         return False
-    e = ct.parse_line(t, ct.today())
-    return not (e and ct.learn_key(e["ghichu"]) in plain_notes())
+    e = chitieu_ctx.parse_line(t, chitieu_ctx.today())
+    return not (e and learn_key(e["ghichu"]) in plain_notes())
 
 
 def known_names():
     """Tên tài khoản, sổ, khoản nợ, người đang vay của người dùng (đã bỏ dấu): nhắc tới là việc tài chính."""
     try:
-        items = ct.taisan().load()["items"]
+        items = features.taisan().load()["items"]
     except Exception as e:
         print(f"[lỗi] đọc tên tài sản: {e!r}", file=sys.stderr)
         return []
     out = []
     for it in items:
         name = it.get("ten") or ""
-        if it["loai"] == "khac" and ct.plain(name).startswith("cho ") and " vay" in ct.plain(name):
+        if it["loai"] == "khac" and plain(name).startswith("cho ") and " vay" in plain(name):
             name = re.sub(r"(?i)^cho\s+|\s+vay.*$", "", name)
         elif it["loai"] not in ("tien", "tietkiem", "no"):
             continue
-        key = ct.plain(name).strip()
+        key = plain(name).strip()
         if len(key) >= 3:
             out.append(key)
     return out
 
 
 def names_in(text, names=None):
-    bare = ct.plain(text)
-    names = known_names() if names is None else [ct.plain(n) for n in names]
+    bare = plain(text)
+    names = known_names() if names is None else [plain(n) for n in names]
     return any(re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", bare) for n in names)
 
 
@@ -200,16 +213,16 @@ def personal_context():
     """Tên khoản nợ, quỹ, tài khoản của người dùng (không kèm số tiền) để AI gọi đúng tên."""
     lines = []
     try:
-        data = ct.taisan().load()
+        data = features.taisan().load()
         debts = [it["ten"] for it in data["items"] if it["loai"] == "no" and it.get("tien", 0) > 0]
         accounts = [it["ten"] for it in data["items"] if it["loai"] in ("tien", "tietkiem")]
         if debts:
             lines.append("Khoản nợ đang có: " + "; ".join(debts[:10]))
         if accounts:
             lines.append("Tài khoản, sổ tiết kiệm đang có: " + "; ".join(accounts[:12]))
-        cfg = ct.dautu().config()
+        cfg = features.dautu().config()
         if cfg.get("ma"):
-            side = ct.dautu().side(cfg)
+            side = features.dautu().side(cfg)
             lines.append(f"Quỹ mở đang đầu tư định kỳ: {cfg['ma']}" + (f"; quỹ chờ: {side['ma']}" if side else ""))
     except Exception as e:
         print(f"[lỗi] ngữ cảnh cho AI: {e!r}", file=sys.stderr)
@@ -329,7 +342,7 @@ def value_of(f, value):
     if kind == "tien":
         x = number_of(value)
         if x is None:
-            found = ct.parse_amount(str(value))
+            found = parse_amount(str(value))
             x = found[0] if found else None
         return int(round(abs(x))) if x and 0 < abs(x) < 1e12 else None
     if kind == "so":
@@ -339,7 +352,7 @@ def value_of(f, value):
         s = " ".join(str(value).split())[:40]
         if s.islower() and f["ten"] == "ten":
             s = s[0].upper() + s[1:]  # "techcombank" -> "Techcombank"
-        return s if s and ct.plain(s) not in ("null", "none", "khong ro") else None
+        return s if s and plain(s) not in ("null", "none", "khong ro") else None
     if kind == "ngay":
         try:
             when = date.fromisoformat(str(value)[:10])
@@ -351,7 +364,7 @@ def value_of(f, value):
                 when = date(int(m[3]), int(m[2]), int(m[1]))
             except ValueError:
                 return None
-        return when.isoformat() if abs((when - ct.today()).days) < 3700 else None
+        return when.isoformat() if abs((when - chitieu_ctx.today()).days) < 3700 else None
     if kind == "chon":
         return value if value in [c[0] for c in choices(f)] else None
     if kind == "co":
@@ -361,7 +374,7 @@ def value_of(f, value):
 
 def text_amounts(text):
     """(mọi số tiền code đọc được trong câu, riêng các số có ghi đơn vị như 35k, 2tr476), để soát số tiền AI đưa."""
-    found = [(v, explicit) for v, explicit in (ct.money(m) for m in ct.MONEY.finditer(text or "")) if v]
+    found = [(v, explicit) for v, explicit in (read_money(m) for m in MONEY.finditer(text or "")) if v]
     return [v for v, _ in found], [v for v, explicit in found if explicit]
 
 
@@ -426,7 +439,7 @@ def clean(raw, text=None):
 def finance_facts(day):
     """Số liệu tài chính bot tính sẵn, gửi kèm câu hỏi để AI trả lời thẳng (không tự tính). Phần nào lỗi thì bỏ."""
     from interface.kehoach import plan as kehoach
-    ts, sono = ct.taisan(), ct.sono()
+    ts, sono = features.taisan(), features.sono()
     short = ts.short
     lines = [f"Hôm nay {WEEKDAYS[day.weekday()]} {day:%d/%m/%Y}."]
 
@@ -441,8 +454,8 @@ def finance_facts(day):
     n = kehoach.numbers(day)
 
     def month():
-        today = sum(e["tien"] for e in ct.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()
-                    and e["nhom"] != ct.INCOME and not e.get("no"))
+        today = sum(e["tien"] for e in ledger_repo.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()
+                    and e["nhom"] != INCOME and not e.get("no"))
         return (f"Tháng {day.month}: đã thu {short(n['income'])}" + (f" ({n['income_basis']})" if n["income_basis"] else "")
                 + f" · đã chi {short(n['spent'])} (không tính trả nợ) · hôm nay đã chi {short(today)}")
 
@@ -492,7 +505,7 @@ def finance_facts(day):
         return f"Nợ còn {short(sum(d['tien'] for d in items))}: " + " · ".join(parts)
 
     def invest():
-        dt = ct.dautu()
+        dt = features.dautu()
         cfg = dt.config()
         if not dt.active(cfg):
             return None
@@ -532,8 +545,8 @@ def ask_ai(text, day, context=None, personal=True, people=None, facts=None):
                    + (f". Bot vừa hỏi: «{asked}»" if asked else ". Người dùng muốn sửa lại")
                    + ". Tin dưới đây là câu trả lời hoặc lời sửa: trả về JSON ĐẦY ĐỦ của việc đó sau khi cập nhật (giữ các "
                    "trường không đổi). Nếu tin là một việc khác hẳn thì trả JSON của việc mới.")
-    out, model = ct.ai_chat(system, text, timeout=15, budget=25)
-    raw = ct.first_json(out)
+    out, model = ai_client.chat(system, text, timeout=15, budget=25)
+    raw = ai_client.first_json(out)
     if not isinstance(raw, dict):
         raise RuntimeError(f"AI trả lời không đúng dạng: {out[:100]!r}")
     print(f"[hiểu] {model}: {raw.get('viec')}", file=sys.stderr)
@@ -599,7 +612,7 @@ def missing(a):
 def show(f, v):
     name = f["ten"]
     if f["kieu"] == "tien":
-        return ("trả " if name == "moi_thang" else "") + ct.vnd(v) + ("/tháng" if name == "moi_thang" else "")
+        return ("trả " if name == "moi_thang" else "") + vnd(v) + ("/tháng" if name == "moi_thang" else "")
     if name == "lai":
         return f"lãi {num(v)}%/năm" if v else "không lãi"
     if name == "ky":
@@ -637,8 +650,8 @@ def known(a):
 def fund_names():
     """{"cho": mã quỹ chờ, "chinh": mã quỹ chính} để điền vào câu hỏi."""
     try:
-        cfg = ct.dautu().config()
-        return {"cho": (ct.dautu().side(cfg) or {}).get("ma") or "quỹ chờ", "chinh": cfg.get("ma") or "quỹ chính"}
+        cfg = features.dautu().config()
+        return {"cho": (features.dautu().side(cfg) or {}).get("ma") or "quỹ chờ", "chinh": cfg.get("ma") or "quỹ chính"}
     except Exception as e:
         print(f"[lỗi] tên quỹ: {e!r}", file=sys.stderr)
         return {"cho": "quỹ chờ", "chinh": "quỹ chính"}
@@ -655,7 +668,7 @@ def question(a, f):
 def describe(a):
     """Câu mô tả việc trên thẻ xác nhận."""
     job, esc = a["viec"], html.escape
-    money = ct.vnd(a["tien"]) if a.get("tien") else ""
+    money = vnd(a["tien"]) if a.get("tien") else ""
     if job == "du_phong":
         out = a.get("chieu") == "rut"
         return f"🛟 {'Rút' if out else 'Chuyển'} <b>{money}</b> {'khỏi' if out else 'vào'} quỹ dự phòng"
@@ -687,7 +700,7 @@ def describe(a):
             return f"💹 Hoán đổi <b>{num(a['ccq'])} ccq</b> từ quỹ chờ sang quỹ chính{when}"
         return f"💹 Mua quỹ <b>{esc((a.get('ma') or fund_code() or 'quỹ đang đầu tư').upper())}</b>: <b>{money}</b>{when}"
     if job == "no_moi":
-        extra = (f", mỗi tháng trả {ct.vnd(a['moi_thang'])}" if a.get("moi_thang") else "") + (
+        extra = (f", mỗi tháng trả {vnd(a['moi_thang'])}" if a.get("moi_thang") else "") + (
             "" if a.get("lai") is None else ", không lãi" if not a["lai"] else f", lãi {num(a['lai'])}%/năm") + (
             f", hạn ngày {int(a['ngay_tra'])}" if a.get("ngay_tra") else "")
         return f"💳 Khoản nợ <b>{esc(a['ten'])}</b>: còn nợ <b>{money}</b>{extra}"
@@ -713,7 +726,7 @@ def describe(a):
         order = switch_order(a)
         if not order:
             return "🔁 Không thấy lệnh hoán đổi nào đang chờ"
-        return ct.dautu().switch_preview(order["id"], date.fromisoformat(a["ngay_ban"]), date.fromisoformat(a["ngay_mua"]),
+        return features.dautu().switch_preview(order["id"], date.fromisoformat(a["ngay_ban"]), date.fromisoformat(a["ngay_mua"]),
                                          a.get("ccq"))
     if job == "quy_cho":
         out = a.get("chieu") == "rut"
@@ -735,7 +748,7 @@ def describe(a):
 
 def fund_code():
     try:
-        return ct.dautu().config().get("ma")
+        return features.dautu().config().get("ma")
     except Exception:
         return None
 
@@ -743,12 +756,12 @@ def fund_code():
 def big_side_buy(a):
     """Mua quỹ chờ một khoản lớn (từ 3 lần tiền góp mỗi tháng): gợi ý rải dần sang quỹ chính."""
     try:
-        dt = ct.dautu()
+        dt = features.dautu()
         cfg = dt.config()
         side = dt.side(cfg)
         if a["viec"] != "quy" or a.get("chieu") == "hoan_doi" or not side or (a.get("ma") or "").upper() != side["ma"]:
             return None
-        monthly = dt.total_of(cfg, dt.ym_of(ct.today()))
+        monthly = dt.total_of(cfg, dt.ym_of(chitieu_ctx.today()))
         return cfg["ma"] if monthly and a.get("tien", 0) >= 3 * monthly else None
     except Exception as e:
         print(f"[lỗi] xét khoản mua lớn: {e!r}", file=sys.stderr)
@@ -767,7 +780,7 @@ def money_move(a):
     if job == "quy_cho" and a.get("tien"):
         return a["tien"] if a.get("chieu") == "rut" else -a["tien"]
     if job == "co_phieu" and a.get("sl") and a.get("gia"):
-        if ct.taisan().broker_cash(ct.taisan().load()):
+        if features.taisan().broker_cash(features.taisan().load()):
             return 0  # tiền đi, về tài khoản chứng khoán
         value = a["sl"] * price_dong(a["gia"])
         return value if a.get("chieu") == "ban" else -value
@@ -780,7 +793,7 @@ def source(a):
     if not delta:
         return None
     try:
-        ts = ct.taisan()
+        ts = features.taisan()
         main = ts.main_account()
         if not main:
             return None
@@ -823,10 +836,10 @@ def run_many(jobs, now, chat):
     for job in jobs:
         try:
             if job["viec"] == "chi":
-                reply = ct.record_text(dated(job, f"{job['tien']}đ {job.get('ghi_chu') or 'khoản chi'}", now.date()),
+                reply = chitieu_bot.record_text(dated(job, f"{job['tien']}đ {job.get('ghi_chu') or 'khoản chi'}", now.date()),
                                        now)
             elif job["viec"] == "thu":
-                reply = ct.record_text("+ " + dated(job, f"{job['tien']}đ {job.get('ghi_chu') or 'thu nhập'}",
+                reply = chitieu_bot.record_text("+ " + dated(job, f"{job['tien']}đ {job.get('ghi_chu') or 'thu nhập'}",
                                                     now.date()), now)
             else:
                 reply = run(job, now, chat)
@@ -846,7 +859,7 @@ ANSWER_LINKS = {"no": "no:xem", "du_phong": "dp:xem", "dau_tu": "dt:xem", "tai_s
 def answer(a):
     """Trả lời thẳng câu hỏi tài chính (AI viết từ số liệu bot tính sẵn), kèm nút mở màn hình liên quan."""
     link = ANSWER_LINKS.get(a.get("man"))
-    return f"💬 {html.escape(a['cau'])}", [[("🔎 Xem chi tiết", link), ct.BACK] if link else [ct.BACK]]
+    return f"💬 {html.escape(a['cau'])}", [[("🔎 Xem chi tiết", link), chitieu_ctx.BACK] if link else [chitieu_ctx.BACK]]
 
 
 def card(a, chat, cid=None):
@@ -872,7 +885,7 @@ def switch_order(a):
     """Lệnh hoán đổi của việc doi_xong: theo mã lệnh (nút bấm), không có thì lệnh đang chờ gần nhất, không có nữa thì
     lệnh hoán đổi gần nhất (sửa lại lệnh bản cũ đã tính khớp cùng một ngày)."""
     try:
-        dt = ct.dautu()
+        dt = features.dautu()
         cfg = dt.config()
         if a.get("lenh"):
             return next((o for o in cfg.get("lenh", []) if o["id"] == int(a["lenh"]) and o.get("loai") == "doi"), None)
@@ -885,7 +898,7 @@ def switch_order(a):
 
 def main_name():
     try:
-        main = ct.taisan().main_account()
+        main = features.taisan().main_account()
         return main["ten"] if main else None
     except Exception as e:
         print(f"[lỗi] tài khoản chính: {e!r}", file=sys.stderr)
@@ -894,7 +907,7 @@ def main_name():
 
 def no_main():
     try:
-        return ct.taisan().main_account() is None
+        return features.taisan().main_account() is None
     except Exception:
         return False
 
@@ -933,22 +946,22 @@ def dated(a, text, day):
 def run(a, now, chat, option=None):
     """Thực hiện một việc đã đủ trường; trả câu trả lời (chữ, hoặc (chữ, nút))."""
     job, day = a["viec"], now.date()
-    ts = ct.taisan()
+    ts = features.taisan()
     if job == "thu":
-        return ct.record_text("+ " + dated(a, f"{a['tien']}đ {a.get('ghi_chu') or 'thu nhập'}", day), now)
+        return chitieu_bot.record_text("+ " + dated(a, f"{a['tien']}đ {a.get('ghi_chu') or 'thu nhập'}", day), now)
     if job == "tra_no":
-        return ct.record_text(dated(a, f"{a['tien']}đ trả nợ {a['ten']}", day), now)
+        return chitieu_bot.record_text(dated(a, f"{a['tien']}đ trả nợ {a['ten']}", day), now)
     paid = not a.get("san")  # tiền đi từ (về) tài khoản chính, nếu có
     if job == "du_phong":
-        note = ct.duphong().change(-a["tien"] if a.get("chieu") == "rut" else a["tien"], day, from_main=paid)
-        return note, [[("🛟 Quỹ dự phòng", "dp:xem"), ct.BACK]]
+        note = features.duphong().change(-a["tien"] if a.get("chieu") == "rut" else a["tien"], day, from_main=paid)
+        return note, [[("🛟 Quỹ dự phòng", "dp:xem"), chitieu_ctx.BACK]]
     if job == "tiet_kiem":
         data = ts.load()
         start_day = date.fromisoformat(a["ngay"]) if a.get("ngay") else day
         note = ts.add_saving_item(data, a["ten"], a["tien"], a["lai"], int(a.get("ky") or 0), start_day)
         moved = ts.move_main(data, -a["tien"], f"sổ tiết kiệm {a['ten']}", day) if paid else None
         ts.save(data)
-        return note + (f"\n{moved}" if moved else ""), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+        return note + (f"\n{moved}" if moved else ""), [[("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]]
     if job in ("tai_khoan", "cho_vay"):
         data = ts.load()
         name = a["ten"] if job == "tai_khoan" else f"Cho {a['ten']} vay"
@@ -964,7 +977,7 @@ def run(a, now, chat, option=None):
                 ts.set_main(data, item)
                 note += "\n🏦 Đã đặt làm tài khoản chính"
         ts.save(data)
-        return note, [[("🏦 Tài khoản chính", "ts:chinh"), ("💼 Tài sản", "m:ts"), ct.BACK]]
+        return note, [[("🏦 Tài khoản chính", "ts:chinh"), ("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]]
     if job == "vang":
         args = [a["loai"], num(a["chi"]), "chi"]
         if a.get("tien"):
@@ -977,56 +990,56 @@ def run(a, now, chat, option=None):
             if moved:
                 ts.save(data)
                 note += f"\n{moved}"
-        return (note or "⚠️ Chưa ghi được số vàng này", [[("💼 Tài sản", "m:ts"), ct.BACK]])
+        return (note or "⚠️ Chưa ghi được số vàng này", [[("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]])
     if job == "co_phieu":
         return run_stock(a, now)
     if job == "quy_cho":
-        dt = ct.dautu()
+        dt = features.dautu()
         cfg = dt.config()
         if not dt.active(cfg):
-            return "Chưa bật đầu tư quỹ định kỳ nên chưa có quỹ chờ.", [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
+            return "Chưa bật đầu tư quỹ định kỳ nên chưa có quỹ chờ.", [[("📈 Đầu tư", "dt:xem"), chitieu_ctx.BACK]]
         notes = []
         if a.get("chieu") == "rut":
             taken, left = dt.take_money(cfg, a["tien"], to_main=paid, notes=notes)
-            head = f"✅ Đã rút {ct.vnd(taken)} khỏi quỹ chờ {cfg['ma']}, còn {ct.vnd(left)}"
+            head = f"✅ Đã rút {vnd(taken)} khỏi quỹ chờ {cfg['ma']}, còn {vnd(left)}"
         else:
             left = dt.add_money(cfg, a["tien"], dt.current_period(cfg), from_main=paid, notes=notes)
             dt.save(cfg)
-            head = f"✅ Đã để {ct.vnd(a['tien'])} vào quỹ chờ {cfg['ma']}: {ct.vnd(left)}"
-        return "\n".join([head] + notes), [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
+            head = f"✅ Đã để {vnd(a['tien'])} vào quỹ chờ {cfg['ma']}: {vnd(left)}"
+        return "\n".join([head] + notes), [[("📈 Đầu tư", "dt:xem"), chitieu_ctx.BACK]]
     if job == "chuyen_tk":
         return run_transfer(a, now, chat)
     if job == "quy":
         return run_fund(a, now, option)
     if job == "ban_vang":
-        return ts.sell_gold(a.get("chi"), a["tien"], now, a.get("loai"), paid), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+        return ts.sell_gold(a.get("chi"), a["tien"], now, a.get("loai"), paid), [[("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]]
     if job == "tat_toan":
-        return ts.close_saving(a["ten"], a.get("tien"), now, paid), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+        return ts.close_saving(a["ten"], a.get("tien"), now, paid), [[("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]]
     if job == "ban_quy":
-        return ts.sell_fund(a["ma"], a["tien"], a.get("ccq"), now, paid), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+        return ts.sell_fund(a["ma"], a["tien"], a.get("ccq"), now, paid), [[("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]]
     if job == "thu_no":
-        return ts.collect_loan(a["ten"], a["tien"], now, paid), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+        return ts.collect_loan(a["ten"], a["tien"], now, paid), [[("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]]
     if job == "xoa_tai_san":
-        return ts.remove_named(a["ten"]), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+        return ts.remove_named(a["ten"]), [[("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]]
     if job in ("doi_chieu", "doi_chieu_sl"):
         from interface.doichieu import reconcile as doichieu
         return doichieu.set_value(a["muc"], a["gia_tri"], now)
     if job == "doi_xong":
         order = switch_order(a)
         if not order:
-            return "Không thấy lệnh hoán đổi nào đang chờ", [[("📈 Đầu tư", "dt:xem"), ct.BACK]]
-        note = ct.dautu().finish_switch(order["id"], date.fromisoformat(a["ngay_ban"]),
+            return "Không thấy lệnh hoán đổi nào đang chờ", [[("📈 Đầu tư", "dt:xem"), chitieu_ctx.BACK]]
+        note = features.dautu().finish_switch(order["id"], date.fromisoformat(a["ngay_ban"]),
                                         date.fromisoformat(a["ngay_mua"]), a.get("ccq"))
         return note, [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]
     if job == "sua_ccq":
-        return ct.dautu().fix_units(f"{num(a['ccq'])} {a.get('ma') or ''}".strip()), [[("📈 Đầu tư", "dt:xem")]]
+        return features.dautu().fix_units(f"{num(a['ccq'])} {a.get('ma') or ''}".strip()), [[("📈 Đầu tư", "dt:xem")]]
     if job == "no_moi":
         due = int(a["ngay_tra"]) if a.get("ngay_tra") and 1 <= a["ngay_tra"] <= 31 else None
         info = {"ten": a["ten"][:30], "con": a["tien"], "thang": a.get("moi_thang"),
                 "lai": float(a["lai"]) if a.get("lai") is not None else None, "ngay_tra": due}
-        return ct.sono().declare_info(info, day), [[("💳 Sổ nợ", "no:xem"), ct.BACK]]
+        return features.sono().declare_info(info, day), [[("💳 Sổ nợ", "no:xem"), chitieu_ctx.BACK]]
     if job == "ngan_sach":
-        return ct.ngansach([*str(a["nhom"]).split(), str(a["tien"])])
+        return chitieu_commands.ngansach([*str(a["nhom"]).split(), str(a["tien"])])
     if job == "ngay_luong":
         return ts.luong([str(int(a["ngay_luong"])), f"{a['tien']}đ"])
     return "⚠️ Việc này bot chưa làm được"
@@ -1034,7 +1047,7 @@ def run(a, now, chat, option=None):
 
 def run_transfer(a, now, chat):
     """Chuyển giữa hai tài khoản tiền của mình: trừ nơi đi, cộng nơi đến (tài khoản đến chưa có thì tạo)."""
-    ts, day = ct.taisan(), now.date()
+    ts, day = features.taisan(), now.date()
     data = ts.load()
     src = ts.find_account(data, a["tu"]) if a.get("tu") else ts.main_account(data)
     if src is None:
@@ -1056,12 +1069,12 @@ def run_transfer(a, now, chat):
         src["tien"] -= a["tien"]
         ts.save(data)
         text, rows = reply if isinstance(reply, tuple) else (reply, None)
-        return text + f"\n🏦 {html.escape(src['ten'])} còn {ct.vnd(src['tien'])}", rows
+        return text + f"\n🏦 {html.escape(src['ten'])} còn {vnd(src['tien'])}", rows
     created = dst is None
     if created:
         dst = {"id": ts.new_id(data), "loai": "tien", "ten": a["den"][:30], "tien": 0, "ngay": day.isoformat()}
         data["items"].append(dst)
-    lines = [f"✅ Đã chuyển {ct.vnd(a['tien'])} từ {html.escape(src['ten'])} sang {html.escape(dst['ten'])}"
+    lines = [f"✅ Đã chuyển {vnd(a['tien'])} từ {html.escape(src['ten'])} sang {html.escape(dst['ten'])}"
              + (" (tài khoản mới)" if created else "")]
     for it, delta in ((src, -a["tien"]), (dst, a["tien"])):
         if it.get("chinh"):
@@ -1069,14 +1082,14 @@ def run_transfer(a, now, chat):
         else:
             it["tien"] += delta
             it["ngay"] = day.isoformat()
-            lines.append(f"🏦 {html.escape(it['ten'])}: {ct.vnd(it['tien'])}")
+            lines.append(f"🏦 {html.escape(it['ten'])}: {vnd(it['tien'])}")
     ts.save(data)
     return "\n".join(lines), [
-        [("💼 Tài sản", "m:ts"), ct.BACK]]
+        [("💼 Tài sản", "m:ts"), chitieu_ctx.BACK]]
 
 
 def run_stock(a, now):
-    ts = ct.taisan()
+    ts = features.taisan()
     code, qty, price = a["ma"].upper(), int(a["sl"]), int(round(price_dong(a["gia"])))
     if a["chieu"] == "ban" and a.get("gia_von"):
         data = ts.load()
@@ -1091,11 +1104,11 @@ def run_stock(a, now):
 
 
 def run_fund(a, now, option=None):
-    dt = ct.dautu()
+    dt = features.dautu()
     cfg = dt.config()
     if not dt.active(cfg):
         return ("Chưa bật đầu tư quỹ định kỳ nên mình chưa ghi được lệnh quỹ. Bấm nút để xem cách bật.",
-                [[("📈 Đầu tư", "dt:xem"), ct.BACK]])
+                [[("📈 Đầu tư", "dt:xem"), chitieu_ctx.BACK]])
     side = dt.side(cfg)
     code = (a.get("ma") or cfg["ma"]).upper()
     fund = side if side and code == side["ma"] else None
@@ -1119,25 +1132,25 @@ def run_fund(a, now, option=None):
         return dt.record_switch(a["ccq"], trading, now, ym, day), [[("📈 Đầu tư", "dt:xem")]]
     if option == "rai" and fund:
         text = f"{a['tien']}đ {when}".strip()
-        return dt.restructure(cfg, text, ct.parse_amount(text), now), [[("📈 Đầu tư", "dt:xem")]]
+        return dt.restructure(cfg, text, parse_amount(text), now), [[("📈 Đầu tư", "dt:xem")]]
     return dt.record_order(a["tien"], trading, now, ym, day, fund=fund), [[("📈 Đầu tư", "dt:xem"), ("🧾 Lệnh", "dt:ls")]]
 
 
 def screen(a, text, now):
     """Mở màn hình theo việc "xem"."""
     day, name = now.date(), a.get("man")
-    menu = ct.menu()
+    menu = features.menu()
     if name == "chi_tieu":
-        return ct.report(a.get("ky") or "thang", day)[0], ct.REPORT_BUTTONS
+        return chitieu_ctx.report(a.get("ky") or "thang", day)[0], chitieu_ctx.REPORT_BUTTONS
     direct = {"tong_quan": "home", "tai_san": "tien", "no": "no", "ke_hoach": "lt"}
     if name in direct:
         return menu.screen(direct[name], day)
     makers = {
-        "chia_luong": lambda: ct.kehoach().plan(day), "du_phong": lambda: ct.duphong().text(day),
-        "dau_tu": lambda: ct.dautu().view(), "tiet_kiem": lambda: ct.tietkiem().view(day),
-        "suc_khoe": lambda: ct.taisan().health(day), "lich_su": lambda: ct.lichsu([]),
-        "bieu_do": lambda: ct.phantich().chart_reply("thang", day), "du_bao": lambda: ct.phantich().dubao([]),
-        "ngan_sach": lambda: ct.ngansach([]), "huong_dan": lambda: menu.guide()}
+        "chia_luong": lambda: features.kehoach().plan(day), "du_phong": lambda: features.duphong().text(day),
+        "dau_tu": lambda: features.dautu().view(), "tiet_kiem": lambda: features.tietkiem().view(day),
+        "suc_khoe": lambda: features.taisan().health(day), "lich_su": lambda: chitieu_commands.lichsu([]),
+        "bieu_do": lambda: features.phantich().chart_reply("thang", day), "du_bao": lambda: features.phantich().dubao([]),
+        "ngan_sach": lambda: chitieu_commands.ngansach([]), "huong_dan": lambda: menu.guide()}
     return makers.get(name, lambda: menu.screen("home", day))()
 
 
@@ -1145,13 +1158,13 @@ def unsure(text, down=False):
     """Không hiểu (hoặc AI bận): có số tiền thì hỏi có phải khoản chi không; không thì gợi ý cách nhắn."""
     why = "AI đang bận nên mình chưa đọc được câu này" if down else "Mình chưa rõ câu này là việc gì"
     quoted = html.escape(text.strip()[:80])
-    if ct.parse_amount(text):
+    if parse_amount(text):
         cid = kho.command("INCR", keys.CARD_COUNTER)
         kho.put(keys.card(cid), {"viec": "_chi", "cau": text.strip()[:300]}, CARD_SECONDS)
         return (f"🤔 {why}: «{quoted}»\nNếu là một khoản chi thì bấm nút dưới. Việc khác (chuyển tiền, tài sản, nợ…) "
                 "thì bấm ➕ Thêm hoặc nhắn lại rõ hơn.",
                 [[("💸 Ghi là khoản chi", f"y:chi:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")],
-                 [("➕ Thêm tài sản, nợ", "y:them"), ct.BACK]])
+                 [("➕ Thêm tài sản, nợ", "y:them"), chitieu_ctx.BACK]])
     return (f"🤔 {why}: «{quoted}»\nBạn cứ nhắn câu thường, ví dụ:\n{EXAMPLES}\nHoặc mở menu để bấm nút.",
             [[("➕ Thêm tài sản, nợ", "y:them"), ("🏠 Menu", "m:home")]])
 
@@ -1160,17 +1173,17 @@ def handle(a, text, now, chat):
     """Xử lý một việc AI vừa hiểu. Trả câu trả lời; None nếu là khoản chi thường (ghi như cũ)."""
     job = a["viec"]
     if job == "chi":
-        if ct.parse_amount(text):
+        if parse_amount(text):
             remember_plain(text)
             return None
         if a.get("tien"):
-            return ct.record_text(f"{a['tien']}đ {a.get('ghi_chu') or 'khoản chi'}", now)
+            return chitieu_bot.record_text(f"{a['tien']}đ {a.get('ghi_chu') or 'khoản chi'}", now)
         return unsure(text)
-    if job == "tra_no" and a.get("ten") and ct.parse_amount(text):
+    if job == "tra_no" and a.get("ten") and parse_amount(text):
         remember_plain(text)  # câu trả nợ đủ ý: ghi nguyên câu như trước (sổ nợ tự trừ), lần sau khỏi hỏi AI
         return None
     if job == "hoi":
-        return ct.phantich().hoi(text, now.date())
+        return features.phantich().hoi(text, now.date())
     if job == "xem":
         return screen(a, text, now)
     if job == "tra_loi":
@@ -1179,9 +1192,9 @@ def handle(a, text, now, chat):
         return start_many(a["ds"], chat, now)
     if job == "khong_tieu":
         day = now.date() - timedelta(days=1 if a.get("ngay") == "homqua" else 0)
-        return ct.tietkiem().mark_no_spend(day.isoformat(), now.date())
+        return features.tietkiem().mark_no_spend(day.isoformat(), now.date())
     if job == "xoa_cuoi":
-        return ct.xoa_cuoi([])
+        return chitieu_commands.xoa_cuoi([])
     if job == "khac":
         return unsure(text)
     return advance(a, chat, now)
@@ -1191,10 +1204,10 @@ def handle(a, text, now, chat):
 
 def quick(text, now):
     """Việc hiểu được bằng luật, không cần AI: "hôm nay không tiêu gì", "hôm qua ko tiêu". None nếu không phải."""
-    bare = ct.plain(text.strip())
-    if len(bare) <= 40 and not ct.parse_amount(text) and NO_SPEND.search(bare):
+    bare = plain(text.strip())
+    if len(bare) <= 40 and not parse_amount(text) and NO_SPEND.search(bare):
         day = now.date() - timedelta(days=1 if "hom qua" in bare else 0)
-        return ct.tietkiem().mark_no_spend(day.isoformat(), now.date())
+        return features.tietkiem().mark_no_spend(day.isoformat(), now.date())
     return None
 
 
@@ -1212,8 +1225,8 @@ def understand(text, now, chat, question=False):
     except Exception as e:
         print(f"[lỗi] AI hiểu câu: {e!r}", file=sys.stderr)
         if question:
-            return ct.phantich().hoi(text, now.date())
-        if ct.parse_amount(text) and re.match(r"tra (?:no|gop|tien)(?!\w)", ct.plain(text.strip())):
+            return features.phantich().hoi(text, now.date())
+        if parse_amount(text) and re.match(r"tra (?:no|gop|tien)(?!\w)", plain(text.strip())):
             return None  # "trả nợ chú Tư 5tr": ghi như trước, sổ nợ tự trừ
         return unsure(text, down=True)
     return handle(a, text, now, chat)
@@ -1230,13 +1243,13 @@ def parse_value(f, text):
     t = text.strip()
     if not t or "\n" in t or len(t) > 60:
         return None
-    bare = ct.plain(t)
+    bare = plain(t)
     for value, label in choices(f):
-        if bare in (ct.plain(str(label)), ct.plain(str(value))):
+        if bare in (plain(str(label)), plain(str(value))):
             return value
     kind = f["kieu"]
     if kind == "tien":
-        found = ct.parse_amount(t)
+        found = parse_amount(t)
         if found and only_filler(t[:found[1]] + " " + t[found[2]:]):
             return int(found[0])
         return None
@@ -1247,12 +1260,12 @@ def parse_value(f, text):
         x = float(m[1].replace(",", "."))
         return x * 10 if m[2] in ("luong", "cay") and f["ten"] == "chi" else x
     if kind == "chu":
-        if ct.parse_amount(t) or t.endswith("?") or len(t) > 40:
+        if parse_amount(t) or t.endswith("?") or len(t) > 40:
             return None  # có số tiền hay là câu hỏi: không phải tên
         return t.upper() if f["ten"] == "ma" else t
     if kind == "ngay":
-        when, _ = ct.parse_date(t, ct.today())
-        return when.isoformat() if when != ct.today() or "hom nay" in bare else None
+        when, _ = chitieu_ctx.parse_date(t, chitieu_ctx.today())
+        return when.isoformat() if when != chitieu_ctx.today() or "hom nay" in bare else None
     return None
 
 
@@ -1273,7 +1286,7 @@ def on_reply(text, now, chat):
         if v is not None:
             a[f["ten"]] = v
             return advance(a, chat, now)
-    if not ct.ai_key():
+    if not ai_client.key():
         forget(chat)
         return None
     try:
@@ -1331,7 +1344,7 @@ def on_button(arg, message, now):
             order = switch_order({"lenh": int(preset)})
             extra = {"lenh": int(preset), **({"ngay_ban": order["ban"]} if order and order.get("ban") else {})}
         if preset == "chinh" and job == "tai_khoan":
-            main = ct.taisan().main_account()
+            main = features.taisan().main_account()
             extra = {"ten": main["ten"], "chinh": True} if main else {"chinh": True}
         return None, ("send", lambda: start(job, chat, now, **extra))
     if kind == "thoi":
@@ -1361,7 +1374,7 @@ def on_button(arg, message, now):
         return "Đã bỏ", ("edit", lambda: "Đã bỏ, không ghi gì.")
     if kind == "chi" and a.get("viec") == "_chi":
         kho.delete(keys.card(cid))
-        return "Đã ghi", ("edit", lambda: ct.record_text(a["cau"], now))
+        return "Đã ghi", ("edit", lambda: chitieu_bot.record_text(a["cau"], now))
     if kind == "nguon":
         a["san"] = not a.get("san")
         return None, ("edit", lambda: card(a, chat, cid))
@@ -1389,16 +1402,16 @@ def try_text(text, day):
     if used > TRY_LIMIT:
         return f"Hôm nay đã thử {TRY_LIMIT} câu, mai thử tiếp."
     lines = [f"Câu: {text}"]
-    if ct.phantich().is_question(text) and not beyond_spending(text):
+    if features.phantich().is_question(text) and not beyond_spending(text):
         return "\n".join(lines + ["→ Câu hỏi về chi tiêu: trả lời bằng sổ chi tiêu như trước (không qua bộ hiểu câu)."])
     if not wants(text):
         return "\n".join(lines + ["→ Khoản chi/thu thường: ghi ngay như trước (không hỏi AI)."])
     try:
         system = prompt(day, personal=False)
-        out, model = ct.ai_chat(system, text, timeout=15, budget=25)
+        out, model = ai_client.chat(system, text, timeout=15, budget=25)
     except Exception as e:
         return "\n".join(lines + [f"→ AI lỗi: {e}"])
-    a = clean(ct.first_json(out) or {}, text)
+    a = clean(ai_client.first_json(out) or {}, text)
     lines += [f"AI ({model}) trả: {out.strip()[:300]}", f"Việc sau khi kiểm tra: {a}"]
     if a["viec"] in JOBS:
         f = missing(a)

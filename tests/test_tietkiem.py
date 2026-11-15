@@ -75,10 +75,10 @@ class Service(unittest.TestCase):
         h.at(2026, 11, 10, 10)
 
     def test_moc_chi_bao_mot_lan(self):
-        import sochitieu as ct
+        from services.chitieu import ledger as ledger_service
         for d in range(4, 11):  # 7 ngày liên tiếp có ghi (ghi thẳng vào sổ, không qua tin trả lời vì tin trả lời đã báo mốc)
             h.at(2026, 11, d, 9)
-            ct.add("cà phê 35k", h.CLOCK["now"])
+            ledger_service.add("cà phê 35k", h.CLOCK["now"])
         p = service.summary(D(2026, 11, 10))
         first = service.claim_milestones(p)
         self.assertEqual(first.streak, [7])
