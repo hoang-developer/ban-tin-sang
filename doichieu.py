@@ -13,9 +13,9 @@ import html
 import sys
 
 import kho
+from repositories import keys
 import sochitieu as ct
 
-KEY = "chitieu:doichieu"  # {"YYYY-MM": {"muc": {id: {"ten", "bot", "that", "lech", "don_vi"}}}}
 DAY = 15
 UNITS = ("quy", "cp", "etf", "coin", "ngoaite")  # đối chiếu theo số lượng, không theo tiền
 
@@ -25,14 +25,14 @@ def ts():
 
 
 def log(ym=None):
-    data = kho.get(KEY, {}) or {}
+    data = kho.get(keys.RECONCILE, {}) or {}
     return data.get(ym, {"muc": {}}) if ym else data
 
 
 def save_log(ym, month):
-    data = kho.get(KEY, {}) or {}
+    data = kho.get(keys.RECONCILE, {}) or {}
     data[ym] = month
-    kho.put(KEY, dict(sorted(data.items())[-12:]))
+    kho.put(keys.RECONCILE, dict(sorted(data.items())[-12:]))
 
 
 def short(x):
@@ -197,7 +197,7 @@ def book_gap(item_id, now):
     if not rec or not rec["lech"] or rec.get("ghi"):
         return "Khoản lệch này đã xử lý rồi"
     gap = rec["lech"]
-    entry = {"id": kho.command("INCR", ct.K_COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
+    entry = {"id": kho.command("INCR", keys.COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
              "tien": abs(gap), "ghichu": f"{'chi' if gap < 0 else 'thu'} chưa ghi (đối chiếu {rec['ten']})",
              "nhom": ct.INCOME if gap > 0 else ct.OTHER, "khong_tk": True}
     ct.save(entry)
@@ -226,7 +226,7 @@ def morning_part(day):
     if day.day != DAY:
         return None
     left = remaining(day)
-    if not left or not kho.put_new(f"{KEY}:nhac:{day:%Y-%m}", True, 40 * 86400):
+    if not left or not kho.put_new(keys.reconcile_reminder(f"{day:%Y-%m}"), True, 40 * 86400):
         return None
     return (f"🔄 Hôm nay đối chiếu tài sản tháng {day.month}: {len(left)} ngăn, so với app ngân hàng, Fmarket",
             [[("🔄 Bắt đầu đối chiếu", "dc:xem")]])

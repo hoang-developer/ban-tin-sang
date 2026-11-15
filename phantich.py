@@ -14,13 +14,13 @@ from calendar import monthrange
 from datetime import date, timedelta
 
 import kho
+from repositories import keys
 import sochitieu as ct
 from bantin import WEEKDAYS
 
 LARGE = 1_000_000  # khoản từ 1tr (tiền nhà, học phí...) tính riêng, không tính vào nhịp tiêu hằng ngày
 UNUSUAL_MIN, UNUSUAL_RATIO = 200_000, 3  # khoản lạ thường: từ 200k và gấp 3 lần mức thường của nhóm
 SURGE_RATIO, SURGE_MIN = 1.6, 300_000  # nhóm tăng vọt: 7 ngày qua gấp 1,6 lần mức thường và nhiều hơn 300k
-DAILY_KEY = "chitieu:dubao:nhom"  # các nhóm tính là chi tiêu hằng ngày (người dùng chọn bằng /dubao nhom ...)
 DAILY_DEFAULT = ["an", "cho", "xe"]  # ăn uống, đi chợ/siêu thị, đi lại
 SPIKE_MIN, SPIKE_RATIO = 300_000, 3  # khoản đột biến: từ 300k và gấp 3 lần mức thường (trung vị) của nhóm
 CHART_URL = "https://quickchart.io/chart"  # vẽ biểu đồ Chart.js thành ảnh PNG; chỉ gửi tên nhóm và số tiền
@@ -91,7 +91,7 @@ def forecast(day):
     left = days - day.day
     spent = total(month)
     groups = {}
-    for code, limit in kho.get(ct.K_BUDGET, {}).items():
+    for code, limit in kho.get(keys.BUDGET, {}).items():
         if code == "hangngay":  # ngân sách chi tiêu hằng ngày: tính ở daily_forecast
             continue
         mine = month if code == "tong" else [e for e in month if e["nhom"] == code]
@@ -166,7 +166,7 @@ def trend(change):
 
 def daily_groups():
     """Các nhóm tính là chi tiêu hằng ngày: người dùng chọn, mặc định ăn uống, đi chợ/siêu thị, đi lại."""
-    saved = kho.get(DAILY_KEY) if kho.ready() else None
+    saved = kho.get(keys.DAILY_GROUPS) if kho.ready() else None
     active = ct.groups()
     codes = [c for c in (saved or DAILY_DEFAULT) if c in active and c != ct.INCOME]
     return codes or [c for c in DAILY_DEFAULT if c in active]
@@ -203,7 +203,7 @@ def daily_forecast(day):
     left = days - day.day
     spent = total(month)
     today = total(e for e in month if e["ngay"] == day.isoformat())
-    budgets = kho.get(ct.K_BUDGET, {})
+    budgets = kho.get(keys.BUDGET, {})
     # Ngân sách: "hằng ngày" nếu có; không thì cộng ngân sách các nhóm hằng ngày khi nhóm nào cũng đã đặt
     limit = budgets.get("hangngay") or (sum(budgets[c] for c in codes) if all(c in budgets for c in codes) else None)
     room = None
@@ -260,7 +260,7 @@ def dubao(args):
             return (f"Đang tính là chi tiêu hằng ngày: {html.escape(daily_label(daily_groups()))}\n"
                     "Đổi: /dubao nhom ăn uống, đi chợ, đi lại · về mặc định: /dubao nhom macdinh")
         if ct.plain(rest) in ("macdinh", "mac dinh"):
-            kho.delete(DAILY_KEY)
+            kho.delete(keys.DAILY_GROUPS)
             return f"✅ Về mặc định: {html.escape(daily_label(daily_groups()))}"
         codes, unknown = [], []
         for part in re.split(r"[,;]", rest):
@@ -269,7 +269,7 @@ def dubao(args):
                 (codes if code and code != ct.INCOME else unknown).append(code or part.strip())
         if unknown or not codes:
             return "Không thấy nhóm: " + html.escape(", ".join(unknown or [rest])) + ". Xem tên nhóm: /nhom"
-        kho.put(DAILY_KEY, list(dict.fromkeys(codes)))
+        kho.put(keys.DAILY_GROUPS, list(dict.fromkeys(codes)))
         return f"✅ Dự báo hằng ngày giờ tính: {html.escape(daily_label(daily_groups()))}\nXem: /dubao"
     return daily_text(ct.today())
 
@@ -321,7 +321,7 @@ def after_record(entries, day):
     sách thì không thêm dòng (con số theo kế hoạch xem ở 🏠 Hôm nay)."""
     lines = unusual_lines(entries, day)
     codes = daily_groups()
-    budgets = kho.get(ct.K_BUDGET, {})
+    budgets = kho.get(keys.BUDGET, {})
     if any(e["nhom"] in codes for e in entries) and ("hangngay" in budgets or all(c in budgets for c in codes)):
         f = daily_forecast(day)
         if f["room"]:
@@ -351,14 +351,14 @@ def alerts(day):
             now_sum = total(e for e in week if e["nhom"] == code)
             usual = total(e for e in before if e["nhom"] == code) / 4
             if usual and now_sum >= SURGE_RATIO * usual and now_sum - usual >= SURGE_MIN \
-                    and kho.put_new(f"chitieu:canhbao:tang:{code}", True, 7 * 86400):
+                    and kho.put_new(keys.alert_rise(code), True, 7 * 86400):
                 lines.append(f"📈 {ct.name(code)}: 7 ngày qua {vnd(now_sum)}, gấp {times(now_sum / usual)} lần mức "
                              f"thường ({short(usual)}/tuần). Nhiều nhất: "
                              + ", ".join(habit_text(k, c, a) for k, c, a in habits([e for e in week if e["nhom"] == code])[:3]))
     f = forecast(day)
     for code, b in f["budgets"].items():
         if b["spent"] < b["limit"] < b["projected"] and f["history"] >= 7 \
-                and kho.put_new(f"chitieu:canhbao:ngansach:{code}:{day:%Y-%m}", True, 7 * 86400):
+                and kho.put_new(keys.alert_budget(code, f"{day:%Y-%m}"), True, 7 * 86400):
             label = "Tổng chi" if code == "tong" else ct.name(code)
             when = f" vào khoảng ngày {b['over_day']}" if b["over_day"] else " trước cuối tháng"
             lines.append(f"⏳ Theo đà này {label} sẽ vượt ngân sách {short(b['limit'])}{when} "
@@ -480,7 +480,7 @@ def rule_spec(question, day):
     if not spec["nhom"] and not spec["thu"]:  # món cụ thể: từ khóa dài nhất khớp trong câu
         text = ct.norm(question)
         typed_plain = text == ct.plain(text)
-        hits = [(len(pattern.pattern), pattern) for exact, plain_p, score, code in ct.rules(kho.get(ct.K_LEARN, {}))
+        hits = [(len(pattern.pattern), pattern) for exact, plain_p, score, code in ct.rules(kho.get(keys.LEARN, {}))
                 for pattern in [plain_p if typed_plain else exact] if pattern and pattern.search(text) and score >= 2]
         if hits:
             word = max(hits, key=lambda x: x[0])[1].search(text)[0]

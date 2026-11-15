@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 import chungkhoan
 import kho
+from repositories import keys
 from bantin import VN_TZ, vn_num
 
 FINFO = "https://api-finfo.vndirect.com.vn/v4"
@@ -40,7 +41,6 @@ SHORT_NAMES = {"Dịch vụ Đầu tư Bất Động Sản": "Bất động sả
 BUTTONS = [[("🔥 Ngành", "nd:nganh"), ("🎯 Khuyến nghị", "nd:kn"), ("📰 Tin", "nd:tin")],
            [("🔄 Cập nhật nhận định", "nd:moi")]]
 SHORT_REF = "<i>Nguồn VNDirect</i>"
-OFF = "nhandinh:tat"  # có khóa này thì không tự gửi nhận định trong phiên
 TICKER = re.compile(r"(?<![A-Za-z0-9])[A-Z][A-Z0-9]{2}(?![A-Za-z0-9])")
 
 
@@ -77,11 +77,11 @@ def industry_map():
                 if code.strip():
                     out[code.strip()] = SHORT_NAMES.get(name, name)
         return out
-    return remembered("nhandinh:nganh", 7 * 86400, fetch)
+    return remembered(keys.CACHE_SECTORS, 7 * 86400, fetch)
 
 
 def hose_symbols():
-    return remembered("nhandinh:hose", 86400, lambda: [x["symbol"] for x in chungkhoan.get_json(
+    return remembered(keys.CACHE_HOSE, 86400, lambda: [x["symbol"] for x in chungkhoan.get_json(
         f"{chungkhoan.VCI}/getByGroup?group=HOSE")])
 
 
@@ -96,7 +96,7 @@ def recommendations(days=30):
             out.setdefault(r["code"], []).append({k: r.get(k) for k in (
                 "firm", "type", "reportDate", "reportPrice", "targetPrice", "avgTargetPrice")})
         return out
-    return remembered(f"nhandinh:kn:{days}:{since}", 3 * 3600, fetch)
+    return remembered(keys.cache_foreign(days, since), 3 * 3600, fetch)
 
 
 def text_of(node, tag):
@@ -461,9 +461,9 @@ def nhandinh(args):
         if not kho.ready():
             return "Cần kho dữ liệu để bật/tắt, gõ /caidat"
         if word in ("tat", "tắt"):
-            kho.put(OFF, True)
+            kho.put(keys.ANALYSIS_OFF, True)
             return "Đã tắt nhận định tự gửi trong phiên. Bật lại: /nhandinh bat"
-        kho.delete(OFF)
+        kho.delete(keys.ANALYSIS_OFF)
         return "Đã bật: ngày giao dịch bot gửi nhận định lúc 10h15 và 13h45"
     return brief()
 
@@ -483,7 +483,7 @@ def on_button(arg):
 
 def scheduled(now):
     """Nhận định tự gửi trong phiên: (chữ, nút) hoặc None nếu đã tắt, hay hôm nay không giao dịch."""
-    if kho.ready() and kho.get(OFF):
+    if kho.ready() and kho.get(keys.ANALYSIS_OFF):
         return None
     data = gather()
     vni = data["index"].get("VN-Index")

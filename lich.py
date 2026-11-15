@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 import amlich
 import canhbao
 import kho
+from repositories import keys
 import lenh
 import nhandinh
 import phantich
@@ -37,11 +38,11 @@ def trading_day(now):
 
 
 def done_today(job, now):
-    return kho.get(f"xong:{job}:{now.date()}") is not None
+    return kho.get(keys.job_done(job, now.date())) is not None
 
 
 def mark_done(job, now):
-    kho.put(f"xong:{job}:{now.date()}", True, 3 * 86400)
+    kho.put(keys.job_done(job, now.date()), True, 3 * 86400)
 
 
 # ---- Các việc --------------------------------------------------------------------
@@ -59,15 +60,15 @@ def canh_bao(now, chat):
     """Các cảnh báo của canhbao.py, trạng thái lưu trong kho thay cho state.json."""
     if not between(now, (6, 0), (22, 0)):
         return None
-    state = kho.get("canhbao", {})
+    state = kho.get(keys.ALERT_STATE, {})
     alerts = canhbao.run(state, now, watchlist={**canhbao.WATCHLIST, **lenh.price_alerts()},
                          keywords=lenh.all_keywords())
-    items = kho.get("vivang", [])
+    items = kho.get(keys.GOLD, [])
     if items:
         alerts = [a + "\n" + lenh.wallet_brief(items) if a.startswith("🪙") else a for a in alerts]
     if alerts:
         tg.send(chat, "\n\n".join(alerts))
-    kho.put("canhbao", state)
+    kho.put(keys.ALERT_STATE, state)
     return f"{len(alerts)} cảnh báo"
 
 
@@ -86,7 +87,7 @@ def board_text(now):
     except Exception as e:
         print(f"[lỗi] bảng điện, chỉ số: {e!r}", file=sys.stderr)
         lines.append("⚪ Chỉ số: không lấy được")
-    watch = kho.get("theodoi", {})
+    watch = kho.get(keys.WATCHLIST, {})
     if watch:
         try:
             for s, q in quotes(watch).items():
@@ -110,7 +111,7 @@ def bang_dien(now, chat):
     if not trading_day(now) or not between(now, (9, 0), (15, 20)):
         return None
     text = board_text(now)
-    board = kho.get("bangdien", {})
+    board = kho.get(keys.BOARD, {})
     if board.get("ngay") == str(now.date()):
         try:
             tg.edit(chat, board["id"], text)
@@ -125,7 +126,7 @@ def bang_dien(now, chat):
         except tg.TelegramError:
             pass  # tin cũ đã bị xóa hoặc bỏ ghim
     tg.call("pinChatMessage", chat_id=chat, message_id=msg["message_id"], disable_notification=True)
-    kho.put("bangdien", {"ngay": str(now.date()), "id": msg["message_id"]})
+    kho.put(keys.BOARD, {"ngay": str(now.date()), "id": msg["message_id"]})
     return "đã gửi và ghim"
 
 
@@ -140,7 +141,7 @@ def gui_doan(now, chat):
 def cham_doan(now, chat):
     if not trading_day(now) or not between(now, (15, 0), (23, 0)) or done_today("cham_doan", now):
         return None
-    guess = kho.get(f"doan:{now.date()}")
+    guess = kho.get(keys.guess(now.date()))
     if guess is None:
         mark_done("cham_doan", now)
         return "hôm nay không đoán"
@@ -150,7 +151,7 @@ def cham_doan(now, chat):
     else:
         pct = (c[-1] - c[-2]) / c[-2] * 100
         result = "xanh" if c[-1] > c[-2] else "do" if c[-1] < c[-2] else None
-        s = kho.get("doan_thongke", {"dung": 0, "tong": 0, "chuoi": 0, "chuoi_max": 0, "thang": {}})
+        s = kho.get(keys.GUESS_STATS, {"dung": 0, "tong": 0, "chuoi": 0, "chuoi_max": 0, "thang": {}})
         if result is None:
             text = "🎯 VN-Index đứng giá tham chiếu, lượt đoán hòa."
         else:
@@ -162,12 +163,12 @@ def cham_doan(now, chat):
             s["tong"] += 1
             s["chuoi"] = s["chuoi"] + 1 if right else 0
             s["chuoi_max"] = max(s["chuoi_max"], s["chuoi"])
-            kho.put("doan_thongke", s)
+            kho.put(keys.GUESS_STATS, s)
             text = (f"🎯 {'✅ Đoán đúng!' if right else '❌ Đoán trật.'} VN-Index {vn_num(c[-1])} "
                     f"({vn_num(pct, sign=True)}%) – {lenh.GUESS_LABEL[result]}, bạn chọn "
                     f"{lenh.GUESS_LABEL[guess]}\nChuỗi đúng: {s['chuoi']} · tháng này {month[0]}/{month[1]}")
     tg.send(chat, text)
-    kho.put(f"doan_kq:{now.date()}", text, 3 * 86400)
+    kho.put(keys.guess_result(now.date()), text, 3 * 86400)
     mark_done("cham_doan", now)
     return "đã chấm"
 
@@ -175,7 +176,7 @@ def cham_doan(now, chat):
 def reminders_due(day, offsets):
     """Các ngày cần nhớ rơi vào day + offset ngày (offset trong offsets)."""
     lines = []
-    for r in kho.get("nhac", []):
+    for r in kho.get(keys.REMINDERS, []):
         d = amlich.next_date(r["ngay"], r["thang"], r["am"], day)
         n = (d - day).days
         if n in offsets:
@@ -205,9 +206,9 @@ def co_tuc(now, chat):
     """Dò tin cổ tức, chốt quyền của các mã đang theo dõi."""
     if not between(now, (7, 30), (23, 0)) or done_today("co_tuc", now):
         return None
-    seen = kho.get("cotuc_daxem", [])
+    seen = kho.get(keys.DIVIDENDS_SEEN, [])
     found = []
-    for symbol in kho.get("theodoi", {}):
+    for symbol in kho.get(keys.WATCHLIST, {}):
         query = f'"{symbol}" (cổ tức OR "chốt quyền" OR "chốt danh sách" OR "không hưởng quyền") when:3d'
         for title, link, *_ in google_news(query):
             if (link in seen or not re.search(rf"\b{symbol}\b", title)
@@ -217,7 +218,7 @@ def co_tuc(now, chat):
             found.append(f'• <b>{symbol}</b>: <a href="{html.escape(link)}">{html.escape(title, quote=False)}</a>')
     if found:
         tg.send(chat, "💰 <b>Tin quyền lợi cổ đông</b>\n" + "\n".join(found[:8]))
-    kho.put("cotuc_daxem", seen[-300:])
+    kho.put(keys.DIVIDENDS_SEEN, seen[-300:])
     mark_done("co_tuc", now)
     return f"{len(found)} tin"
 
@@ -240,7 +241,7 @@ def evening_message(now):
     if trading_day(now):
         def market():
             lines = stocks()
-            watch = kho.get("theodoi", {})
+            watch = kho.get(keys.WATCHLIST, {})
             if watch:
                 for s, q in quotes(watch).items():
                     p = q["price"] or q["ref"]
@@ -260,16 +261,16 @@ def evening_message(now):
     def gold_today():
         prices = gold_prices()
         sell = prices["sjc"][1]
-        hist = kho.get("vang_lichsu", {})
+        hist = kho.get(keys.GOLD_HISTORY, {})
         earlier = [d for d in hist if d < str(now.date())]
         line = f"Miếng SJC bán {vn_num(sell, 1)} triệu/lượng"
         if earlier:
             last = max(earlier)
             line += f" ({vn_num(sell - hist[last], 1, sign=True)} so với {last[8:]}/{last[5:7]})"
         hist[str(now.date())] = sell  # ghi lại mỗi tối, /neu vang dùng
-        kho.put("vang_lichsu", dict(sorted(hist.items())[-800:]))
+        kho.put(keys.GOLD_HISTORY, dict(sorted(hist.items())[-800:]))
         lines = [line]
-        items = kho.get("vivang", [])
+        items = kho.get(keys.GOLD, [])
         if items:
             lines.append(lenh.wallet_brief(items))
         return lines
@@ -280,7 +281,7 @@ def evening_message(now):
     if remind:
         parts.append("<b>🔔 Ngày mai</b>\n" + "\n".join(
             f"• {html.escape(r['ten'])} ({lenh.when_text(r)})" for _, _, r in remind))
-    result = kho.get(f"doan_kq:{now.date()}")
+    result = kho.get(keys.guess_result(now.date()))
     if result:
         parts.append(result)
     return "\n\n".join(parts)
@@ -412,7 +413,7 @@ def tai_san_cuoi_ngay(now, chat):
     if not between(now, (18, 0), (23, 45)) or not chitieu.token() or done_today("tai_san_cuoi_ngay", now):
         return None
     chitieu.reset()
-    if not taisan.load()["items"] and not kho.get(taisan.K_GOLD):
+    if not taisan.load()["items"] and not kho.get(keys.GOLD):
         mark_done("tai_san_cuoi_ngay", now)
         return "chưa khai báo tài sản"
     v = taisan.valuation(now.date(), fresh=True)
@@ -495,5 +496,5 @@ def run(now):
         except Exception as e:
             print(f"[lỗi] {job.__name__}: {e!r}", file=sys.stderr)
             notes.append(f"{job.__name__}: lỗi {e!r}")
-    kho.put("tick_cuoi", now.strftime("%H:%M %d/%m"))
+    kho.put(keys.TICK_LAST, now.strftime("%H:%M %d/%m"))
     return notes

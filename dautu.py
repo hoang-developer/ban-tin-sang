@@ -17,17 +17,15 @@ import sys
 from datetime import date, datetime, timedelta
 
 import kho
+from repositories import keys
 import phantich as pt
 import sochitieu as ct
 import taisan as ts
 from bantin import VN_TZ, vn_num
 
-KEY = "chitieu:dautu"
 # {"ma", "id", "ten", "bat_dau": "YYYY-MM", "goc": giá trị quỹ có sẵn lúc bắt đầu, "gop": {"YYYY-MM": số góp từ tháng đó},
 #  "tang": 0.01, "nap": {"YYYY-MM": đã góp vào hệ thống trong tháng}, "ky": {"YYYY-MM": {"chot", "bo", "muc", "gt"}},
 #  "lenh": [{"id", "ky", "tien", "dat", "phien", "trang_thai": "cho"|"khop", "nav", "ccq"}], "tat": bool, "top_luc"}
-K_NAV = "chitieu:dautu:nav"  # {"ma", "luc", "nav": [[ngày ISO, NAV], ...]} (khoảng 400 phiên gần nhất)
-K_INFO = "chitieu:dautu:thongtin"  # {"ma", "luc", "data": chi tiết quỹ của Fmarket (phiên giao dịch, top 10, phí)}
 FMARKET = "https://api.fmarket.vn/res"
 DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG = "VMEEF", 4_000_000, 0.01
 MIN_ORDER, STEP = 100_000, 10_000
@@ -53,11 +51,11 @@ USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
 # ---- Lưu trữ ---------------------------------------------------------------------------
 
 def config():
-    return kho.get(KEY, {}) or {}
+    return kho.get(keys.FUND, {}) or {}
 
 
 def save(cfg):
-    kho.put(KEY, cfg)
+    kho.put(keys.FUND, cfg)
 
 
 def active(cfg=None):
@@ -115,7 +113,7 @@ def find_fund(code):
 
 def nav_history(cfg, fresh=False):
     """[(ngày, NAV)] khoảng 400 phiên gần nhất. Lưu trong kho 2 tiếng; nguồn lỗi thì dùng bản đã lưu."""
-    key = f"{K_NAV}:{cfg['ma']}"
+    key = keys.fund_nav(cfg['ma'])
     store = kho.get(key, {}) or {}
     if store.get("ma") == cfg["ma"] and store.get("nav") and not fresh and \
             (now_vn() - datetime.fromisoformat(store["luc"])).total_seconds() < 2 * 3600:
@@ -137,7 +135,7 @@ def nav_history(cfg, fresh=False):
 
 def fund_info(cfg, fresh=False):
     """Chi tiết quỹ của Fmarket (phiên giao dịch kế tiếp, top 10 mã, phí); lưu 1 tiếng, lỗi thì dùng bản cũ."""
-    key = f"{K_INFO}:{cfg['ma']}"
+    key = keys.fund_info(cfg['ma'])
     store = kho.get(key, {}) or {}
     if store.get("ma") == cfg["ma"] and not fresh and \
             (now_vn() - datetime.fromisoformat(store["luc"])).total_seconds() < 3600:
@@ -1010,7 +1008,7 @@ def start(args, switch=False):
         lines.append(f"Đã tính {units_text(hold['sl'])} ccq đang có ({money(base)}) vào điểm xuất phát.")
     lines.append("Đã mua trong tháng này (trước khi bật) thì ghi lại: /dautu dadat 1tr 9/11 (số tiền, ngày đặt lệnh; "
                  "bot tự tính phiên khớp).")
-    if not kho.get(ts.K_SALARY):
+    if not kho.get(keys.SALARY):
         lines.append("Đặt ngày lương để bot nhắc để tiền vào quỹ chờ: /luong 5 số_tiền_lương")
     text, rows = view()
     return "\n".join(lines) + "\n\n" + text, rows

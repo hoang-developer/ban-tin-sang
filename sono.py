@@ -16,6 +16,7 @@ import unicodedata
 from calendar import monthrange
 
 import kho
+from repositories import keys
 import phantich as pt
 import sochitieu as ct
 import taisan as ts
@@ -131,7 +132,7 @@ def pay_day(d, day):
     last = monthrange(day.year, day.month)[1]
     if d.get("ngay_tra"):
         return min(d["ngay_tra"], last)
-    salary = kho.get(ts.K_SALARY) or {}
+    salary = kho.get(keys.SALARY) or {}
     return min(salary["ngay"] + 2, last) if salary.get("ngay") else 10
 
 
@@ -371,7 +372,7 @@ def pay(debt_id, amount, now):
         return None, ["Khoản nợ này đã trả xong hoặc đã xóa"]
     group, note = debt_group(create=True)
     day = now.date()
-    e = {"id": kho.command("INCR", ct.K_COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
+    e = {"id": kho.command("INCR", keys.COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
          "tien": int(amount), "ghichu": f"trả nợ {d['ten']}", "nhom": group or ct.OTHER, "no": d["id"]}
     if not group:
         e["dekhac"] = True
@@ -487,7 +488,7 @@ def reminders(day):
         if day.day < start:
             continue
         stage = 1 if day.day < start + 5 else 2
-        if kho.put_new(f"chitieu:nhac:no:{d['id']}:{ym}:{stage}", True, 40 * 86400):
+        if kho.put_new(keys.debt_reminder(d['id'], ym, stage), True, 40 * 86400):
             due.append((d, left))
     if not due:
         return None

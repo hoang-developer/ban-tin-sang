@@ -18,6 +18,7 @@ from calendar import monthrange
 from datetime import date, datetime, timedelta
 
 import kho
+from repositories import keys
 from bantin import VN_TZ, WEEKDAYS, vn_num
 
 # ---- Nhóm chi tiêu --------------------------------------------------------------
@@ -83,8 +84,6 @@ MAX_LEARNED = 500  # số cụm từ học được tối đa
 MAX_GROUPS, MAX_WORDS = 20, 60  # số nhóm tự tạo, số từ khóa tự thêm cho mỗi nhóm
 # ---------------------------------------------------------------------------------
 
-K_COUNTER, K_LEARN, K_BUDGET, K_AI = "chitieu:dem", "chitieu:hoc", "chitieu:ngansach", "chitieu:ai"
-K_GROUPS, K_AI_STATS = "chitieu:nhomrieng", "chitieu:ai:thongke"
 NEED_STORE = "⚠️ Bot chi tiêu cần kho dữ liệu (Upstash Redis trên Vercel), xem README."
 
 
@@ -150,15 +149,15 @@ def config():
     if _config is None:
         if not kho.ready():
             return {}
-        _config = kho.get(K_GROUPS, {})
+        _config = kho.get(keys.GROUPS, {})
     return _config
 
 
 def save_config(cfg):
     global _config
-    kho.put(K_GROUPS, cfg)
+    kho.put(keys.GROUPS, cfg)
     _config = cfg
-    kho.delete(K_AI)  # nhóm đã khác: các câu AI trả lời trước đó không còn đúng danh sách nhóm
+    kho.delete(keys.AI_CACHE)  # nhóm đã khác: các câu AI trả lời trước đó không còn đúng danh sách nhóm
 
 
 def name(code, cfg=None):
@@ -502,13 +501,13 @@ def ask_ai(entries, learned=None):
     unknown = [e for e in entries if pending(e) and e["ghichu"] and not e.get("_chon")]
     if not unknown or not ai_key():
         return 0
-    cache = kho.get(K_AI, {})
+    cache = kho.get(keys.AI_CACHE, {})
     ask = list(dict.fromkeys(e["ghichu"] for e in unknown if learn_key(e["ghichu"]) not in cache))
     if ask:
         try:
             for note, code in ai_request(ask, learned)[0].items():
                 cache[learn_key(note)] = code
-            kho.put(K_AI, dict(list(cache.items())[-MAX_LEARNED:]))
+            kho.put(keys.AI_CACHE, dict(list(cache.items())[-MAX_LEARNED:]))
         except Exception as e:
             print(f"[lỗi] xếp nhóm bằng AI: {e!r}", file=sys.stderr)
     active, done = groups(), 0
@@ -518,13 +517,13 @@ def ask_ai(entries, learned=None):
             e["nhom"], e["ai"] = code, True
             done += 1
     if done:
-        kho.command("HINCRBY", K_AI_STATS, "doan", done)
+        kho.command("HINCRBY", keys.AI_STATS, "doan", done)
     return done
 
 
 def ai_stats():
     """(số khoản AI đã xếp, số khoản người dùng phải sửa lại)."""
-    flat = kho.command("HGETALL", K_AI_STATS) or []
+    flat = kho.command("HGETALL", keys.AI_STATS) or []
     stats = dict(zip(flat[::2], flat[1::2]))
     return int(stats.get("doan", 0)), int(stats.get("sua", 0))
 
@@ -579,7 +578,7 @@ def ai_status(test=False):
 # Ghi/sửa/xóa từng mục riêng nên hai tin nhắn tới cùng lúc không đè mất khoản của nhau.
 
 def month_key(ym):
-    return f"chitieu:{ym}"
+    return keys.ledger_month(ym)
 
 
 def load(ym):
@@ -605,14 +604,14 @@ def find(reference):
 
 def add(text, now):
     """Ghi mọi khoản trong tin nhắn (mỗi dòng một khoản); trả về các khoản đã ghi."""
-    learned = kho.get(K_LEARN, {})
+    learned = kho.get(keys.LEARN, {})
     entries = [e for e in (parse_line(line, now.date(), learned) for line in text.splitlines()) if e]
     chosen = [(e["ghichu"], e["nhom"]) for e in entries if e.get("_chon") and e["nhom"] != OTHER]
     if chosen:
         learn_all(chosen)
     ask_ai(entries, learned)
     for e in entries:
-        e["id"] = kho.command("INCR", K_COUNTER)
+        e["id"] = kho.command("INCR", keys.COUNTER)
         e["gio"] = now.strftime("%H:%M")
         save(e)
     return entries
@@ -650,11 +649,11 @@ def learn_all(pairs):
     pairs = [(learn_key(note), code) for note, code in pairs if note]
     if not pairs:
         return
-    learned = kho.get(K_LEARN, {})
+    learned = kho.get(keys.LEARN, {})
     for key, code in pairs:
         learned.pop(key, None)
         learned[key] = code
-    kho.put(K_LEARN, dict(list(learned.items())[-MAX_LEARNED:]))
+    kho.put(keys.LEARN, dict(list(learned.items())[-MAX_LEARNED:]))
 
 
 def learn(note, code):
@@ -669,7 +668,7 @@ def pending(e):
 def tidy(day):
     """Xếp lại các khoản đang ở Khác (tháng này và tháng trước) theo từ khóa, cụm từ đã học mới nhất.
     Trả về số khoản đã chuyển nhóm."""
-    table = rules(kho.get(K_LEARN, {}))
+    table = rules(kho.get(keys.LEARN, {}))
     prev = (day.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
     moved = 0
     for e in load(prev) + load(day.strftime("%Y-%m")):
@@ -710,7 +709,7 @@ def budget_label(code):
 
 def budget_lines(codes, day):
     """Tiến độ ngân sách tháng của các nhóm vừa ghi (và ngân sách tổng)."""
-    budgets = kho.get(K_BUDGET, {})
+    budgets = kho.get(keys.BUDGET, {})
     if not budgets:
         return []
     items = [e for e in load(day.strftime("%Y-%m")) if e["nhom"] != INCOME]
@@ -898,7 +897,7 @@ def income_kinds(items):
 
 def budget_status(day):
     """Tiến độ mọi ngân sách đã đặt (từng nhóm và tổng) trong tháng này."""
-    return budget_lines([c for c in kho.get(K_BUDGET, {}) if c != "tong"], day)
+    return budget_lines([c for c in kho.get(keys.BUDGET, {}) if c != "tong"], day)
 
 
 # ---- Lệnh ---------------------------------------------------------------------------
@@ -962,7 +961,7 @@ def ngansach(args):
     usage = ("Đặt ngân sách tháng: /ngansach ăn uống 3tr · /ngansach tổng 15tr\n"
              "Chi tiêu hằng ngày (ăn uống, đi chợ, đi lại…): /ngansach hằng ngày 9tr\n"
              "Bỏ ngân sách: /ngansach ăn uống 0")
-    budgets = kho.get(K_BUDGET, {})
+    budgets = kho.get(keys.BUDGET, {})
     if not args:
         lines = budget_status(today())
         return "\n".join(["🎯 <b>Ngân sách tháng này</b>"] + lines + ["", usage]) if lines else usage
@@ -971,13 +970,13 @@ def ngansach(args):
         return usage
     if args[-1] == "0":
         budgets.pop(code, None)
-        kho.put(K_BUDGET, budgets)
+        kho.put(keys.BUDGET, budgets)
         return f"Đã bỏ ngân sách {budget_label(code)}"
     found = parse_amount(args[-1])
     if found is None:
         return usage
     budgets[code] = found[0]
-    kho.put(K_BUDGET, budgets)
+    kho.put(keys.BUDGET, budgets)
     label = budget_label(code)
     return "\n".join([f"🎯 Ngân sách {label}: {vnd(found[0])}/tháng"] + budget_lines([code], today()))
 
@@ -1012,10 +1011,10 @@ def add_words(cfg, code, words):
     """Thêm từ khóa cho một nhóm; từ khóa đó có ở nhóm tự chỉnh khác thì chuyển sang nhóm này,
     cụm từ đã học trùng hẳn từ khóa đó (học từ lần sửa cũ) thì bỏ để từ khóa mới có tác dụng."""
     if words:
-        learned = kho.get(K_LEARN, {})
+        learned = kho.get(keys.LEARN, {})
         kept = {k: c for k, c in learned.items() if k not in words or c == code}
         if len(kept) != len(learned):
-            kho.put(K_LEARN, kept)
+            kho.put(keys.LEARN, kept)
     cfg.setdefault("tu", {})
     for other, own in cfg["tu"].items():
         if other != code:
@@ -1103,7 +1102,7 @@ def nhom_cmd(args):
                            (("doiten", "ten", "sua"), nhom_doiten), (("xoa",), nhom_xoa)]:
         if action in words:
             return handler(rest)
-    learned = kho.get(K_LEARN, {})
+    learned = kho.get(keys.LEARN, {})
     cfg = config()
     lines = ["🗂 <b>Các nhóm và vài từ khóa</b>"]
     for code, (label, own, builtin) in groups().items():
@@ -1132,7 +1131,7 @@ def chuaxep(args):
     items = [e for e in recent(day, 1000) if pending(e)][:8]
     if not items:
         return "✅ Không còn khoản nào chưa rõ nhóm. Khoản mới chưa rõ nhóm thì bot hỏi ngay khi ghi."
-    if ask_ai(items, kho.get(K_LEARN, {})):
+    if ask_ai(items, kho.get(keys.LEARN, {})):
         for e in items:
             if e.get("ai"):
                 save(e)
@@ -1415,7 +1414,7 @@ def on_button(data, message, now):
         if code not in groups():
             return "Nhóm này không còn, chọn nhóm khác", ("edit", lambda: render(refs, day, message))
         if e.get("ai") and code != e["nhom"]:
-            kho.command("HINCRBY", K_AI_STATS, "sua", 1)  # AI đoán sai
+            kho.command("HINCRBY", keys.AI_STATS, "sua", 1)  # AI đoán sai
         e["nhom"] = code
         e.pop("ai", None)  # người dùng đã chọn, không còn là AI đoán
         e.pop("dekhac", None)

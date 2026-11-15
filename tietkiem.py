@@ -17,10 +17,10 @@ import sys
 from datetime import date, timedelta
 
 import kho
+from repositories import keys
 import phantich as pt
 import sochitieu as ct
 
-KEY = "chitieu:tietkiem"  # {"moc", "bat_dau", "khong_tieu": [ngày ISO], "nhac": bool, "da_chuyen": đồng}
 DEFAULT_BASE = 323_700
 DEFAULT_START = "2026-11-04"
 SMALL = 1_000_000  # khoản lặt vặt: dưới 1 triệu (khoản lớn, thất thường không tính, giống cách tính mốc)
@@ -34,11 +34,11 @@ USAGE = ("💚 /tietkiem: chi lặt vặt so với trước khi dùng bot, chu�
 
 def config():
     return {"moc": DEFAULT_BASE, "bat_dau": DEFAULT_START, "khong_tieu": [], "nhac": True, "da_chuyen": 0,
-            **(kho.get(KEY, {}) or {})}
+            **(kho.get(keys.SAVINGS, {}) or {})}
 
 
 def save(cfg):
-    kho.put(KEY, cfg)
+    kho.put(keys.SAVINGS, cfg)
 
 
 def money(x):
@@ -159,10 +159,10 @@ def after_record(entries, day, brief=False):
 def milestones(s):
     out = []
     for n in STREAK_MARKS:
-        if s["streak"] >= n and kho.put_new(f"{KEY}:moc:chuoi:{n}", True, 5 * 365 * 86400):
+        if s["streak"] >= n and kho.put_new(keys.savings_streak_milestone(n), True, 5 * 365 * 86400):
             out.append(f"🎉 Ghi chép {n} ngày liên tiếp! Kỷ lục: {s['best']} ngày")
     for m in SAVED_MARKS:
-        if s["saved"] >= m and kho.put_new(f"{KEY}:moc:bot:{m}", True, 5 * 365 * 86400):
+        if s["saved"] >= m and kho.put_new(keys.savings_saved_milestone(m), True, 5 * 365 * 86400):
             out.append(f"🎉 Từ {s['start']:%d/%m} đã chi lặt vặt ít hơn trước {money(m)}! Chuyển vào quỹ để thành "
                        "tiền để dành thật: /tietkiem")
     return out

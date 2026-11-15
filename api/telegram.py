@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import các file ở thư mục gốc
 
 import kho  # noqa: E402
+from repositories import keys  # noqa: E402
 import tg  # noqa: E402
 from bantin import VN_TZ  # noqa: E402
 from lenh import MENU, answer, answer_location, on_button  # noqa: E402
@@ -77,7 +78,7 @@ def status_page(environ):
     lines.append(f"Chỉ trả lời chat ID: {tg.owner_chat()}")
     if kho.ready():
         try:
-            last = kho.get("tick_cuoi")
+            last = kho.get(keys.TICK_LAST)
             lines += ["Kho dữ liệu: đã kết nối",
                       f"Lịch chạy: {'lần gần nhất ' + last if last else 'chưa chạy lần nào (xem /caidat)'}"]
         except Exception as e:

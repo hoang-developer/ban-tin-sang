@@ -11,6 +11,7 @@ from urllib.parse import parse_qs
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import các file ở thư mục gốc
 
 import kho  # noqa: E402
+from repositories import keys  # noqa: E402
 import lich  # noqa: E402
 import tg  # noqa: E402
 from bantin import VN_TZ  # noqa: E402
@@ -32,10 +33,10 @@ def app(environ, start_response):
         return respond(start_response, "503 Service Unavailable", "chưa có kho dữ liệu (xem README)")
     now = datetime.now(VN_TZ)
     # Hai lời gọi sát nhau (cron-job.org và GitHub) thì chỉ một lượt chạy
-    if not kho.put_new("khoa:tick", now.isoformat(), 300):
+    if not kho.put_new(keys.TICK_LOCK, now.isoformat(), 300):
         return respond(start_response, "200 OK", "lượt khác đang chạy")
     try:
         notes = lich.run(now)
     finally:
-        kho.delete("khoa:tick")
+        kho.delete(keys.TICK_LOCK)
     return respond(start_response, "200 OK", "\n".join(notes))

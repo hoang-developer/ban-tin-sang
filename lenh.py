@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import amlich
 import kho
+from repositories import keys
 import nhandinh
 import tg
 from bantin import BUTTONS as BANTIN_BUTTONS
@@ -53,7 +54,7 @@ def watchlist():
     if not kho.ready():
         return {}
     try:
-        return kho.get("theodoi", {})
+        return kho.get(keys.WATCHLIST, {})
     except Exception as e:
         print(f"[lỗi] đọc danh sách theo dõi: {e!r}", file=sys.stderr)
         return {}
@@ -102,7 +103,7 @@ def level_text(levels):
 def theodoi(args):
     if not kho.ready():
         return NEED_STORE
-    watch = kho.get("theodoi", {})
+    watch = kho.get(keys.WATCHLIST, {})
     if not args:
         if not watch:
             return ("Chưa theo dõi mã nào.\nThêm mã: /theodoi FPT\n"
@@ -134,23 +135,23 @@ def theodoi(args):
     if not quote(symbol):
         return f"❓ Không tìm thấy mã <b>{symbol}</b>"
     watch[symbol] = levels
-    kho.put("theodoi", watch)
+    kho.put(keys.WATCHLIST, watch)
     return f"⭐ Đã theo dõi <b>{symbol}</b>{level_text(levels)}. Xem danh sách: /theodoi"
 
 
 def toggle_follow(symbol):
     """Bấm ⭐: theo dõi hoặc bỏ theo dõi; trả câu thông báo ngắn."""
-    watch = kho.get("theodoi", {})
+    watch = kho.get(keys.WATCHLIST, {})
     if symbol in watch:
         del watch[symbol]
-        kho.put("theodoi", watch)
+        kho.put(keys.WATCHLIST, watch)
         return f"Đã bỏ theo dõi {symbol}"
     if len(watch) >= MAX_WATCH:
         return f"Đã theo dõi tối đa {MAX_WATCH} mã"
     if not quote(symbol):
         return f"Không tìm thấy mã {symbol}"
     watch[symbol] = [None, None]
-    kho.put("theodoi", watch)
+    kho.put(keys.WATCHLIST, watch)
     return f"⭐ Đã theo dõi {symbol}"
 
 
@@ -165,7 +166,7 @@ def nho(args):
              "/nho giỗ ông 12/3 âm\n/nho sinh nhật vợ 20/11")
     if not kho.ready():
         return NEED_STORE
-    items = kho.get("nhac", [])
+    items = kho.get(keys.REMINDERS, [])
     if not args:
         if not items:
             return usage
@@ -194,7 +195,7 @@ def nho(args):
     item = {"id": max((r["id"] for r in items), default=0) + 1, "ten": name[:60],
             "ngay": day, "thang": month, "am": lunar}
     items.append(item)
-    kho.put("nhac", items)
+    kho.put(keys.REMINDERS, items)
     t = today()
     d = amlich.next_date(day, month, lunar, t)
     return (f"🔔 Đã lưu: <b>{html.escape(item['ten'])}</b> – {when_text(item)}\n"
@@ -202,9 +203,9 @@ def nho(args):
 
 
 def delete_reminder(rid):
-    items = kho.get("nhac", [])
+    items = kho.get(keys.REMINDERS, [])
     kept = [r for r in items if str(r["id"]) != rid]
-    kho.put("nhac", kept)
+    kho.put(keys.REMINDERS, kept)
     return "Đã xóa" if len(kept) < len(items) else "Mục này đã xóa rồi"
 
 
@@ -246,7 +247,7 @@ def money(vnd):
 def history_from(what, start):
     """(ngày mua, giá lúc đó, giá nay) kể từ ngày `start`; None nếu không đủ dữ liệu."""
     if what in ("VANG", "VÀNG"):
-        hist = sorted(kho.get("vang_lichsu", {}).items()) if kho.ready() else []
+        hist = sorted(kho.get(keys.GOLD_HISTORY, {}).items()) if kho.ready() else []
         after = [(d, p) for d, p in hist if d >= str(start)]
         if not after or after[0][0] == hist[-1][0]:
             return None
@@ -364,14 +365,14 @@ def vivang(args):
              "/vivang sjc 1 luong 140\nXóa ví: /vivang xoa")
     if not kho.ready():
         return NEED_STORE
-    items = kho.get("vivang", [])
+    items = kho.get(keys.GOLD, [])
     if not args:
         if not items:
             return usage
         lines, summary = wallet(items)
         return "\n".join(["🪙 <b>Ví vàng</b> <i>(theo giá cửa hàng mua vào)</i>"] + lines + [summary])
     if args[0].lower() in ("xoa", "xóa"):
-        kho.put("vivang", [])
+        kho.put(keys.GOLD, [])
         return "🗑 Đã xóa ví vàng"
     try:
         kind = KINDS[args[0].lower()]
@@ -382,7 +383,7 @@ def vivang(args):
     if taels <= 0 or taels > 1000:
         return usage
     items.append({"loai": kind, "luong": taels, "gia": paid})
-    kho.put("vivang", items)
+    kho.put(keys.GOLD, items)
     lines, summary = wallet(items)
     return "\n".join([f"🪙 Đã thêm {amount_text(taels)} vào ví"] + lines + [summary])
 
@@ -402,14 +403,14 @@ def record_guess(choice, now):
         return "Cuối tuần không có phiên, thứ Hai đoán tiếp nhé"
     if (now.hour, now.minute) >= GUESS_DEADLINE:
         return "Hết giờ đoán hôm nay rồi"
-    kho.put(f"doan:{now.date()}", choice, 3 * 86400)
+    kho.put(keys.guess(now.date()), choice, 3 * 86400)
     return None
 
 
 def doan(args):
     if not kho.ready():
         return NEED_STORE
-    s = kho.get("doan_thongke", {})
+    s = kho.get(keys.GUESS_STATS, {})
     if not s.get("tong"):
         return ("🎯 Chưa có lượt đoán nào. Mỗi ngày giao dịch, 8:15–9:15 bot hỏi VN-Index hôm nay "
                 "xanh hay đỏ, 15h chấm điểm.")
@@ -431,7 +432,7 @@ def keywords():
     if not kho.ready():
         return []
     try:
-        return kho.get("tukhoa", [])
+        return kho.get(keys.KEYWORDS, [])
     except Exception as e:
         print(f"[lỗi] đọc từ khóa: {e!r}", file=sys.stderr)
         return []
@@ -475,16 +476,16 @@ def toggle_keyword(keyword):
     """Bấm 🔔: thêm hoặc bỏ từ khóa báo tin mới; trả câu thông báo ngắn."""
     if normalize(keyword) in {normalize(k) for k in KEYWORDS}:
         return "Từ khóa này cài sẵn trong canhbao.py, luôn được báo"
-    words = kho.get("tukhoa", [])
+    words = kho.get(keys.KEYWORDS, [])
     same = [w for w in words if normalize(w) == normalize(keyword)]
     if same:
         words.remove(same[0])
-        kho.put("tukhoa", words)
+        kho.put(keys.KEYWORDS, words)
         return f"Đã thôi báo tin về “{keyword}”"
     if len(words) >= MAX_KEYWORDS:
         return f"Đã có tối đa {MAX_KEYWORDS} từ khóa, bỏ bớt trong /tukhoa"
     words.append(keyword)
-    kho.put("tukhoa", words)
+    kho.put(keys.KEYWORDS, words)
     return f"🔔 Sẽ báo tin mới về “{keyword}”"
 
 
@@ -500,7 +501,7 @@ def tukhoa(args):
             return f"“{html.escape(keyword)}” đã có trong danh sách. Xem: /tukhoa"
         return (html.escape(toggle_keyword(keyword)) + "\n<i>Bot xem tiêu đề VnExpress, Dân trí, Tuổi Trẻ, "
                 "Thanh Niên 15 phút một lần, mỗi lần báo tối đa 5 tin</i>")
-    words = kho.get("tukhoa", [])
+    words = kho.get(keys.KEYWORDS, [])
     lines = (["🔔 <b>Từ khóa báo tin mới</b>"] + [f"• {html.escape(k)} <i>(cài sẵn)</i>" for k in KEYWORDS]
              + [f"• {html.escape(w)}" for w in words] + ["Thêm: /tukhoa giá xăng · tìm thử: /tin giá xăng"])
     buttons = [(f"❌ {w[:16]}", f"botk:{w}") for w in words if fits(f"botk:{w}")]
@@ -528,7 +529,7 @@ def caidat(args):
     lines = ["⚙️ <b>Cài đặt bot</b>"]
     if kho.ready():
         try:
-            last = kho.get("tick_cuoi")
+            last = kho.get(keys.TICK_LAST)
             lines.append("Kho dữ liệu: ✅ đã kết nối")
             lines.append(f"Lịch chạy: {'lần gần nhất ' + last if last else '❌ chưa chạy lần nào'}")
         except Exception as e:
@@ -608,24 +609,24 @@ def on_button(data, message, now):
     if not kho.ready():
         return "Chưa có kho dữ liệu, gõ /caidat", None
     # Dữ liệu các nút đang có dưới tin, để vẽ lại nút mà giữ nguyên nội dung tin
-    keys = [b.get("callback_data", "") for row in (message.get("reply_markup") or {}).get(
+    data_keys = [b.get("callback_data", "") for row in (message.get("reply_markup") or {}).get(
         "inline_keyboard", []) for b in row]
     if kind == "theo":
         toast = toggle_follow(arg)
         # Giữ nguyên danh sách mã của tin: lấy từ nút "Làm mới" (stock:FPT,VNM)
-        symbols = next((k[6:].split(",") for k in keys if k.startswith("stock:") and k != "stock:"), [arg])
+        symbols = next((k[6:].split(",") for k in data_keys if k.startswith("stock:") and k != "stock:"), [arg])
         return toast, ("buttons", lambda: stock_buttons(symbols))
     if kind == "tk":
         toast = toggle_keyword(arg)
-        hours = next((int(k.split(":")[1]) for k in keys if k.startswith("tim:")), parse_query([])[1])
+        hours = next((int(k.split(":")[1]) for k in data_keys if k.startswith("tim:")), parse_query([])[1])
         return toast, ("buttons", lambda: news_buttons(arg, hours))
     if kind == "botk":
         toast = toggle_keyword(arg) if followed(arg) else "Từ khóa này đã bỏ rồi"
         return toast, ("edit", lambda: tukhoa([]))
     if kind == "bo":
-        watch = kho.get("theodoi", {})
+        watch = kho.get(keys.WATCHLIST, {})
         watch.pop(arg, None)
-        kho.put("theodoi", watch)
+        kho.put(keys.WATCHLIST, watch)
         return f"Đã bỏ theo dõi {arg}", ("edit", lambda: theodoi([]))
     if kind == "xoanho":
         return delete_reminder(arg), ("edit", lambda: nho([]))
