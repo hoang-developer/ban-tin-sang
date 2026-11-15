@@ -195,7 +195,8 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.7c `taisan`: bán, rút, thu về (`services/taisan/sales`; `find_item`, `removable` về `domain/taisan/rules`, `gain_line` về `domain/taisan/text`) | xong, đã deploy (#70) |
 | 6.7d `taisan`: mua bán cổ phiếu, khai báo, nhắc lương/đáo hạn, dòng tiền (`domain/taisan/trade`, `services/taisan/{trade,declare,flows,reminders}`) | xong, chờ deploy |
 | 6.7e `taisan`: màn hình (`presentation/taisan/view`), khám sức khỏe (`services/taisan/health`), lệnh và nút (`interface/taisan/assets`), xóa `taisan.py`, services/presentation không còn import module cũ `taisan` | xong, chờ deploy: **`taisan` xong đủ 4 lớp** |
-| 6.8… các chức năng còn lại (`chitieu`/`sochitieu`, `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin) | chưa |
+| 6.8a `chitieu`: máy khách AI (`infrastructure/ai`), xếp nhóm và đọc dòng chi tiêu (`domain/chitieu/{categories,classify,parse}`), cấu hình nhóm (`repositories/chitieu/groups`) | xong, chờ deploy |
+| 6.8… phần còn lại của `sochitieu` (ghi/học/chỉnh sổ, báo cáo, lệnh, nhóm tự chỉnh, định tuyến tin nhắn và nút), rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
 | Cuối: dọn | chưa |
 
 Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.
