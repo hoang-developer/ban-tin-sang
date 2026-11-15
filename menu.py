@@ -140,7 +140,7 @@ def todo(day, n, now):
             out.append((f"📒 Ghi chép đủ 14 ngày để bot tính quỹ dự phòng (đang có {n['fund'].days} ngày)", None))
     for text, rows in part("hoán đổi quỹ", lambda: ct.dautu().switch_prompts(day)) or []:
         out.append((text, rows[0][0]))
-    check = part("đối chiếu", lambda: __import__("doichieu").todo(day))
+    check = part("đối chiếu", lambda: __import__("interface.doichieu.reconcile", fromlist=["todo"]).todo(day))
     if check:
         out.append(check)
     unsorted = sum(ct.pending(e) for e in ct.load(day.strftime("%Y-%m")))

@@ -24,8 +24,11 @@ LEGACY_IMPORTS = {
     "services/tietkiem/progress.py": {"sochitieu", "sono", "dautu"},
     "presentation/tietkiem/progress.py": {"phantich", "sochitieu"},
     "interface/tietkiem/progress.py": {"sochitieu"},
+    "services/doichieu/reconcile.py": {"sochitieu", "taisan"},
+    "presentation/doichieu/reconcile.py": {"sochitieu", "taisan"},
+    "interface/doichieu/reconcile.py": {"sochitieu"},
 }
-ROOT_PY_MAX = 22  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
+ROOT_PY_MAX = 21  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
 
 
 def py_files(folder):

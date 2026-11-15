@@ -4,7 +4,7 @@ import unittest
 from tests import harness as h
 from tests.test_dongtien import item, main_balance, set_main
 
-import doichieu
+from interface.doichieu import reconcile as doichieu
 import sono
 import taisan as ts
 import thongbao

@@ -1234,7 +1234,7 @@ COMMANDS = {
     "dautu": ("Đầu tư quỹ mở hằng tháng: tháng này nên mua bao nhiêu", lambda args: dautu().dautu(args)),
     "tietkiem": ("Tiết kiệm từ khi dùng bot, chuỗi ngày ghi chép", lambda args: tietkiem().tietkiem(args)),
     "doichieu": ("Đối chiếu tài sản tháng: so từng ngăn với app ngân hàng, Fmarket",
-                 lambda args: __import__("doichieu").doichieu(args)),
+                 lambda args: __import__("interface.doichieu.reconcile", fromlist=["doichieu"]).doichieu(args)),
 }
 COMMANDS["help"] = COMMANDS["huongdan"]
 # Danh sách lệnh hiện ở nút Menu của Telegram: chỉ các lệnh chính, lệnh khác vẫn gõ được (/huongdan)
@@ -1380,7 +1380,7 @@ def on_button(data, message, now):
     if kind == "dp":
         return duphong().on_button(arg, message, now)
     if kind == "dc":
-        import doichieu
+        from interface.doichieu import reconcile as doichieu
         return doichieu.on_button(arg, message, now)
     if kind == "dt":
         return dautu().on_button(arg, message, now)
