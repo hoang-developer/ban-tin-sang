@@ -17,6 +17,7 @@ import urllib.request
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 
+from domain.chitieu.kinds import INCOME, OTHER  # noqa: F401
 from domain.common.money import MONEY, QUANTITY, UNITS, money, money_count, parse_amount, to_number  # noqa: F401
 from domain.common.text import norm, plain  # noqa: F401
 from infrastructure import kho
@@ -82,7 +83,6 @@ CATEGORIES = {
         "thu nhập", "được cho", "được tặng", "hoàn tiền", "cashback", "freelance", "làm thêm"]),
 }
 GENERIC = {"mua", "ăn", "quán", "học", "bánh", "nước", "xe"}  # từ chung chung: chỉ dùng khi không có từ nào rõ hơn
-INCOME, OTHER = "thu", "khac"
 MAX_LEARNED = 500  # số cụm từ học được tối đa
 MAX_GROUPS, MAX_WORDS = 20, 60  # số nhóm tự tạo, số từ khóa tự thêm cho mỗi nhóm
 # ---------------------------------------------------------------------------------
@@ -545,11 +545,7 @@ def add(text, now):
 
 def between(start, end):
     """Các khoản từ ngày start tới end (tính cả hai đầu)."""
-    out, ym = [], date(start.year, start.month, 1)
-    while ym <= end:
-        out += [e for e in load(ym.strftime("%Y-%m")) if start.isoformat() <= e["ngay"] <= end.isoformat()]
-        ym = (ym + timedelta(days=32)).replace(day=1)
-    return out
+    return ledger_repo.between(start, end)
 
 
 def recent(day, limit):
