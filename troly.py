@@ -287,7 +287,8 @@ def prompt(day, personal=True, facts=None, people=None):
         "TIẾT KIỆM, VÀNG\n"
         '- "tiet_kiem": gửi, mở sổ tiết kiệm. "ten" (ngân hàng hay tên sổ), "tien", "lai" (%/năm), "ky" (số tháng; 0 nếu '
         'không kỳ hạn), "ngay".\n'
-        '- "tat_toan": tất toán, rút sổ tiết kiệm, sổ đáo hạn rút về. "ten" (tên sổ), "tien" (số nhận về, nếu có nói).\n'
+        '- "tat_toan": tất toán, rút sổ tiết kiệm, sổ đáo hạn rút về. "ten" (tên sổ), "tien" (số nhận về, nếu có nói). '
+        'Tiền tất toán, bán vàng, bán quỹ, thu nợ tự về tài khoản chính: không thêm "chuyen_tk".\n'
         '- "vang": MUA vàng. "loai": "nhan" (nhẫn, 24k, 9999, ép vỉ) | "sjc" (vàng miếng), "chi" (tổng số chỉ; 1 lượng = '
         '1 cây = 10 chỉ; 1 phân = 0,1 chỉ), "tien" (tổng tiền đã trả).\n'
         '- "ban_vang": BÁN vàng. "chi" (số chỉ bán; bán hết thì bỏ trống), "tien" (tổng tiền nhận), "loai" (nếu có nói).\n'
@@ -327,6 +328,7 @@ def prompt(day, personal=True, facts=None, people=None):
         'mua 2 vỉ vàng 0,1 chỉ hết 2tr476 → {"viec": "vang", "loai": "nhan", "chi": 0.2, "tien": 2476000}\n'
         'bán 0,5 chỉ vàng được 6tr7 → {"viec": "ban_vang", "chi": 0.5, "tien": 6700000}\n'
         'rút sổ tiết kiệm VCB được 51tr2 → {"viec": "tat_toan", "ten": "VCB", "tien": 51200000}\n'
+        'sổ MB đáo hạn, rút hết về tài khoản → {"viec": "tat_toan", "ten": "MB"}\n'
         'bán 40 ccq VMEEF được 600k → {"viec": "ban_quy", "ma": "VMEEF", "ccq": 40, "tien": 600000}\n'
         'Nam trả mình 1tr → {"viec": "thu_no", "ten": "Nam", "tien": 1000000}\n'
         'vay anh Nam 10tr không lãi → {"viec": "no_moi", "ten": "anh Nam", "tien": 10000000, "lai": 0}\n'

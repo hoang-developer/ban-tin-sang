@@ -384,7 +384,8 @@ def habit_text(key, count, amount):
 
 QUESTION_WORDS = ["bao nhieu", "nhieu nhat", "it nhat", "lon nhat", "may lan", "so voi", "so sanh", "the nao",
                   "tai sao", "liet ke", "nhung khoan", "cac khoan", "het bao", "khoan nao", "nhom nao", "ngay nao",
-                  "trung binh", "co phai", "vao dau", "tieu gi", "chi gi", "nhieu hon", "it hon"]
+                  "trung binh", "co phai", "vao dau", "tieu gi", "chi gi", "nhieu hon", "it hon", "bao gio", "khi nao",
+                  "luc nao", "co nen"]
 QUESTION_ENDS = ("khong", "ko", "chua", "nhi")  # "tháng này tiêu nhiều hơn tháng trước không"
 KINDS = ("tong", "nhom", "lon_nhat", "liet_ke", "so_sanh", "theo_ngay")
 HOI_HELP = ("🔎 Hỏi bằng câu thường, ví dụ:\n• tháng này cà phê hết bao nhiêu?\n• tuần này tiêu vào đâu nhiều nhất?\n"

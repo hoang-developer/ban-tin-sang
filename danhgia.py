@@ -15,7 +15,7 @@ import sochitieu as ct
 DAY = date(2026, 11, 20)  # thứ Sáu
 LIMIT = 80  # số lượt ?danhgia= mỗi ngày (mỗi lượt vài câu, mỗi câu tối đa một lần gọi AI)
 DEMO_CONTEXT = ("Khoản nợ đang có: bác Vân; thẻ Techcombank trả góp\n"
-                "Tài khoản, ví đang có: VCB (tài khoản chính); Techcombank; MoMo; tiền mặt; DNSE\n"
+                "Tài khoản, ví đang có: VCB; Techcombank (tài khoản chính); MoMo; tiền mặt; DNSE\n"
                 "Sổ tiết kiệm đang có: TCB; MB\n"
                 "Đang cho vay: Hùng; em gái\n"
                 "Vàng đang có: nhẫn 0,5 chỉ\n"
