@@ -3,7 +3,7 @@ import html
 
 import phantich as pt  # module cũ ở gốc: định dạng số tiền gọn, tạm dùng
 import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
-import taisan as ts  # module cũ ở gốc: định dạng số lượng
+from domain.taisan import text as taisan_text
 from domain.no.debt import Ask, month_left, month_of, paid_in, schedule, ym_text
 
 USAGE = ("💳 <b>Sổ nợ</b>\n"
@@ -31,7 +31,7 @@ def bar(ratio, width=10):
 
 def interest_text(d):
     rate = d.get("lai")
-    return "không lãi" if rate == 0 else "chưa rõ lãi" if rate is None else f"lãi {ts.qty_text(rate)}%/năm"
+    return "không lãi" if rate == 0 else "chưa rõ lãi" if rate is None else f"lãi {taisan_text.qty_text(rate)}%/năm"
 
 
 def plan_line(d, day):

@@ -6,7 +6,6 @@ import sys
 from datetime import timedelta
 
 import sochitieu as ct  # module cũ ở gốc: sổ chi tiêu, nhóm
-import taisan as ts  # module cũ ở gốc: tài sản, tài khoản chính, dòng thu chi trung bình
 from domain.kehoach import plan as rules
 from domain.kehoach.plan import DoAllResult, StepResult
 from domain.no import debt as debt_rules
@@ -18,7 +17,10 @@ from services.dautu import market as dautu_market
 from services.dautu import orders as dautu_orders
 from services.dautu import reports as dautu_reports
 from services.duphong import reserve as reserve_service
+from repositories.taisan import assets as assets_repo
 from services.no import debt as debt_service
+from services.taisan import accounts, flows
+from services.taisan import valuation as valuation_service
 
 
 def spending_estimate(day, group, debt_need):
@@ -43,7 +45,7 @@ def invest_part(day):
 def numbers(day):
     """Số liệu chia lương tháng này (dùng chung cho /kehoach, tin ghi lương, màn hình tổng quan)."""
     ym = debt_rules.month_of(day)
-    data = ts.load()
+    data = assets_repo.load()
     group = debt_service.debt_group()[0]
     month = ct.load(ym)
     income = sum(e["tien"] for e in month if e["nhom"] == ct.INCOME)
@@ -53,7 +55,7 @@ def numbers(day):
         if salary and salary.amount:
             income, basis = salary.amount, "lương dự kiến, chưa ghi"
         else:
-            _, average, days = ts.monthly_flows(day)
+            _, average, days = flows.monthly_flows(day)
             if average and days >= 20:
                 income, basis = average, "trung bình 3 tháng qua"
     debts = rules.month_debts(debt_service.debts(data), ym)  # (khoản nợ, phải trả kỳ này, đã trả kỳ này)
@@ -120,9 +122,9 @@ def next_actions(day, n=None):
 
 def invest_held(day):
     """{loại tài sản: giá trị} tiền đã đầu tư (không tính phần gắn vào quỹ dự phòng)."""
-    fund_ids = {str(it["id"]) for it in ts.load()["items"] if it.get("duphong")}
+    fund_ids = {str(it["id"]) for it in assets_repo.load()["items"] if it.get("duphong")}
     sums = {}
-    for kind, rid, _, value, _, _ in ts.valuation(day)["rows"]:
+    for kind, rid, _, value, _, _ in valuation_service.valuation(day)["rows"]:
         if rid not in fund_ids:
             sums[kind] = sums.get(kind, 0) + value
     return sums
@@ -130,20 +132,20 @@ def invest_held(day):
 
 def roadmap(day, n):
     """Roadmap của tháng chứa day (n: số liệu chia lương)."""
-    _, _, days = ts.monthly_flows(day)
+    _, _, days = flows.monthly_flows(day)
     return rules.roadmap_state(n["fund"], days, debt_service.active(n["data"]), lambda d: debt_rules.schedule(d, day),
                                invest_held(day))
 
 
 def main_account(day=None):
     """(tài khoản chính hoặc None, số dư của nó); số dư 0 nếu không có."""
-    main = ts.main_account()
-    return (main, ts.main_balance(main, day) if day else ts.main_balance(main)) if main else (None, 0)
+    main = accounts.main_account()
+    return (main, accounts.main_balance(main, day) if day else accounts.main_balance(main)) if main else (None, 0)
 
 
 def main_account_of(data, day):
-    main = ts.main_account(data)
-    return (main, ts.main_balance(main, day)) if main else (None, 0)
+    main = accounts.main_account(data)
+    return (main, accounts.main_balance(main, day)) if main else (None, 0)
 
 
 def do_all(now):

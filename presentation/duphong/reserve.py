@@ -4,7 +4,7 @@ import math
 
 import phantich as pt  # module cũ ở gốc: định dạng số tiền gọn, tạm dùng
 import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
-import taisan as ts  # module cũ ở gốc: định dạng số lượng
+from domain.taisan import text as taisan_text
 from bantin import vn_num  # module cũ ở gốc
 from domain.duphong.reserve import DEADLINE_CHOICES, MIN_DAYS, MONTHS_CHOICES
 
@@ -95,7 +95,7 @@ def where_text(books):
              "• Có thể để 1 tháng chi ở tài khoản thanh toán, phần còn lại gửi tiết kiệm"]
     if books:
         lines.append("   Sổ của bạn: " + " · ".join(
-            f"{html.escape(name)} {ts.qty_text(rate)}%" + (" ✅" if in_fund else "") for name, rate, in_fund in books))
+            f"{html.escape(name)} {taisan_text.qty_text(rate)}%" + (" ✅" if in_fund else "") for name, rate, in_fund in books))
     lines.append("• Không để quỹ dự phòng ở cổ phiếu, ETF, vàng (giá lên xuống, lúc cần có thể đang lỗ); các khoản này "
                  "dành cho bước đầu tư sau khi quỹ đủ")
     lines.append("Tính sổ tiết kiệm có sẵn vào quỹ dự phòng: /duphong tinh <tên sổ>")

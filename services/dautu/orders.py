@@ -3,7 +3,6 @@ Câu báo cho người dùng còn nằm trong module này (sẽ tách sang prese
 import re
 from datetime import date, timedelta
 
-import taisan as ts  # move_main: ghi chuyển tiền của tài khoản chính
 from domain.common.format import vn_num, vnd
 from domain.common.text import plain
 from domain.common.money import number
@@ -13,6 +12,7 @@ from domain.dautu.text import money, units_text
 from repositories.dautu import fund as fund_repo
 from repositories.taisan import assets as assets_repo
 from services.dautu import market
+from services.taisan import accounts
 from services.dautu.market import current_period, nav_history, next_trading, session
 from services.dautu.status import close_periods, wait_item
 
@@ -26,7 +26,7 @@ def add_money(cfg, amount, ym, data=None, from_main=True, notes=None):
     item["tien"] += amount
     item["ngay"] = market.now_vn().date().isoformat()
     cfg.setdefault("nap", {})[ym] = cfg.get("nap", {}).get(ym, 0) + amount
-    moved = ts.move_main(data, -amount, f"quỹ chờ {cfg['ma']}") if from_main else None
+    moved = accounts.move_main(data, -amount, f"quỹ chờ {cfg['ma']}") if from_main else None
     if moved and notes is not None:
         notes.append(moved)
     if own:
@@ -40,7 +40,7 @@ def take_money(cfg, amount, to_main=True, notes=None):
     item = wait_item(data, cfg)
     taken = min(item["tien"], amount)
     item["tien"] -= taken
-    moved = ts.move_main(data, taken, f"rút quỹ chờ {cfg['ma']}") if to_main else None
+    moved = accounts.move_main(data, taken, f"rút quỹ chờ {cfg['ma']}") if to_main else None
     if moved and notes is not None:
         notes.append(moved)
     assets_repo.save(data)
@@ -90,7 +90,7 @@ def record_order(amount, trading_day=None, now=None, period=None, order_day=None
         outside = extra
     else:
         item["tien"] -= amount
-    moved = ts.move_main(data, -outside, f"mua {code}", order_day) if from_main and outside else None
+    moved = accounts.move_main(data, -outside, f"mua {code}", order_day) if from_main and outside else None
     order = {"id": max([o["id"] for o in cfg.get("lenh", [])] + [0]) + 1, "ky": ym, "tien": amount, "quy": code,
              "loai": "mua", "dat": order_day.isoformat(), "phien": trading.isoformat(), "trang_thai": "cho",
              **({"ngoai": True} if lump else {})}

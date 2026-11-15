@@ -3,7 +3,8 @@
 Trả kết quả có cấu trúc (domain.no.debt), không trả chữ.
 """
 import sochitieu as ct  # module cũ ở gốc: nhóm chi, khoản chi (ghi, tìm, học)
-import taisan as ts  # module cũ ở gốc: so tên, giờ Việt Nam
+from infrastructure import clock
+from services.taisan import accounts
 from domain.no import debt as rules
 from domain.no.debt import Ask, DeclareResult, Paid, PayResult, ViewState
 from infrastructure import kho
@@ -55,7 +56,7 @@ def debt_group(create=False):
 
 
 def now():
-    return ts.now_vn()
+    return clock.now_vn()
 
 
 def home_summary(day):
@@ -88,7 +89,7 @@ def declare_info(info, day):
     (trường không có để None)."""
     info = {"con": None, "goc": None, "thang": None, "lai": None, "ngay_tra": None, "nay": False, **info}
     data = debt_repo.load()
-    d = next((x for x in debts(data) if ts.same_name(x["ten"], info["ten"])), None)
+    d = next((x for x in debts(data) if accounts.same_name(x["ten"], info["ten"])), None)
     created = d is None
     if created:
         if not info["con"]:

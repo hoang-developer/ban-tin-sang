@@ -6,7 +6,7 @@ from tests.test_dongtien import item, main_balance, set_main
 
 from interface.doichieu import reconcile as doichieu
 from interface.no import debt as sono
-import taisan as ts
+from interface.taisan import assets as ts
 import thongbao
 
 

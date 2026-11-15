@@ -18,29 +18,30 @@ ALLOWED = {
 # Module cũ ở gốc mà file trong lớp mới còn tạm import, cho tới khi chức năng đó được chuyển. Phải khớp CHÍNH XÁC với
 # thực tế: thêm import cũ mới thì test đỏ, bỏ được import cũ mà không xóa khỏi danh sách cũng đỏ (ratchet: chỉ rút ngắn).
 LEGACY_IMPORTS = {
-    "services/duphong/reserve.py": {"phantich", "sochitieu", "taisan"},
-    "presentation/duphong/reserve.py": {"phantich", "sochitieu", "taisan", "bantin"},
+    "services/duphong/reserve.py": {"phantich", "sochitieu"},
+    "presentation/duphong/reserve.py": {"phantich", "sochitieu", "bantin"},
     "interface/duphong/reserve.py": {"sochitieu"},
     "services/tietkiem/progress.py": {"sochitieu"},
     "presentation/tietkiem/progress.py": {"phantich", "sochitieu"},
     "interface/tietkiem/progress.py": {"sochitieu"},
-    "services/doichieu/reconcile.py": {"sochitieu", "taisan"},
-    "presentation/doichieu/reconcile.py": {"sochitieu", "taisan"},
+    "services/doichieu/reconcile.py": {"sochitieu"},
+    "presentation/doichieu/reconcile.py": {"sochitieu"},
     "interface/doichieu/reconcile.py": {"sochitieu"},
-    "services/no/debt.py": {"sochitieu", "taisan"},
-    "presentation/no/debt.py": {"phantich", "sochitieu", "taisan"},
+    "services/no/debt.py": {"sochitieu"},
+    "presentation/no/debt.py": {"phantich", "sochitieu"},
     "interface/no/debt.py": {"sochitieu", "menu"},
     "interface/common.py": {"sochitieu"},
     "services/taisan/prices.py": {"chungkhoan", "bantin"},
     "services/taisan/declare.py": {"lenh"},
     "presentation/dautu/view.py": {"sochitieu"},
-    "services/dautu/orders.py": {"taisan"},
-    "interface/dautu/fund.py": {"phantich", "sochitieu", "taisan"},
-    "services/kehoach/plan.py": {"sochitieu", "taisan", "phantich"},
-    "presentation/kehoach/plan.py": {"sochitieu", "taisan"},
+    "presentation/taisan/view.py": {"phantich", "sochitieu"},
+    "interface/taisan/assets.py": {"phantich", "sochitieu"},
+    "interface/dautu/fund.py": {"phantich", "sochitieu"},
+    "services/kehoach/plan.py": {"sochitieu", "phantich"},
+    "presentation/kehoach/plan.py": {"sochitieu"},
     "interface/kehoach/plan.py": {"sochitieu"},
 }
-ROOT_PY_MAX = 18  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
+ROOT_PY_MAX = 17  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
 
 
 def py_files(folder):
