@@ -1,5 +1,6 @@
 """Khóa Redis: chuỗi phải y như bản cũ (đổi là mất dữ liệu đang chạy), và code không viết khóa trực tiếp."""
 import ast
+import re
 import unittest
 from pathlib import Path
 
@@ -87,6 +88,11 @@ class Khoa(unittest.TestCase):
                     bad.append(f"{path.name}:{node.lineno}")
         self.assertEqual(bad, [], "khóa chitieu: viết ngoài repositories/keys.py")
 
+    def test_vi_vang_chi_qua_repository(self):
+        """keys.GOLD chỉ repositories/gold.py được dùng; nơi khác đi qua GoldRepo."""
+        bad = [path.name for path in list(ROOT.glob("*.py")) + list((ROOT / "api").glob("*.py"))
+               if re.search(r"keys\.GOLD\b(?!_)", path.read_text(encoding="utf-8"))]
+        self.assertEqual(bad, [], "ví vàng: dùng repositories.gold, không gọi kho với keys.GOLD")
 
 if __name__ == "__main__":
     unittest.main()

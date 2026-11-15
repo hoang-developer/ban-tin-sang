@@ -12,6 +12,7 @@ import amlich
 import canhbao
 import kho
 from repositories import keys
+from repositories import gold as gold_repo
 import lenh
 import nhandinh
 import phantich
@@ -63,7 +64,7 @@ def canh_bao(now, chat):
     state = kho.get(keys.ALERT_STATE, {})
     alerts = canhbao.run(state, now, watchlist={**canhbao.WATCHLIST, **lenh.price_alerts()},
                          keywords=lenh.all_keywords())
-    items = kho.get(keys.GOLD, [])
+    items = gold_repo.load()
     if items:
         alerts = [a + "\n" + lenh.wallet_brief(items) if a.startswith("🪙") else a for a in alerts]
     if alerts:
@@ -270,7 +271,7 @@ def evening_message(now):
         hist[str(now.date())] = sell  # ghi lại mỗi tối, /neu vang dùng
         kho.put(keys.GOLD_HISTORY, dict(sorted(hist.items())[-800:]))
         lines = [line]
-        items = kho.get(keys.GOLD, [])
+        items = gold_repo.load()
         if items:
             lines.append(lenh.wallet_brief(items))
         return lines
@@ -413,7 +414,7 @@ def tai_san_cuoi_ngay(now, chat):
     if not between(now, (18, 0), (23, 45)) or not chitieu.token() or done_today("tai_san_cuoi_ngay", now):
         return None
     chitieu.reset()
-    if not taisan.load()["items"] and not kho.get(keys.GOLD):
+    if not taisan.load()["items"] and not gold_repo.load():
         mark_done("tai_san_cuoi_ngay", now)
         return "chưa khai báo tài sản"
     v = taisan.valuation(now.date(), fresh=True)
