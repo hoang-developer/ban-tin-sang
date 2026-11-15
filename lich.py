@@ -26,7 +26,7 @@ from domain.common.format import vn_num
 from interface.bantin.bulletin import BUTTONS as BANTIN_BUTTONS
 from interface.bantin.bulletin import build_message, section, stocks, weather
 from services.bantin.data import gold_prices, hourly, index_history
-from chungkhoan import change, color, dong, google_news, index_rows, quotes
+from interface.chungkhoan.stock import change, color, dong, google_news, index_rows, quotes
 
 # Từ khóa nhận ra tin quyền lợi cổ đông (so khớp sau khi đưa về chữ thường)
 DIVIDEND_WORDS = ["cổ tức", "chốt quyền", "chốt danh sách", "không hưởng quyền", "phát hành thêm",

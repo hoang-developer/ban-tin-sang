@@ -17,7 +17,8 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
-import chungkhoan
+from infrastructure import stockfeeds
+from interface.chungkhoan import stock as chungkhoan
 from infrastructure import kho
 from repositories import keys
 from domain.common.format import vn_num
@@ -70,7 +71,7 @@ def remembered(key, seconds, fetch):
 def industry_map():
     """{mã: tên ngành} theo phân ngành ICB cấp 3 của VNDirect (giữ 7 ngày)."""
     def fetch():
-        rows = chungkhoan.get_json(f"{FINFO}/industry_classification?q=industryLevel:3&size=100")["data"]
+        rows = stockfeeds.get_json(f"{FINFO}/industry_classification?q=industryLevel:3&size=100")["data"]
         out = {}
         for r in rows:
             name = " ".join((r.get("vietnameseName") or "").split())
@@ -82,8 +83,8 @@ def industry_map():
 
 
 def hose_symbols():
-    return remembered(keys.CACHE_HOSE, 86400, lambda: [x["symbol"] for x in chungkhoan.get_json(
-        f"{chungkhoan.VCI}/getByGroup?group=HOSE")])
+    return remembered(keys.CACHE_HOSE, 86400, lambda: [x["symbol"] for x in stockfeeds.get_json(
+        f"{stockfeeds.VCI}/getByGroup?group=HOSE")])
 
 
 def recommendations(days=30):
@@ -91,7 +92,7 @@ def recommendations(days=30):
     since = (now_vn().date() - timedelta(days=days)).isoformat()
 
     def fetch():
-        rows = chungkhoan.get_json(f"{FINFO}/recommendations?q=reportDate:gte:{since}&sort=reportDate:desc&size=500")
+        rows = stockfeeds.get_json(f"{FINFO}/recommendations?q=reportDate:gte:{since}&sort=reportDate:desc&size=500")
         out = {}
         for r in rows.get("data", []):
             out.setdefault(r["code"], []).append({k: r.get(k) for k in (
@@ -106,7 +107,7 @@ def text_of(node, tag):
 
 def feed(source, url):
     items = []
-    for item in ET.fromstring(chungkhoan.get(url)).iter("item"):
+    for item in ET.fromstring(stockfeeds.get(url)).iter("item"):
         title = " ".join(text_of(item, "title").split())
         if title:
             items.append({"nguon": source, "tieu_de": title, "link": (item.findtext("link") or "").strip(),

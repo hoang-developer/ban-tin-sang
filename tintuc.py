@@ -11,7 +11,8 @@ from datetime import datetime, timezone
 from infrastructure.web import fetch
 from interface.bantin.bulletin import news as headlines
 from domain.canhbao.rules import KEYWORD_FEEDS, normalize
-from chungkhoan import google_news, published_at
+from domain.chungkhoan.rules import published_at
+from services.chungkhoan.market import google_news
 
 # ---- Cấu hình -------------------------------------------------------------
 RESULTS = 8                                       # số tin mỗi lần tìm
