@@ -79,7 +79,7 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
 - **🌙 Bản tin tối** (21h): thời tiết và gợi ý ngày mai, chứng khoán hôm nay, giá vàng so với hôm
   qua, ví vàng, ngày cần nhớ ngày mai, kết quả đoán. Bot cũng ghi giá vàng mỗi tối để `/neu vang` dùng.
 
-Nếu Vercel không chạy được (chưa có kho dữ liệu, lỗi...), GitHub tự chạy `canhbao.py` và `bantin.py`
+Nếu Vercel không chạy được (chưa có kho dữ liệu, lỗi...), GitHub tự chạy `canhbao.py` và `interface/bantin/bulletin.py`
 như trước, chỉ thiếu các việc mới; bản tin gửi theo cách này có dòng ⚠️ ở cuối. Lịch của GitHub rất
 thất thường (có ngày gần như không chạy), nên đừng trông vào nó: cronjob 15 phút ở bước 6 là chính.
 
@@ -541,12 +541,12 @@ GitHub không tự tắt lịch khi repo 60 ngày không có commit.
 ## Xem thử trên máy
 
 ```
-python bantin.py                    # bản tin sáng
+python -m interface.bantin.bulletin                    # bản tin sáng
 python lenh.py /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
 python thoitiet.py Đà Nẵng
 python tintuc.py giá vàng 24h
 python sochitieu.py "cà phê 35k"   # bot chi tiêu: chỉ đọc và xếp nhóm, không ghi
-python amlich.py 17/2/2026
+python -m domain.amlich.lunar 17/2/2026
 python canhbao.py --xem             # cảnh báo, không gửi
 ```
 
@@ -562,5 +562,5 @@ TELEGRAM_CHAT_ID=...
 Open-Meteo (thời tiết, AQI, tìm địa danh), SJC (dự phòng: PNJ), VNDirect (dự phòng: SSI), RSS VnExpress
 và Dân trí. Chứng khoán trong phiên: VPS (chỉ số), Vietcap (giá từng mã, dự phòng: VPS). Google News:
 tìm tin theo từ khóa ([tintuc.py](tintuc.py), dự phòng: RSS VnExpress, Dân trí, Tuổi Trẻ, Thanh Niên),
-tin theo mã, tin cổ tức. Âm lịch tính theo thuật toán của Hồ Ngọc Đức ([amlich.py](amlich.py)).
+tin theo mã, tin cổ tức. Âm lịch tính theo thuật toán của Hồ Ngọc Đức ([domain/amlich/lunar.py](domain/amlich/lunar.py)).
 Lịch sử giá vàng không có nguồn công khai: bot tự ghi giá SJC mỗi tối.

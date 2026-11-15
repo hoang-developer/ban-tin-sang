@@ -50,7 +50,7 @@ jobs:
           lookup-only: true
       - id: gui
         if: steps.vercel.outcome != 'success' && steps.da_gui.outputs.cache-hit != 'true'
-        run: python3 bantin.py && touch da-gui
+        run: python3 -m interface.bantin.bulletin && touch da-gui
       - if: env.TU_DONG == 'true' && steps.gui.outcome == 'success'
         uses: actions/cache/save@v4
         with:

@@ -5,7 +5,7 @@ import math
 from domain.common.format import short as format_short
 import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
 from domain.taisan import text as taisan_text
-from bantin import vn_num  # module cũ ở gốc
+from domain.common.format import vn_num
 from domain.duphong.reserve import DEADLINE_CHOICES, MIN_DAYS, MONTHS_CHOICES
 
 

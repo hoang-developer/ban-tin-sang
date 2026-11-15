@@ -8,7 +8,7 @@ import sys
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
-import amlich
+from domain.amlich import lunar as amlich
 import canhbao
 from infrastructure import kho
 from repositories import keys
@@ -20,9 +20,12 @@ import sochitieu as chitieu
 from interface.no import debt as sono
 from interface.taisan import assets as taisan
 from infrastructure import telegram as tg
-from bantin import BUTTONS as BANTIN_BUTTONS
-from bantin import (WEEKDAYS, build_message, gold_prices, hourly, index_history, section, stocks, tips,
-                    vn_num, weather)
+from domain.bantin.weather import tips
+from domain.common.dates import WEEKDAYS
+from domain.common.format import vn_num
+from interface.bantin.bulletin import BUTTONS as BANTIN_BUTTONS
+from interface.bantin.bulletin import build_message, section, stocks, weather
+from services.bantin.data import gold_prices, hourly, index_history
 from chungkhoan import change, color, dong, google_news, index_rows, quotes
 
 # Từ khóa nhận ra tin quyền lợi cổ đông (so khớp sau khi đưa về chữ thường)

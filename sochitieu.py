@@ -35,7 +35,8 @@ from infrastructure import kho
 from repositories import keys
 from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
-from bantin import VN_TZ, vn_num
+from domain.common.format import vn_num
+from infrastructure.clock import VN_TZ
 
 MAX_GROUPS, MAX_WORDS = 20, 60  # số nhóm tự tạo, số từ khóa tự thêm cho mỗi nhóm
 

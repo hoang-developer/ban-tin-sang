@@ -16,7 +16,12 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
-from bantin import UA, VN_TZ, WEEKDAYS, index_history, stocks, vn_num
+from domain.common.dates import WEEKDAYS
+from domain.common.format import vn_num
+from infrastructure.clock import VN_TZ
+from infrastructure.web import UA
+from interface.bantin.bulletin import stocks
+from services.bantin.data import index_history
 
 # ---- Cấu hình -------------------------------------------------------------
 # Mã chỉ số bên VPS -> tên hiển thị

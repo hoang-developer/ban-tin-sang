@@ -8,8 +8,8 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
-from bantin import fetch
-from bantin import news as headlines
+from infrastructure.web import fetch
+from interface.bantin.bulletin import news as headlines
 from canhbao import KEYWORD_FEEDS, normalize
 from chungkhoan import google_news, published_at
 

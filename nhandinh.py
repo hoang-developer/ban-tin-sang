@@ -20,7 +20,8 @@ from datetime import datetime, timedelta, timezone
 import chungkhoan
 from infrastructure import kho
 from repositories import keys
-from bantin import VN_TZ, vn_num
+from domain.common.format import vn_num
+from infrastructure.clock import VN_TZ
 
 FINFO = "https://api-finfo.vndirect.com.vn/v4"
 FEEDS = [("CafeF", "https://cafef.vn/thi-truong-chung-khoan.rss"),

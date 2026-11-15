@@ -62,7 +62,7 @@ def command(*args):
 kho.send = command  # lớp nhớ trong một lượt (kho.memo) vẫn chạy thật trên kho giả
 kho.ready = lambda: True
 
-import bantin  # noqa: E402
+from infrastructure import clock as _clock  # noqa: E402
 from interface.dautu import fund as dautu  # noqa: E402
 from infrastructure import ai as ai_client  # noqa: E402
 from infrastructure import clock  # noqa: E402
@@ -71,7 +71,7 @@ import sochitieu as ct  # noqa: E402
 from interface.taisan import assets as ts  # noqa: E402
 from infrastructure import telegram as tg  # noqa: E402
 
-VN_TZ = bantin.VN_TZ
+VN_TZ = _clock.VN_TZ
 CLOCK = {"now": datetime(2026, 11, 13, 9, 0, tzinfo=VN_TZ)}
 CHAT = 1
 SENT = []  # tin bot tự gửi (việc theo giờ)

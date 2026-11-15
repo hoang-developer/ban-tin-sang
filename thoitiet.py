@@ -6,7 +6,11 @@ import sys
 import urllib.parse
 from datetime import datetime
 
-from bantin import HANOI, VN_TZ, fetch_json, hourly, section, tips, weather
+from domain.bantin.weather import HANOI, tips
+from infrastructure.clock import VN_TZ
+from infrastructure.web import fetch_json
+from interface.bantin.bulletin import section, weather
+from services.bantin.data import hourly
 from canhbao import rain_outlook
 
 
