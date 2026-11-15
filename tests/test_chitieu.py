@@ -52,9 +52,11 @@ class ChiTieu(unittest.TestCase):
         h.say("/taisan cp HAG 100 12")
         h.say("bán 100 HAG giá 12")  # bán hết: không còn dòng 0 cp
         _, body, _ = h.press("ts:xem")
-        self.assertIn("Nhẫn 0,3 chỉ · vốn TB 13,19tr/chỉ · hôm nay 13,6tr/chỉ", body)
-        self.assertIn("• 20/10 0,1 chỉ giá 14,8tr/chỉ → 🔴 −120k (−8%)", body)
-        self.assertIn("• 11/11 0,2 chỉ giá 12,38tr/chỉ → 🟢 +243k (+10%)", body)
+        self.assertIn("Ngày  Chỉ Giá/chỉ Lãi/lỗ    %", body)  # bảng đều cột (<pre>)
+        self.assertIn("20/10 0,1 14,80tr  −120k  −8% 🔴", body)
+        self.assertIn("11/11 0,2 12,38tr  +243k +10% 🟢", body)
+        self.assertIn("Tổng  0,3 13,19tr  +123k  +3% 🟢", body)
+        self.assertIn("Hôm nay   13,60tr", body)
         self.assertNotIn("HAG", body)
 
     def test_mua_vang_qua_the_ghi_ngay_mua(self):

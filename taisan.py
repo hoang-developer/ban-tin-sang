@@ -509,33 +509,46 @@ def gain_text(gain, cost):
 
 
 def gold_lines(rows):
-    """Vàng theo từng loại: tổng số chỉ, giá vốn TB và giá cửa hàng mua vào hôm nay (theo chỉ), rồi mỗi lần mua một
-    dòng: ngày, số chỉ × giá mua một chỉ → lãi/lỗ."""
+    """Vàng: mỗi loại một bảng chữ đều cột (<pre>): mỗi lần mua một dòng (ngày, số chỉ, giá mua một chỉ, lãi/lỗ),
+    dòng Tổng (vốn trung bình), dòng Hôm nay (giá cửa hàng mua vào). Chấm màu ở cuối dòng để không lệch cột."""
     gold = kho.get(K_GOLD, []) or []
     lots = {}
     for _, rid, _, value, cost, _ in rows:
         g = gold[int(rid[1:])]
         lots.setdefault(g["loai"], []).append((g, value, cost))
+
+    def tr(x):
+        return f"{x / 1e6:.2f}".replace(".", ",") + "tr"
+
+    def signed(x):
+        return ("+" if x >= 0 else "−") + short(abs(x))
+
+    def pct(gain, cost):
+        return f"{gain / cost * 100:+.0f}%".replace("-", "−")
+
+    def row(when, chi, price, gain=None, cost=None):
+        line = f"{when:<5} {qty_text(round(chi, 2)):>3} {price:>7}"
+        if gain is not None:
+            line += f" {signed(gain):>6} {pct(gain, cost):>4} {'🟢' if gain >= 0 else '🔴'}"
+        return line
+
     out = []
     for kind, items in lots.items():
+        table = [f"{'Ngày':<5} {'Chỉ':>3} {'Giá/chỉ':>7} {'Lãi/lỗ':>6} {'%':>4}"]
+        for g, v, c in items:
+            chi = g["luong"] * 10
+            when = f"{g['ngay'][8:]}/{g['ngay'][5:7]}" if g.get("ngay") else "—"
+            table.append(row(when, chi, tr(c / chi), v - c, c) if c else row(when, chi, "?"))
         chi = sum(g["luong"] for g, _, _ in items) * 10
         value = sum(v for _, v, _ in items)
         priced = [(g, v, c) for g, v, c in items if c]
-        price = value / chi if chi and value else None
-        head = f"  {gold_name(kind)} <b>{qty_text(round(chi, 2))} chỉ</b>"
         if priced:
-            avg = sum(c for _, _, c in priced) / (sum(g["luong"] for g, _, _ in priced) * 10)
-            head += f" · vốn TB {short(avg)}/chỉ"
-        if price:
-            head += f" · hôm nay {short(price)}/chỉ"
-        out.append(head)
-        for g, v, c in items:
-            when = f"{g['ngay'][8:]}/{g['ngay'][5:7]} " if g.get("ngay") else ""
-            amount = f"{qty_text(round(g['luong'] * 10, 2))} chỉ"
-            if c:
-                out.append(f"   • {when}{amount} giá {short(c / (g['luong'] * 10))}/chỉ → {gain_text(v - c, c)}")
-            else:
-                out.append(f"   • {when}{amount} · chưa có giá mua")
+            cost = sum(c for _, _, c in priced)
+            table.append(row("Tổng", chi, tr(cost / (sum(g["luong"] for g, _, _ in priced) * 10)),
+                             sum(v for _, v, _ in priced) - cost, cost))
+        if chi and value:
+            table.append(f"{'Hôm nay':<9} {tr(value / chi):>7}")
+        out.append(f"  {gold_name(kind)}\n<pre>" + "\n".join(table) + "</pre>")
     return out
 
 
