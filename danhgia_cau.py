@@ -35,7 +35,8 @@ CAU = [
     ("du_phong", "nạp 2tr vào quỹ dự phòng", [{"viec": "du_phong", "tien": 2000000, "chieu": "nap"}]),
     ("du_phong", "rút 1tr quỹ khẩn cấp", [{"viec": "du_phong", "tien": 1000000, "chieu": "rut"}]),
     ("du_phong", "để dành 3tr vào quỹ phòng thân", [{"viec": "du_phong", "tien": 3000000}]),
-    ("du_phong", "rút quỹ dự phòng 2tr sửa xe", [{"viec": "du_phong", "tien": 2000000, "chieu": "rut"}]),
+    ("du_phong", "rút quỹ dự phòng 2tr sửa xe",  # rút ra rồi tiêu: hai việc
+     [{"viec": "du_phong", "tien": 2000000, "chieu": "rut"}, {"viec": "chi", "tien": 2000000}]),
     ("du_phong", "quỹ dự phòng thêm 1tr", [{"viec": "du_phong", "tien": 1000000}]),
     # ---- Tiết kiệm -------------------------------------------------------------------------
     ("tiet_kiem", "gửi tiết kiệm VCB 50tr lãi 4,7% 6 tháng",
