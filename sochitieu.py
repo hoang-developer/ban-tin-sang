@@ -17,9 +17,9 @@ import urllib.request
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 
-import kho
+from infrastructure import kho
 from repositories import keys
-from repositories import ledger as ledger_repo
+from repositories.chitieu import ledger as ledger_repo
 from bantin import VN_TZ, WEEKDAYS, vn_num
 
 # ---- Nhóm chi tiêu --------------------------------------------------------------

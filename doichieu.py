@@ -12,9 +12,9 @@ Ngày 15 (DAY) chọn vì lương (ngày 5), trả nợ (quanh ngày 10), lệnh
 import html
 import sys
 
-import kho
+from infrastructure import kho
 from repositories import keys
-from repositories import ledger as ledger_repo
+from repositories.chitieu import ledger as ledger_repo
 import sochitieu as ct
 
 DAY = 15

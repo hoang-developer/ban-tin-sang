@@ -14,11 +14,11 @@ import sys
 import urllib.request
 from datetime import date, timedelta
 
-import kho
+from infrastructure import kho
 from repositories import keys
-from repositories import ledger as ledger_repo
+from repositories.chitieu import ledger as ledger_repo
 import sochitieu as ct
-import tg
+from infrastructure import telegram as tg
 
 MAX_BYTES = 8_000_000  # ảnh Telegram đã nén thường dưới 500KB; file gửi nguyên bản có thể lớn hơn
 

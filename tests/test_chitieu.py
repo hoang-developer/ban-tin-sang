@@ -3,7 +3,7 @@ import unittest
 
 from tests import harness as h
 
-import kho
+from infrastructure import kho
 import tietkiem
 
 

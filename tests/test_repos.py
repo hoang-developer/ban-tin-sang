@@ -4,9 +4,13 @@ import unittest
 
 from tests import harness as h
 
-import kho
-from domain.salary import Salary
-from repositories import assets, fund, keys, ledger, salary
+from infrastructure import kho
+from domain.luong.salary import Salary
+from repositories import keys
+from repositories.chitieu import ledger
+from repositories.dautu import fund
+from repositories.luong import salary
+from repositories.taisan import assets
 
 
 class AssetRepo(unittest.TestCase):

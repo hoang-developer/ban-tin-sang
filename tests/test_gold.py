@@ -3,9 +3,9 @@ import unittest
 
 from tests import harness as h
 
-import kho
-from domain.gold import GoldLot, holdings_chi, sell_fifo
-from repositories import gold as gold_repo
+from infrastructure import kho
+from domain.vang.gold import GoldLot, holdings_chi, sell_fifo
+from repositories.vang import gold as gold_repo
 from repositories import keys
 
 

@@ -13,7 +13,7 @@ import html
 import math
 from datetime import date, timedelta
 
-import kho
+from infrastructure import kho
 from repositories import keys
 import phantich as pt
 import sochitieu as ct

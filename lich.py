@@ -10,16 +10,16 @@ from datetime import datetime, timedelta, timezone
 
 import amlich
 import canhbao
-import kho
+from infrastructure import kho
 from repositories import keys
-from repositories import gold as gold_repo
+from repositories.vang import gold as gold_repo
 import lenh
 import nhandinh
 import phantich
 import sochitieu as chitieu
 import sono
 import taisan
-import tg
+from infrastructure import telegram as tg
 from bantin import BUTTONS as BANTIN_BUTTONS
 from bantin import (WEEKDAYS, build_message, gold_prices, hourly, index_history, section, stocks, tips,
                     vn_num, weather)

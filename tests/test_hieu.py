@@ -5,7 +5,7 @@ from tests import harness as h
 from tests.test_dongtien import item, main_balance, set_main
 
 import danhgia
-import kho
+from infrastructure import kho
 import taisan as ts
 
 

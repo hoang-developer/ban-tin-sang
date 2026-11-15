@@ -14,9 +14,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # để import các file ở thư mục gốc
 
 import docanh  # noqa: E402
-import kho  # noqa: E402
+from infrastructure import kho  # noqa: E402
 import sochitieu as chitieu  # noqa: E402 (file lõi đặt tên khác file này để khỏi import nhầm)
-import tg  # noqa: E402
+from infrastructure import telegram as tg  # noqa: E402
 from bantin import VN_TZ  # noqa: E402
 
 

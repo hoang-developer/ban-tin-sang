@@ -1,5 +1,5 @@
 """Store: chỗ duy nhất của tầng repositories gọi kho.py. Các repo dùng Store, không gọi kho trực tiếp."""
-import kho
+from infrastructure import kho
 
 
 def get(key, default=None):

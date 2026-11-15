@@ -17,20 +17,64 @@ Nhánh: `claude/refactor-repository` (tách từ `main`). Mỗi bước là mộ
 
 ## 2. Đích đến
 
+Chia **theo lớp trước**; trong mỗi lớp có **thư mục theo chức năng**; mỗi file chức năng nằm đúng một lớp.
+Gốc repo chỉ còn `api/` (Vercel bắt buộc), tài liệu, cấu hình và các lớp.
+
 ```
-interface/      router, LLM điều phối, api/*, lịch tick
-   ↓
-services/       một hàm cho mỗi việc người dùng làm; trả kết quả có cấu trúc (dataclass), không trả HTML
-   ↓                                  ↘
-repositories/   mỗi aggregate một repo, bọc kho.py       presentation/   kết quả → HTML Telegram + bàn phím
-domain/         dataclass + quy tắc thuần (không I/O, không HTML)
+interface/<chức năng>/        tầng vào: định tuyến tin nhắn, lệnh /…, nút bấm, cron; gọi services, nhờ presentation dựng tin
+services/<chức năng>/         một hàm cho mỗi việc người dùng làm; nối repositories + domain; trả kết quả có cấu trúc
+presentation/<chức năng>/     kết quả → HTML Telegram + bàn phím; không logic nghiệp vụ, không I/O
+domain/<chức năng>/           dataclass + quy tắc thuần + kiểu kết quả của service (không I/O, không HTML)
+repositories/<chức năng>/     mỗi aggregate một repo, bọc infrastructure/kho
+infrastructure/               cổng ra ngoài: kho (Redis), telegram, AI (Gemini/OpenRouter), nguồn giá/tin/thời tiết
 ```
 
-Phụ thuộc chỉ đi một chiều xuống. Hết import vòng thì bỏ 9 hàm nạp muộn.
+Chức năng (tên thư mục trong mỗi lớp): `chitieu` (sổ thu chi, ngân sách, nhóm), `phantich` (hỏi đáp, báo cáo chi tiêu),
+`taisan`, `vang`, `dautu`, `tietkiem`, `duphong`, `no`, `luong`, `kehoach`, `doichieu`, `troly` (AI hiểu câu, thẻ xác nhận),
+`anh` (đọc ảnh), `menu`, `bantin` (bot bản tin: bản tin sáng, giá, chứng khoán, nhận định, lịch). Thư mục chỉ tạo khi có file đầu tiên.
 
-Pattern: Repository, Domain Model, Service Layer (Use Case), Presenter. Chuyển đổi theo Strangler Fig, không viết lại một lượt.
+Phụ thuộc chỉ đi một chiều (test kiến trúc canh, xem mục 3):
 
-Tên gói bằng tiếng Anh (tên tầng), tên khái niệm trong gói theo nghĩa nghiệp vụ (`gold`, `assets`, `ledger`…).
+| Lớp | Được import |
+|---|---|
+| `domain` | thư viện chuẩn, `domain` |
+| `infrastructure` | thư viện chuẩn, `infrastructure` |
+| `repositories` | `domain`, `infrastructure`, `repositories` |
+| `services` | `domain`, `repositories`, `infrastructure`, `services` |
+| `presentation` | `domain`, `presentation` (kiểu kết quả của service nằm ở `domain`) |
+| `interface` | mọi lớp dưới, `interface` |
+| `api/` | `interface` |
+
+Hết import vòng thì bỏ 9 hàm nạp muộn (`ct.taisan()`…).
+
+Pattern: Layered Architecture, Repository, Domain Model, Service Layer (Use Case), Presenter. Chuyển đổi theo Strangler Fig,
+không viết lại một lượt.
+
+Tên lớp bằng tiếng Anh; tên chức năng và file trong lớp theo nghĩa nghiệp vụ (`gold`, `assets`, `ledger`…).
+
+### Mỗi module cũ đi đâu
+
+Hầu hết module cũ trộn nhiều lớp (ví dụ `sochitieu.py` vừa là router, vừa là sổ, vừa là hiển thị), nên không chuyển nguyên file:
+tách theo lớp rồi đặt từng mảnh vào `<lớp>/<chức năng>/`; file cũ xóa khi hết nội dung.
+
+| Module hiện tại | Tách thành |
+|---|---|
+| `kho.py`, `tg.py` | `infrastructure/kho.py`, `infrastructure/telegram.py` |
+| khung gọi AI trong `sochitieu.py` (`ai_chat`, khóa, thử lần lượt nhà cung cấp) | `infrastructure/ai.py` |
+| `chungkhoan.py`, `thoitiet.py`, `tintuc.py` | `infrastructure/` (nguồn giá, thời tiết, tin) |
+| `amlich.py` | `domain/bantin/amlich.py` (tính lịch âm thuần) |
+| `sochitieu.py` | `domain/chitieu` (đọc tiền/ngày/dòng, luật xếp nhóm), `services/chitieu` (ghi, xóa, học nhóm, ngân sách), `presentation/chitieu` (dòng khoản, định dạng số), `interface/chitieu` (`respond`, lệnh, nút) |
+| `phantich.py` | `domain/phantich` (bộ lọc, tính), `services/phantich`, `presentation/phantich`, `interface/phantich` |
+| `taisan.py` | `domain/taisan` (định giá, lãi sổ…), `services/taisan` (bán, tất toán, chuyển), `presentation/taisan` (bảng, tổng quan), `interface/taisan` (`/taisan`, nút `ts:`); phần vàng sang `*/vang` |
+| `dautu.py` | `domain/dautu` (Value Averaging, phiên khớp, trạng thái lệnh), `services/dautu`, `presentation/dautu`, `interface/dautu` |
+| `sono.py`, `duphong.py`, `tietkiem.py`, `doichieu.py`, `kehoach.py` | cùng cách, mỗi chức năng một bộ bốn lớp |
+| `troly.py` | `services/troly` (hiểu câu thành việc, làm việc, thẻ gộp), `presentation/troly` (`describe`, thẻ), `interface/troly` (nút `y:`, hội thoại dở) |
+| `docanh.py` | `infrastructure/ai.py` (đọc ảnh), `services/anh`, `interface/anh` |
+| `menu.py`, `thongbao.py` | `presentation/menu`, `interface/menu`; thông báo sáng/tối: `services` + `presentation` |
+| `lich.py`, `lenh.py`, `bantin.py`, `canhbao.py`, `nhandinh.py` | `services/bantin`, `presentation/bantin`, `interface/bantin` (lịch tick, lệnh bot bản tin) |
+| `danhgia.py`, `danhgia_cau.py` | `tools/danhgia/` (công cụ đo, không phải lớp của app) |
+
+Workflow GitHub chạy thẳng `python3 bantin.py` và `python3 canhbao.py`: đổi sang `python3 -m interface.bantin.…` khi chuyển xong.
 
 ## 3. Luật bất di bất dịch
 
@@ -92,20 +136,33 @@ Dùng nhiều nhất (`sochitieu.load/save/HSET/HGET/HDEL`, và 8 chỗ xin mã 
 Xong khi: không file nào ngoài repo dùng `keys.COUNTER`, `keys.ledger_month` hay lệnh hash `HSET/HGET/HDEL` cho sổ (test chặn);
 toàn bộ lệnh ghi Redis trong test giống `main` từng lệnh.
 
-### Bước 5: tách `taisan.py` thành domain / service / presentation
-- `sell_gold`, `close_saving`, `sell_fund`, `collect_loan`, `remove_named` trả `SaleResult` / `CloseResult`…; phần HTML chuyển sang `presentation/`.
-- `troly.run_many` ghép kết quả có cấu trúc thành tin gộp thay vì cắt chuỗi.
+### Bước 5: dựng khung lớp và luật phụ thuộc, chuyển `infrastructure`
+- `tests/test_kientruc.py`: quét import bằng AST, báo đỏ khi một file trong lớp import sai chiều (bảng mục 2) hoặc lớp mới
+  import module cũ còn ở gốc; số file ở gốc tối đa (`ROOT_PY_MAX`) chỉ được giảm qua từng bước (ratchet); import thử mọi module, cả `api/*.py`.
+- `infrastructure/`: `kho.py`, `telegram.py` (hai module chỉ dùng thư viện chuẩn, chuyển nguyên). Khung gọi AI (`ai_chat`…) và nguồn
+  giá/tin/thời tiết đang lẫn với logic trong `sochitieu.py`, `chungkhoan.py`…: tách cùng chức năng sở hữu chúng ở bước 6…, không chuyển nguyên file.
+- Repo và domain đã có xếp vào thư mục chức năng: `repositories/{vang,taisan,chitieu,luong,dautu}/`, `domain/{vang,luong}/`.
+  `repositories/keys.py` và `repositories/store.py` ở gốc của lớp (dùng chung mọi chức năng).
+- Viết lại import bằng script (31 file).
 
-Xong khi: không hàm service nào trả HTML; chạy bộ đo (đụng `troly`).
+Xong khi: `kho.py`, `tg.py` không còn ở gốc; test kiến trúc xanh; test và lệnh ghi Redis giống `main`.
 
-### Bước 6: các repo còn lại và gỡ hàm nạp muộn
-- `SettingsRepo` (ngân sách, nhóm riêng, nhóm dự báo, cờ bàn phím, bật/tắt), `ConversationRepo` (trạng thái dở, thẻ chờ), `FundRepo` (cấu hình, NAV, thông tin quỹ), `DebtRepo`, `ReserveRepo`, `SavingRepo`, `ReconcileRepo`, `CacheRepo` (AI học, thống kê, dedup ảnh).
-- Gỡ 9 hàm nạp muộn `ct.taisan()`… khi hết import vòng.
+### Bước 6…: từng chức năng, tách theo lớp rồi đặt vào `<lớp>/<chức năng>/`
+Thứ tự từ nhỏ tới lớn, mỗi chức năng một PR (nếu quá ~500 dòng đổi thì tách tiếp): `duphong` → `tietkiem` → `doichieu` → `no` →
+`kehoach` → `vang`+`dautu` → `taisan` → `chitieu`+`phantich` → `anh`+`menu`+thông báo → `troly` → `bantin`.
 
-Xong khi: chỉ `repositories/store.py` còn gọi `kho`; không còn hàm nạp muộn; chạy bộ đo.
+Mỗi PR chức năng:
+- Tách module cũ thành `domain/`, `services/`, `presentation/`, `interface/` của chức năng đó; xóa file cũ.
+- Service trả kết quả có cấu trúc (kiểu nằm ở `domain/<chức năng>/`), presentation dựng HTML từ kết quả; không hàm service nào trả HTML.
+- Gỡ các hàm nạp muộn liên quan; chuyển repo còn lại của chức năng (`SettingsRepo`, `ConversationRepo`, NAV quỹ, `CacheRepo`…).
+- Kiểu dữ liệu riêng (`Entry`, `AssetItem`…) thêm khi tách tới chức năng cần nó, thay dần dict.
 
-### Bước 7 (tùy chọn): chống ghi đè
-Thêm số phiên bản vào `AssetRepo` để webhook và tick không ghi đè nhau (Upstash REST hỗ trợ `EVAL`). Làm riêng, có test mô phỏng hai lần ghi chen nhau.
+Xong khi: file cũ không còn; test kiến trúc xanh; ratchet giảm; toàn bộ lệnh ghi Redis trong test giống `main`; tin nhắn bot gửi
+không đổi (test hiện có, so thêm các chuỗi hiển thị chính); chạy bộ đo khi đụng `troly`/định tuyến.
+
+### Bước cuối: dọn
+- Gốc chỉ còn `api/`, tài liệu, cấu hình, các lớp; workflow đổi sang `python -m`; xóa hàm nạp muộn; ratchet về 0.
+- (Tùy chọn) số phiên bản cho `assets` repo để webhook và tick không ghi đè nhau (Upstash REST hỗ trợ `EVAL`), có test mô phỏng.
 
 ## 4b. Tiến độ
 
@@ -114,15 +171,18 @@ Thêm số phiên bản vào `AssetRepo` để webhook và tick không ghi đè 
 | 0 Nền, `plan.md` | xong, đã deploy ([#52](https://github.com/hoang-developer/ban-tin-sang/pull/52)) |
 | 1 `keys.py` + `Store` | xong, đã deploy ([#52](https://github.com/hoang-developer/ban-tin-sang/pull/52)) |
 | 2 `GoldRepo` | xong, đã deploy ([#53](https://github.com/hoang-developer/ban-tin-sang/pull/53)) |
-| 3 `AssetRepo`, `SalaryRepo`, `FundRepo` | xong, đã gộp ([#54](https://github.com/hoang-developer/ban-tin-sang/pull/54)) |
-| 4 `LedgerRepo` | đang làm |
-| 5–7 | chưa |
+| 3 `AssetRepo`, `SalaryRepo`, `FundRepo` | xong, đã deploy ([#54](https://github.com/hoang-developer/ban-tin-sang/pull/54)) |
+| 4 `LedgerRepo` | xong, đã deploy ([#55](https://github.com/hoang-developer/ban-tin-sang/pull/55)) |
+| 5 Khung lớp, luật phụ thuộc, `infrastructure` | đang làm |
+| 6… Từng chức năng vào đúng lớp | chưa |
+| Cuối: dọn | chưa |
+
+Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.
 
 ## 5. Chưa làm
 
 - Không viết lại một lượt; không DDD đầy đủ; không interface/port trừu tượng khi chỉ có một nơi lưu trữ (Redis).
-- Chưa động `phantich.py`, `lenh.py` (trừ khóa/ví vàng), `bantin.py`, `chungkhoan.py`: phần lớn là đọc và hiển thị.
-- Không đổi schema Redis, không đổi giao diện tin nhắn.
+- Không đổi schema Redis, không đổi nội dung tin nhắn bot gửi.
 
 ## 6. Rủi ro và cách giữ
 
@@ -132,16 +192,21 @@ Thêm số phiên bản vào `AssetRepo` để webhook và tick không ghi đè 
 | Gói mới không vào bundle Vercel / Actions | Kiểm tra trang tình trạng bot sau mỗi deploy; bước 1 deploy riêng để phát hiện sớm |
 | Hành vi lệch khi gom hàm | Test hiện có (hơn 80 test) + bộ đo 113 câu + test mới cho phần thuần |
 | PR quá lớn | Mỗi bước tách tiếp nếu quá ~500 dòng đổi |
-| Hết lượt Gemini miễn phí khi chạy bộ đo | Chỉ chạy bộ đo ở bước 5, 6 (và khi đụng `troly`) |
+| Hết lượt Gemini miễn phí khi chạy bộ đo (80 lượt/ngày) | Chỉ chạy khi đụng `troly`/định tuyến; gom nhiều thay đổi trước khi đo |
+| Import sót sau khi chuyển file | Script viết lại import + test import thử mọi module (cả `api/*.py`) + test kiến trúc |
+| Workflow GitHub chạy file ở gốc | Đổi workflow cùng PR chuyển file; kiểm tra bằng chạy thử workflow |
+| Tách module làm đổi chữ hiển thị | Test hiện có phủ nhiều chuỗi; thêm test so chuỗi cho các màn hình chính trước khi tách |
 
 Hoàn tác: mỗi bước là một PR riêng, `git revert` được.
 
 ## 7. Số đo hoàn thành
 
-| Chỉ số | Hiện tại | Đích |
-|---|---|---|
-| File gọi `kho.*` trực tiếp | 18 | 1 (`repositories/store.py`) |
-| Chuỗi khóa Redis viết cứng ngoài `keys.py` | ~20 | 0 |
-| Hàm nạp muộn né import vòng | 9 | 0 |
-| Hàm nghiệp vụ trả HTML | nhiều (`taisan.*`) | 0 |
-| Bộ đo 113 câu | 98–100 | ≥ 98 |
+| Chỉ số | Lúc đầu | Hiện tại | Đích |
+|---|---|---|---|
+| File `.py` ở gốc repo (không tính `api/`) | 26 | 24 | 0 |
+| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 18 (143) | 1 (`repositories/store.py`) |
+| Chuỗi khóa Redis viết cứng ngoài `keys.py` | ~20 | 0 | 0 |
+| Hàm nạp muộn né import vòng | 9 | 9 | 0 |
+| Hàm nghiệp vụ trả HTML | nhiều | nhiều | 0 |
+| Vi phạm chiều phụ thuộc giữa các lớp (test kiến trúc) | chưa đo | 0 | 0 |
+| Bộ đo 113 câu | 98–100 | chưa đo lại | ≥ 98 |
