@@ -21,6 +21,10 @@ from repositories import keys
 from repositories.dautu import fund as fund_repo
 from repositories.luong import salary as salary_repo
 from domain.dautu.calendar import cutoff_day, months, weekdays_after, ym_add, ym_of, ym_text  # noqa: F401
+from domain.dautu.plan import (DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG, MIN_ORDER, STEP, SWITCH_DAYS,  # noqa: F401
+                                contributed_of, extra_of, goes_main, gop_of, holding, pending_main, side, target, them_of,
+                                total_of, wait_name)
+from services.dautu.status import close_periods, status, wait_item  # noqa: F401
 from services.dautu.market import (current_period, find_fund, fund_info, is_deadline, nav_history,  # noqa: F401
                                    next_trading, now_vn, session)
 import phantich as pt
@@ -31,9 +35,6 @@ from bantin import VN_TZ, vn_num
 # {"ma", "id", "ten", "bat_dau": "YYYY-MM", "goc": giá trị quỹ có sẵn lúc bắt đầu, "gop": {"YYYY-MM": số góp từ tháng đó},
 #  "tang": 0.01, "nap": {"YYYY-MM": đã góp vào hệ thống trong tháng}, "ky": {"YYYY-MM": {"chot", "bo", "muc", "gt"}},
 #  "lenh": [{"id", "ky", "tien", "dat", "phien", "trang_thai": "cho"|"khop", "nav", "ccq"}], "tat": bool, "top_luc"}
-DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG = "VMEEF", 4_000_000, 0.01
-MIN_ORDER, STEP = 100_000, 10_000
-SWITCH_DAYS = 7  # hoán đổi quỹ chờ → quỹ chính: bán quỹ chờ, tiền về rồi mới mua quỹ chính, khoảng 1 tuần
 WATCH = ("VIC", "VHM", "VRE", "VPL")  # nhóm Vingroup: báo nếu vào top 10 của quỹ
 USAGE = ("📈 <b>Đầu tư quỹ mở hằng tháng (Value Averaging)</b>\n"
          "/dautu: tình trạng, tháng này nên mua bao nhiêu\n"
@@ -80,173 +81,7 @@ def units_text(x):
 # ---- Dữ liệu quỹ trên Fmarket, phiên giao dịch: xem services/dautu/market.py
 
 
-# ---- Quỹ chờ, danh mục -----------------------------------------------------------------
-
-def wait_name(cfg):
-    return f"Quỹ chờ {cfg['ma']}"
-
-
-def wait_item(data, cfg):
-    """Tài khoản tiền "Quỹ chờ <mã>" trong /taisan (tạo nếu chưa có)."""
-    item = next((it for it in data["items"] if it["loai"] == "tien" and it.get("dautu")), None)
-    if item is None:
-        item = {"id": ts.new_id(data), "loai": "tien", "ten": wait_name(cfg), "tien": 0,
-                "ngay": ct.today().isoformat(), "dautu": True}
-        data["items"].append(item)
-    return item
-
-
-def holding(data, cfg, code=None):
-    code = code or cfg["ma"]
-    return next((it for it in data["items"] if it["loai"] == "quy" and it["ma"] == code), None)
-
-
-def side(cfg):
-    """Quỹ chờ là quỹ (ví dụ VFF: vừa là phần trái phiếu của danh mục, vừa là tiền chờ cho VA): {"ma", "id"} hoặc None
-    nếu quỹ chờ là tiền gửi."""
-    return cfg.get("cho") or None
-
-
-def pending_main(cfg, o):
-    """Lệnh chưa xong mà tiền đã dành cho quỹ chính: lệnh mua chờ khớp, hoán đổi chưa bán hoặc đã bán chờ mua."""
-    return o["trang_thai"] in ("cho", "chuyen") and goes_main(cfg, o)
-
-
-def goes_main(cfg, o):
-    """Lệnh làm tăng quỹ chính: mua quỹ chính, hoặc hoán đổi từ quỹ chờ sang."""
-    return o.get("loai") == "doi" or o.get("quy", cfg["ma"]) == cfg["ma"]
-
-
-def them_of(cfg, ym):
-    """Số góp thêm mỗi tháng vào quỹ chờ (ngoài phần VA), 0 nếu tháng tạm dừng."""
-    if not side(cfg) or (cfg.get("ky", {}).get(ym) or {}).get("bo"):
-        return 0
-    steps = [(k, v) for k, v in cfg.get("them", {}).items() if k <= ym]
-    return max(steps)[1] if steps else 0
-
-
-def total_of(cfg, ym):
-    """Tổng tiền góp của tháng: phần VA + phần góp thêm vào quỹ chờ."""
-    return gop_of(cfg, ym) + them_of(cfg, ym)
-
-
-def gop_of(cfg, ym):
-    if (cfg.get("ky", {}).get(ym) or {}).get("bo"):
-        return 0
-    steps = [(k, v) for k, v in cfg.get("gop", {}).items() if k <= ym]
-    return max(steps)[1] if steps else 0
-
-
-def extra_of(cfg, ym):
-    """Phần cộng thêm vào kế hoạch quỹ chính trong tháng ym khi rải một khoản tiền lớn (/dautu taicocau)."""
-    return cfg.get("ke_hoach_them", {}).get(ym, 0)
-
-
-def target(cfg, ym):
-    """Giá trị kế hoạch của kỳ ym."""
-    value = None
-    for m in months(cfg["bat_dau"], ym):
-        add = gop_of(cfg, m) + extra_of(cfg, m)
-        value = cfg.get("goc", 0) + add if value is None else value * (1 + cfg.get("tang", DEFAULT_TANG)) + add
-    return value or 0
-
-
-def contributed_of(cfg):
-    """Tổng tiền đã góp: góp hằng tháng + khoản góp một lần (tái cơ cấu) + giá trị có sẵn lúc bắt đầu."""
-    return sum(cfg.get("nap", {}).values()) + sum(cfg.get("ngoai", {}).values()) + cfg.get("goc", 0)
-
-
-def close_periods(cfg, now=None):
-    """Chốt các kỳ đã qua hạn: góp của tháng (phần chưa để) được tính vào quỹ chờ, trừ tháng tạm dừng.
-    Trả True nếu có thay đổi (đã lưu)."""
-    current = current_period(cfg, now)
-    changed = False
-    data = value = None
-    for ym in months(cfg["bat_dau"], ym_add(current, -1)):
-        k = cfg.setdefault("ky", {}).setdefault(ym, {})
-        if k.get("chot"):
-            continue
-        if data is None:
-            data = ts.load()
-            navs = nav_history(cfg)
-            hold = holding(data, cfg)
-            value = (hold["sl"] * navs[-1][1] if hold and navs else 0) + sum(
-                o["tien"] for o in cfg.get("lenh", []) if pending_main(cfg, o))
-        unpaid = max(0, total_of(cfg, ym) - cfg.get("nap", {}).get(ym, 0))
-        if unpaid:
-            wait_item(data, cfg)["tien"] += unpaid
-            cfg.setdefault("nap", {})[ym] = cfg.get("nap", {}).get(ym, 0) + unpaid
-        k.update({"chot": True, "muc": round(target(cfg, ym)), "gt": round(value)})  # gt: giá trị lúc chốt (biểu đồ)
-        changed = True
-    if changed:
-        if data:
-            ts.save(data)
-        save(cfg)
-    return changed
-
-
-def status(cfg, now=None, fresh=False):
-    """Số liệu kỳ đang mở: kế hoạch, giá trị, cần mua, có bao nhiêu, nên mua bao nhiêu..."""
-    now = now or now_vn()
-    close_periods(cfg, now)
-    navs = nav_history(cfg, fresh)
-    data = ts.load()
-    ym = current_period(cfg, now)
-    hold = holding(data, cfg)
-    units = hold["sl"] if hold else 0
-    nav_day, nav = navs[-1] if navs else (None, None)
-    orders = cfg.get("lenh", [])
-    pending = sum(o["tien"] for o in orders if pending_main(cfg, o))
-    value = units * nav + pending if nav else pending + (units * hold["gia_von"] if hold and hold.get("gia_von") else 0)
-    plan = target(cfg, ym)
-    k = cfg.get("ky", {}).get(ym) or {}
-    cash = next((it["tien"] for it in data["items"] if it["loai"] == "tien" and it.get("dautu")), 0)
-    unpaid = 0 if k.get("bo") else max(0, total_of(cfg, ym) - cfg.get("nap", {}).get(ym, 0))
-    money_now = cash + unpaid  # tiền mặt dùng được ngay (chưa đặt lệnh)
-    sd = side(cfg)
-    side_value = side_nav = side_day = None
-    if sd:
-        snavs = nav_history(sd, fresh)
-        side_day, side_nav = snavs[-1] if snavs else (None, None)
-        sh = holding(data, cfg, sd["ma"])
-        side_units = (sh["sl"] if sh else 0) - sum(o["ccq_ra"] for o in orders if o["trang_thai"] == "cho"
-                                                    and o.get("loai") == "doi")
-        side_value = max(0.0, side_units) * (side_nav or 0) + sum(
-            o["tien"] for o in orders if o["trang_thai"] == "cho" and o.get("quy") == sd["ma"] and o.get("loai") != "doi")
-    available = money_now + (side_value or 0)
-    need = plan - value
-    buy = max(0, min(need, available)) // STEP * STEP
-    buy = 0 if buy < MIN_ORDER else buy
-    direct = min(buy, money_now) // STEP * STEP  # mua thẳng bằng tiền góp trước
-    switch = buy - direct
-    if sd and switch and switch < MIN_ORDER:  # phần thiếu quá nhỏ: khỏi hoán đổi
-        buy, switch = direct, 0
-    if not sd:
-        direct, switch = buy, 0
-    side_buy = (money_now - direct) // STEP * STEP if sd and not k.get("bo") else 0
-    side_buy = side_buy if side_buy >= MIN_ORDER else 0
-    switch_units = (int(switch / side_nav * 100) + 1) / 100 if switch and side_nav else 0
-    ordered = sum(o["tien"] for o in orders if o["ky"] == ym)
-    invested = sum(o["tien"] for o in orders if goes_main(cfg, o))
-    cost = units * hold["gia_von"] if hold and hold.get("gia_von") else 0
-    year_ago = [v for d, v in navs if nav_day and (nav_day - d).days <= 365]
-    peak = max(year_ago) if year_ago else None
-    month_start = [v for d, v in navs if nav_day and d < nav_day.replace(day=1)]
-    fund = None
-    try:
-        from services.duphong import reserve as reserve_service
-        fund = reserve_service.status(now.date())
-    except Exception as e:
-        print(f"[lỗi] quỹ dự phòng trong /dautu: {e!r}", file=sys.stderr)
-    return {"ym": ym, "plan": plan, "value": value, "units": units, "nav": nav, "nav_day": nav_day, "pending": pending,
-            "cash": cash, "unpaid": unpaid, "available": available, "need": need, "buy": buy, "skip": k.get("bo"),
-            "direct": direct, "switch": switch, "switch_units": switch_units, "side_buy": side_buy, "side": sd,
-            "side_value": side_value, "side_nav": side_nav, "side_day": side_day, "money_now": money_now,
-            "short": need > available + STEP, "ordered": ordered, "invested": invested, "cost": cost,
-            "contributed": contributed_of(cfg),
-            "drawdown": nav / peak - 1 if peak and nav else None,
-            "month_change": nav / month_start[-1] - 1 if month_start and nav else None,
-            "fund": fund, "below_milestone": bool(fund and fund.monthly and fund.covered < 1)}
+# ---- Quỹ chờ, kế hoạch, tình trạng kỳ: xem domain/dautu/plan.py và services/dautu/status.py
 
 
 # ---- Câu trả lời -----------------------------------------------------------------------
