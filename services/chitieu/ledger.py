@@ -60,3 +60,9 @@ def tidy(day):
                 ledger_repo.save(e)
                 moved += 1
     return moved
+
+
+def find(reference):
+    """'2026-11:12' -> khoản đó, None nếu đã xóa."""
+    ym, _, rid = reference.partition(":")
+    return ledger_repo.find(ym, rid)

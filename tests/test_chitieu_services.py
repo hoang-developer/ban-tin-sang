@@ -37,6 +37,8 @@ class So(unittest.TestCase):
         h.at(2026, 10, 20, 10)
         self.now = h.CLOCK["now"]
         self.replies = []
+        real_ai = ai_client.chat
+        self.addCleanup(setattr, ai_client, "chat", real_ai)
         ai_client.chat = self.ask
 
     def ask(self, system, user, **kw):

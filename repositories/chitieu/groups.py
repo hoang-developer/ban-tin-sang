@@ -53,6 +53,11 @@ def add_ai_guessed(count):
     kho.command("HINCRBY", keys.AI_STATS, "doan", count)
 
 
+def add_ai_fixed(count):
+    """Người dùng sửa lại nhóm do AI đoán (AI đoán sai)."""
+    kho.command("HINCRBY", keys.AI_STATS, "sua", count)
+
+
 def ai_stats():
     """(số khoản AI đã xếp, số khoản người dùng phải sửa lại)."""
     flat = kho.command("HGETALL", keys.AI_STATS) or []

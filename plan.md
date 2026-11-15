@@ -196,8 +196,11 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.7d `taisan`: mua bán cổ phiếu, khai báo, nhắc lương/đáo hạn, dòng tiền (`domain/taisan/trade`, `services/taisan/{trade,declare,flows,reminders}`) | xong, chờ deploy |
 | 6.7e `taisan`: màn hình (`presentation/taisan/view`), khám sức khỏe (`services/taisan/health`), lệnh và nút (`interface/taisan/assets`), xóa `taisan.py`, services/presentation không còn import module cũ `taisan` | xong, chờ deploy: **`taisan` xong đủ 4 lớp** |
 | 6.8a `chitieu`: máy khách AI (`infrastructure/ai`), xếp nhóm và đọc dòng chi tiêu (`domain/chitieu/{categories,classify,parse}`), cấu hình nhóm (`repositories/chitieu/groups`) | xong, đã deploy (#72) |
-| 6.8b `chitieu`: ghi sổ, học nhóm, xếp lại khoản ở Khác, AI xếp nhóm và tình trạng AI (`domain/chitieu/learn`, `services/chitieu/{ledger,ai_sort}`, cấu hình nhóm nhớ một lượt ở `repositories/chitieu/groups`) | xong, chờ deploy |
-| 6.8… phần còn lại của `sochitieu` (ghi/học/chỉnh sổ, báo cáo, lệnh, nhóm tự chỉnh, định tuyến tin nhắn và nút), rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
+| 6.8b `chitieu`: ghi sổ, học nhóm, xếp lại khoản ở Khác, AI xếp nhóm và tình trạng AI (`domain/chitieu/learn`, `services/chitieu/{ledger,ai_sort}`, cấu hình nhóm nhớ một lượt ở `repositories/chitieu/groups`) | xong, đã deploy (#73) |
+| 6.8c `chitieu`: báo cáo, kỳ báo cáo, ngân sách, tin báo khoản vừa ghi, nút chọn nhóm (`domain/chitieu/{period,income,refs,text}`, `services/chitieu/{budget,report}`, `presentation/chitieu/view`) | xong, chờ deploy |
+| 6.8d `chitieu`: lệnh /baocao /thang /lichsu /xoa /ngansach /nhom /chuaxep /xuat (`interface/chitieu/{commands,context}`, `domain/chitieu/labels`) | xong, chờ deploy |
+| 6.8e `chitieu`: định tuyến bot (bảng lệnh, trả lời tin nhắn, nút bấm) ở `interface/chitieu/{bot,features}`, `sochitieu.py` chỉ còn tên cũ dùng tạm (174 dòng) | xong, chờ deploy |
+| 6.8… dọn `sochitieu.py` khi các module còn lại (`troly`, `menu`, `phantich`, `docanh`...) bỏ `ct.`; rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
 | Cuối: dọn | chưa |
 
 Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.
