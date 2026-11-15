@@ -355,9 +355,10 @@ def clean(raw, text=None):
     return a
 
 
-def ask_ai(text, day, context=None, personal=True):
-    """Nhờ AI hiểu một tin thành việc. context=(việc đang dở, câu bot vừa hỏi hoặc None): tin là câu trả lời/lời sửa."""
-    system = prompt(day, personal)
+def ask_ai(text, day, context=None, personal=True, people=None, facts=None):
+    """Nhờ AI hiểu một tin thành việc. context=(việc đang dở, câu bot vừa hỏi hoặc None): tin là câu trả lời/lời sửa.
+    people: thay tên nợ, tài khoản, quỹ của người dùng (đo bằng danhgia.py dùng ngữ cảnh mẫu); facts: số liệu tài chính."""
+    system = prompt(day, personal and people is None) + (("\n" + people) if people else "")
     if context:
         doing, asked = context
         system += ("\nĐang làm dở việc này: " + repr({k: v for k, v in doing.items() if not k.startswith("_")})
