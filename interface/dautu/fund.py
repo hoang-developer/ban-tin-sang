@@ -19,13 +19,13 @@ import re
 import sys
 from datetime import datetime, timedelta
 
-import phantich as pt  # module cũ ở gốc: vẽ biểu đồ
 import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày hôm nay
 from domain.common.money import number
 from domain.dautu.calendar import months, ym_add, ym_of, ym_text  # noqa: F401
 from domain.dautu.plan import (DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG, MIN_ORDER, STEP, WATCH,  # noqa: F401
                                gop_of, holding, is_active, side, them_of, total_of)
 from domain.dautu.text import money, units_text
+from infrastructure import quickchart
 from interface import common
 from interface.kehoach import plan as kehoach
 from presentation.dautu import view as pview
@@ -91,7 +91,7 @@ def chart_reply():
     s = status(cfg)
     rows.append((s["ym"], {"muc": s["plan"], "gt": s["value"]}))
     try:
-        return {"photos": [pt.chart_png(pview.chart_config(cfg, rows), 900, 450)], "caption": pview.chart_caption(cfg, s)}
+        return {"photos": [quickchart.chart_png(pview.chart_config(cfg, rows), 900, 450)], "caption": pview.chart_caption(cfg, s)}
     except Exception as e:
         print(f"[lỗi] vẽ biểu đồ đầu tư: {e!r}", file=sys.stderr)
         return "⚠️ Chưa vẽ được biểu đồ (dịch vụ vẽ không trả lời), thử lại sau"

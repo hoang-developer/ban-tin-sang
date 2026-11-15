@@ -15,7 +15,7 @@ from repositories import keys
 from repositories.vang import gold as gold_repo
 import lenh
 import nhandinh
-import phantich
+from interface.phantich import analysis as phantich
 import sochitieu as chitieu
 from interface.no import debt as sono
 from interface.taisan import assets as taisan

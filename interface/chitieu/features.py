@@ -11,7 +11,7 @@ def duphong():
     return module
 
 def phantich():
-    import phantich as module  # nạp khi cần: phantich.py cũng dùng các hàm trong file này
+    from interface.phantich import analysis as module  # dự báo, hỏi bằng câu thường, biểu đồ, nhận xét
     return module
 
 def sono():
