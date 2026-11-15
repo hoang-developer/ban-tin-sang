@@ -64,6 +64,7 @@ kho.ready = lambda: True
 
 import bantin  # noqa: E402
 from interface.dautu import fund as dautu  # noqa: E402
+from infrastructure import ai as ai_client  # noqa: E402
 from infrastructure import clock  # noqa: E402
 from services.dautu import market as dautu_market  # noqa: E402
 import sochitieu as ct  # noqa: E402
@@ -150,6 +151,8 @@ class FakeAI:
 
 AI = FakeAI()
 ct.ai_chat = AI.chat
+REAL_AI_CHAT = ai_client.chat  # bản thật, để test máy khách AI gọi lại được
+ai_client.chat = AI.chat  # service xếp nhóm gọi thẳng máy khách AI
 
 
 def reset(now=None):

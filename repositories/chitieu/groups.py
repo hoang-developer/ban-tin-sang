@@ -2,15 +2,43 @@
 from infrastructure import kho
 from repositories import keys
 
+_config = None  # đọc một lần mỗi lượt xử lý; reset() ở đầu mỗi tin nhắn, lượt bấm nút, lịch chạy
+
+
+def reset():
+    global _config
+    _config = None
+
 
 def load():
     return kho.get(keys.GROUPS, {})
 
 
+def config():
+    """Cấu hình nhóm của lượt xử lý này (đọc một lần); chưa nối kho thì rỗng."""
+    global _config
+    if _config is None:
+        if not kho.ready():
+            return {}
+        _config = load()
+    return _config
+
+
 def save(cfg):
     """Lưu cấu hình nhóm; nhóm đã khác nên các câu AI trả lời trước đó không còn đúng danh sách nhóm."""
+    global _config
     kho.put(keys.GROUPS, cfg)
+    _config = cfg
     kho.delete(keys.AI_CACHE)
+
+
+def learned():
+    """Các cụm từ người dùng đã chọn nhóm: {khóa: mã nhóm}."""
+    return kho.get(keys.LEARN, {})
+
+
+def save_learned(data):
+    kho.put(keys.LEARN, data)
 
 
 def ai_cache():
