@@ -17,6 +17,7 @@ from pathlib import Path
 
 import amlich
 from infrastructure import telegram as tg
+from domain.common.format import vn_num  # noqa: F401
 
 # ---- Cấu hình -------------------------------------------------------------
 VN_TZ = timezone(timedelta(hours=7))  # Việt Nam không đổi giờ mùa hè
@@ -68,12 +69,6 @@ def fetch(url, data=None):
 
 def fetch_json(url, data=None):
     return json.loads(fetch(url, data))
-
-
-def vn_num(x, decimals=2, sign=False):
-    """1766.65 -> '1.766,65' (kiểu số Việt Nam)."""
-    s = f"{x:{'+' if sign else ''},.{decimals}f}"
-    return s.replace(",", "_").replace(".", ",").replace("_", ".")
 
 
 # ---- Các mục trong bản tin ---------------------------------------------------

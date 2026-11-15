@@ -59,3 +59,11 @@ def parse_amount(text):
 def money_count(text):
     """Số khoản tiền có ghi đơn vị (35k, 1tr, 35.000đ) trong câu: từ 2 trở lên thường là câu nhiều việc."""
     return sum(1 for m in MONEY.finditer(text) if money(m)[0] and money(m)[1])
+
+
+def number(text):
+    """'1.000' -> 1000; '0,05' -> 0.05; '95,5' -> 95.5."""
+    text = text.strip()
+    if re.fullmatch(r"\d{1,3}(\.\d{3})+", text):
+        return float(text.replace(".", ""))
+    return float(text.replace(",", "."))

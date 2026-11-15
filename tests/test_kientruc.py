@@ -30,6 +30,7 @@ LEGACY_IMPORTS = {
     "services/no/debt.py": {"sochitieu", "taisan"},
     "presentation/no/debt.py": {"phantich", "sochitieu", "taisan"},
     "interface/no/debt.py": {"sochitieu", "menu"},
+    "services/dautu/orders.py": {"taisan"},
     "services/kehoach/plan.py": {"sochitieu", "taisan", "phantich", "dautu"},
     "presentation/kehoach/plan.py": {"sochitieu", "taisan"},
     "interface/kehoach/plan.py": {"sochitieu"},

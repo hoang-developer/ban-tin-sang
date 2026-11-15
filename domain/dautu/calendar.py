@@ -2,7 +2,8 @@
 
 Hạn đặt lệnh: trước 14:40 ngày làm việc liền trước phiên khớp (chưa tính ngày lễ khi không có lịch NAV thật).
 """
-from datetime import datetime, timedelta
+import re
+from datetime import date, datetime, timedelta
 
 from domain.common.dates import VN_TZ
 
@@ -82,3 +83,20 @@ def guessed_session(trading):
     close = cutoff_day(trading)
     return {"phien": trading, "dong": datetime(close.year, close.month, close.day, CLOSING_HOUR, CLOSING_MINUTE, tzinfo=VN_TZ),
             "du_phong": True}
+
+
+DATE = re.compile(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?:/(\d{4}))?(?![\d/])")
+
+
+def read_date(text, day):
+    """'9/11' -> ngày (năm nay; xa hơn 6 tháng tới thì là năm trước); None nếu không có ngày."""
+    m = DATE.search(text)
+    if not m:
+        return None
+    try:
+        d = date(int(m[3] or day.year), int(m[2]), int(m[1]))
+    except ValueError:
+        return None
+    if not m[3] and (d - day).days > 180:
+        d = d.replace(year=d.year - 1)
+    return d
