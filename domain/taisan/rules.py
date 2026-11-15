@@ -38,3 +38,20 @@ def main_flows(it, day, entries):
 
 def main_balance(it, income, spend):
     return it["tien"] + income - spend + sum(x["tien"] for x in it.get("chuyen", []))
+
+
+def find_item(data, name, kinds):
+    """Mục tài sản theo tên/mã (trùng, không thì chứa nhau), trong các loại kinds; None nếu không thấy hoặc nhiều."""
+    key = plain(name or "").strip()
+    pool = [it for it in data["items"] if it["loai"] in kinds]
+    if not key:
+        return pool[0] if len(pool) == 1 else None
+    label = lambda it: plain(it.get("ten") or it.get("ma") or "")
+    exact = [it for it in pool if label(it).strip() == key]
+    near = exact or [it for it in pool if key in label(it) or label(it).strip() in key]
+    return near[0] if len(near) == 1 else None
+
+
+def removable(data, name):
+    """Mục tài sản có thể xóa theo tên/mã (mọi loại trừ nợ, nợ xóa ở sổ nợ)."""
+    return find_item(data, name, ("tien", "tietkiem", "khac", "cp", "etf", "quy", "coin", "ngoaite"))

@@ -1,5 +1,5 @@
 """Chữ hiển thị số lượng, số tiền, tên loại vàng trong tài sản."""
-from domain.common.format import short as short_vnd, vn_num
+from domain.common.format import short as short_vnd, vn_num, vnd
 
 
 def qty_text(x):
@@ -25,3 +25,8 @@ def gold_name(kind):
 
 def short(x):
     return ("−" if x < 0 else "") + short_vnd(abs(x))
+
+
+def gain_line(gain, cost):
+    return (f"{'🟢 lãi' if gain >= 0 else '🔴 lỗ'} {vnd(round(abs(gain)))}"
+            + (f" ({gain / cost * 100:+.1f}%)".replace(".", ",").replace("-", "−") if cost else ""))

@@ -191,8 +191,9 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.6e `dautu`: màn hình (`presentation/dautu/view`): màn chính, nhắc hạn, lịch sử lệnh, biểu đồ, nút | xong, đã deploy (#66) |
 | 6.6f `dautu`: lệnh và nút (`interface/dautu/fund`), việc phục vụ chỗ khác (`services/dautu/reports`), xóa `dautu.py` | xong, đã deploy (#67): **`dautu` xong đủ 4 lớp** (câu báo của `orders`, `switch`, `reports` còn trong service) |
 | 6.7a `taisan`: nguồn giá (`infrastructure/{clock,crypto,vietcombank,fmarket}`, `services/taisan/prices`, `domain/taisan/kinds`) | xong, đã deploy (#68) |
-| 6.7b `taisan`: định giá và tài khoản chính (`services/taisan/{valuation,accounts}`, `domain/taisan/{rules,text}`, `domain/chitieu/kinds`, `ledger.between`) | xong, chờ deploy |
-| 6.7… phần còn lại của `taisan` (bán/rút, mua bán cổ phiếu, khai báo tài sản, màn hình, khám sức khỏe, lệnh, nút), rồi các chức năng còn lại | chưa |
+| 6.7b `taisan`: định giá và tài khoản chính (`services/taisan/{valuation,accounts}`, `domain/taisan/{rules,text}`, `domain/chitieu/kinds`, `ledger.between`) | xong, đã deploy (#69) |
+| 6.7c `taisan`: bán, rút, thu về (`services/taisan/sales`; `find_item`, `removable` về `domain/taisan/rules`, `gain_line` về `domain/taisan/text`) | xong, chờ deploy |
+| 6.7… phần còn lại của `taisan` (mua bán cổ phiếu, khai báo tài sản, màn hình, khám sức khỏe, lệnh, nút), rồi các chức năng còn lại | chưa |
 | Cuối: dọn | chưa |
 
 Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.
