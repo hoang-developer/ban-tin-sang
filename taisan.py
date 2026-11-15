@@ -24,6 +24,7 @@ from repositories.taisan import assets as assets_repo
 from repositories.dautu import fund as fund_repo
 from repositories.luong import salary as salary_repo
 from domain.common import dates
+from domain.common.money import number  # noqa: F401
 from domain.vang.gold import GoldLot, holdings_chi, sell_fifo
 from repositories.vang import gold as gold_repo
 import phantich as pt
@@ -294,14 +295,6 @@ USAGE = ("💼 <b>Khai báo tài sản</b> (số tiền viết kiểu 25tr, 1t�
          "Mua bán cổ phiếu, ETF: nhắn <b>mua 1000 FPT giá 95</b>, <b>mua 500 E1VFVN30 giá 33,6</b>, <b>bán 500 FPT giá 120</b>\n"
          "Xem: /taisan · Sửa, xóa: /taisan xoa · Khám sức khỏe tài chính: /suckhoe")
 FX_CODES = {"usd", "eur", "jpy", "gbp", "aud", "cad", "chf", "cny", "sgd", "krw", "thb", "hkd", "twd"}
-
-
-def number(text):
-    """'1.000' -> 1000; '0,05' -> 0.05; '95,5' -> 95.5."""
-    text = text.strip()
-    if re.fullmatch(r"\d{1,3}(\.\d{3})+", text):
-        return float(text.replace(".", ""))
-    return float(text.replace(",", "."))
 
 
 def stock_price(text):

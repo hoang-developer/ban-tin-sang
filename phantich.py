@@ -14,6 +14,7 @@ from calendar import monthrange
 from datetime import date, timedelta
 
 from infrastructure import kho
+from domain.common.format import short  # noqa: F401
 from repositories import keys
 import sochitieu as ct
 from bantin import WEEKDAYS
@@ -34,13 +35,6 @@ def spending(items):
 
 def total(items):
     return sum(e["tien"] for e in items)
-
-
-def short(x):
-    """Số tiền gọn: 1.250.000 -> '1,25tr', 35.000 -> '35k'."""
-    if abs(x) >= 999_500:  # 999.800đ làm tròn thành 1tr, không thành "1000k"
-        return f"{x / 1e6:.2f}".rstrip("0").rstrip(".").replace(".", ",") + "tr"
-    return f"{round(x / 1000)}k"
 
 
 def approx(x):
