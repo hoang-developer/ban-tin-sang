@@ -22,7 +22,7 @@ from repositories import keys
 from repositories.duphong import reserve as reserve_repo
 from repositories.luong import salary as salary_repo
 import sochitieu as ct
-import sono
+from interface.no import debt as sono
 import taisan as ts
 from interface.duphong import reserve as duphong_ui
 from services.duphong import reserve as reserve_service

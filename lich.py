@@ -17,7 +17,7 @@ import lenh
 import nhandinh
 import phantich
 import sochitieu as chitieu
-import sono
+from interface.no import debt as sono
 import taisan
 from infrastructure import telegram as tg
 from bantin import BUTTONS as BANTIN_BUTTONS

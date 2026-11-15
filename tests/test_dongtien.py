@@ -11,7 +11,7 @@ import kehoach
 from infrastructure import kho
 import menu
 import sochitieu as ct
-import sono
+from interface.no import debt as sono
 import taisan as ts
 
 

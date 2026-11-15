@@ -21,14 +21,17 @@ LEGACY_IMPORTS = {
     "services/duphong/reserve.py": {"phantich", "sochitieu", "taisan"},
     "presentation/duphong/reserve.py": {"phantich", "sochitieu", "taisan", "bantin"},
     "interface/duphong/reserve.py": {"sochitieu", "kehoach"},
-    "services/tietkiem/progress.py": {"sochitieu", "sono", "dautu"},
+    "services/tietkiem/progress.py": {"sochitieu", "dautu"},
     "presentation/tietkiem/progress.py": {"phantich", "sochitieu"},
     "interface/tietkiem/progress.py": {"sochitieu"},
     "services/doichieu/reconcile.py": {"sochitieu", "taisan"},
     "presentation/doichieu/reconcile.py": {"sochitieu", "taisan"},
     "interface/doichieu/reconcile.py": {"sochitieu"},
+    "services/no/debt.py": {"sochitieu", "taisan"},
+    "presentation/no/debt.py": {"phantich", "sochitieu", "taisan"},
+    "interface/no/debt.py": {"sochitieu", "kehoach", "menu"},
 }
-ROOT_PY_MAX = 21  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
+ROOT_PY_MAX = 20  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
 
 
 def py_files(folder):
