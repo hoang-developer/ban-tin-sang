@@ -1082,7 +1082,7 @@ def xuat(args):
 
 
 def taisan():
-    import taisan as module  # tài sản, mua bán cổ phiếu, khám sức khỏe tài chính
+    from interface.taisan import assets as module  # tài sản, mua bán cổ phiếu, khám sức khỏe tài chính
     return module
 
 

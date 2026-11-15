@@ -18,7 +18,7 @@ import nhandinh
 import phantich
 import sochitieu as chitieu
 from interface.no import debt as sono
-import taisan
+from interface.taisan import assets as taisan
 from infrastructure import telegram as tg
 from bantin import BUTTONS as BANTIN_BUTTONS
 from bantin import (WEEKDAYS, build_message, gold_prices, hourly, index_history, section, stocks, tips,

@@ -5,7 +5,8 @@ Trả kết quả có cấu trúc (domain.doichieu.reconcile), không trả ch�
 import sys
 
 import sochitieu as ct  # module cũ ở gốc: nhóm Thu/Khác của khoản lệch
-import taisan as ts  # module cũ ở gốc: tài sản, số dư tài khoản chính
+from repositories.taisan import assets as assets_repo
+from services.taisan import accounts
 from domain.doichieu import reconcile as rules
 from domain.doichieu.reconcile import DAY, GapBooked, ScreenState, SetResult, Slot
 from repositories.chitieu import ledger as ledger_repo
@@ -24,12 +25,12 @@ def done_in(day):
 
 def items(day):
     """Các ngăn cần đối chiếu: [Slot(mục tài sản, giá trị bot đang tính, đơn vị)]."""
-    data = ts.load()
+    data = assets_repo.load()
     out = []
     for it in data["items"]:
         kind = it["loai"]
         if kind == "tien":
-            out.append(Slot(it, ts.main_balance(it, day) if it.get("chinh") else it["tien"], "đ"))
+            out.append(Slot(it, accounts.main_balance(it, day) if it.get("chinh") else it["tien"], "đ"))
         elif kind in ("tietkiem", "khac"):
             out.append(Slot(it, it["tien"], "đ"))
         elif kind == "no" and it.get("tien", 0) > 0:
@@ -75,7 +76,7 @@ def _find(day, item_id):
 def set_value(item_id, real, now):
     """Ghi số thật của một ngăn: ghi đè, lưu khoản lệch."""
     day = now.date()
-    data = ts.load()
+    data = assets_repo.load()
     found = _find(day, item_id)
     if not found:
         return SetResult("khong_con")
@@ -86,7 +87,7 @@ def set_value(item_id, real, now):
     if unit == "đ":
         real = int(round(real))
         if it.get("chinh"):
-            ts.pin_balance(it, real)
+            accounts.pin_balance(it, real)
         else:
             it["tien"] = real
         it["ngay"] = day.isoformat()
@@ -96,7 +97,7 @@ def set_value(item_id, real, now):
         if real < 0:
             return SetResult("so_am", it, bot_value, real, unit)
         it["sl"] = round(real, 4)
-    ts.save(data)
+    assets_repo.save(data)
     gap = record(day, it, bot_value, real, unit)
     return SetResult("lech" if gap else "khop", it, bot_value, real, unit, gap)
 

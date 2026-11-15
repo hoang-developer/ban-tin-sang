@@ -2,18 +2,18 @@
 import html
 
 import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
-import taisan as ts  # module cũ ở gốc: định dạng tiền và số lượng
+from domain.taisan import text as taisan_text
 from domain.doichieu.reconcile import UNITS, color, total_gap
 
 NEED_RECONCILE_ROWS = [[("🔄 Đối chiếu", "dc:xem")]]
 
 
 def short(x):
-    return ts.short(x) if abs(x) >= 1000 else f"{round(x)}đ"
+    return taisan_text.short(x) if abs(x) >= 1000 else f"{round(x)}đ"
 
 
 def qty(x):
-    return ts.qty_text(round(x, 4))
+    return taisan_text.qty_text(round(x, 4))
 
 
 def name(it):

@@ -8,7 +8,7 @@ from datetime import date
 from interface.dautu import fund as dautu
 from domain.common.format import vn_num
 from services.dautu import market as dautu_market
-import taisan as ts
+from interface.taisan import assets as ts
 import thongbao
 
 

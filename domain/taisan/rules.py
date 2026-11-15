@@ -3,6 +3,7 @@ from datetime import date
 
 from domain.chitieu.kinds import INCOME
 from domain.common.dates import add_months
+from domain.common.money import number, parse_amount
 from domain.common.text import plain
 
 
@@ -55,3 +56,26 @@ def find_item(data, name, kinds):
 def removable(data, name):
     """Mục tài sản có thể xóa theo tên/mã (mọi loại trừ nợ, nợ xóa ở sổ nợ)."""
     return find_item(data, name, ("tien", "tietkiem", "khac", "cp", "etf", "quy", "coin", "ngoaite"))
+
+
+def stock_price(text):
+    """Giá cổ phiếu/ccq: '95' hay '95k' là 95.000đ, '95500' là 95.500đ."""
+    text = text.lower().rstrip("kđ")
+    value = number(text)
+    return value * 1000 if value < 1000 else value
+
+
+def is_etf(code):
+    """Mã chứng chỉ quỹ ETF trên HOSE: E1VFVN30 (DCVFMVN30 của Dragon Capital), FUEVFVND, FUESSVFL..."""
+    return code.upper().startswith(("E1VF", "FUE"))
+
+
+def money_and_name(args):
+    """'VCB 25tr' -> ('VCB', 25000000); None nếu không có số tiền."""
+    text = " ".join(args)
+    found = parse_amount(text)
+    if not found:
+        return None
+    amount, start, end = found
+    name = " ".join((text[:start] + " " + text[end:]).split()).strip(" ,.:-") or "Chưa đặt tên"
+    return name[:30], amount

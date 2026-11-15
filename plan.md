@@ -192,8 +192,10 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.6f `dautu`: lệnh và nút (`interface/dautu/fund`), việc phục vụ chỗ khác (`services/dautu/reports`), xóa `dautu.py` | xong, đã deploy (#67): **`dautu` xong đủ 4 lớp** (câu báo của `orders`, `switch`, `reports` còn trong service) |
 | 6.7a `taisan`: nguồn giá (`infrastructure/{clock,crypto,vietcombank,fmarket}`, `services/taisan/prices`, `domain/taisan/kinds`) | xong, đã deploy (#68) |
 | 6.7b `taisan`: định giá và tài khoản chính (`services/taisan/{valuation,accounts}`, `domain/taisan/{rules,text}`, `domain/chitieu/kinds`, `ledger.between`) | xong, đã deploy (#69) |
-| 6.7c `taisan`: bán, rút, thu về (`services/taisan/sales`; `find_item`, `removable` về `domain/taisan/rules`, `gain_line` về `domain/taisan/text`) | xong, chờ deploy |
-| 6.7… phần còn lại của `taisan` (mua bán cổ phiếu, khai báo tài sản, màn hình, khám sức khỏe, lệnh, nút), rồi các chức năng còn lại | chưa |
+| 6.7c `taisan`: bán, rút, thu về (`services/taisan/sales`; `find_item`, `removable` về `domain/taisan/rules`, `gain_line` về `domain/taisan/text`) | xong, đã deploy (#70) |
+| 6.7d `taisan`: mua bán cổ phiếu, khai báo, nhắc lương/đáo hạn, dòng tiền (`domain/taisan/trade`, `services/taisan/{trade,declare,flows,reminders}`) | xong, chờ deploy |
+| 6.7e `taisan`: màn hình (`presentation/taisan/view`), khám sức khỏe (`services/taisan/health`), lệnh và nút (`interface/taisan/assets`), xóa `taisan.py`, services/presentation không còn import module cũ `taisan` | xong, chờ deploy: **`taisan` xong đủ 4 lớp** |
+| 6.8… các chức năng còn lại (`chitieu`/`sochitieu`, `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin) | chưa |
 | Cuối: dọn | chưa |
 
 Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.
@@ -228,9 +230,9 @@ Hoàn tác: mỗi bước là một PR riêng, `git revert` được.
 
 | Chỉ số | Lúc đầu | Hiện tại | Đích |
 |---|---|---|---|
-| File `.py` ở gốc repo (không tính `api/`) | 26 | 18 | 0 |
+| File `.py` ở gốc repo (không tính `api/`) | 26 | 17 | 0 |
 | File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 11 (116, đếm lại; lớp `interface` chỉ còn gọi qua `interface/common.py`) | 1 (`repositories/store.py`) |
-| Chức năng đã tách vào đủ các lớp | 0 | 6 (`duphong`, `tietkiem`, `doichieu`, `no`, `kehoach`, `dautu`) | mọi chức năng ở bảng "module cũ đi đâu" |
+| Chức năng đã tách vào đủ các lớp | 0 | 7 (`duphong`, `tietkiem`, `doichieu`, `no`, `kehoach`, `dautu`, `taisan`) | mọi chức năng ở bảng "module cũ đi đâu" |
 | Chuỗi khóa Redis viết cứng ngoài `keys.py` | ~20 | 0 | 0 |
 | Hàm nạp muộn né import vòng | 9 | 9 | 0 |
 | Hàm nghiệp vụ trả HTML | nhiều | nhiều | 0 |

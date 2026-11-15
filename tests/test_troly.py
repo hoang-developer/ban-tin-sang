@@ -7,7 +7,7 @@ from tests import harness as h
 from services.duphong import reserve as duphong
 from infrastructure import kho
 from interface.no import debt as sono
-import taisan as ts
+from interface.taisan import assets as ts
 from repositories.tietkiem import progress as tietkiem_repo
 import troly
 

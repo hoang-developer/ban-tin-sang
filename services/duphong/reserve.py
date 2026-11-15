@@ -8,7 +8,9 @@ from datetime import date, timedelta
 
 import phantich as pt  # module cũ ở gốc, tạm dùng tới khi chức năng phantich được chuyển
 import sochitieu as ct  # module cũ ở gốc
-import taisan as ts  # module cũ ở gốc
+from repositories.taisan import assets as assets_repo
+from services.taisan import accounts, flows
+from services.taisan import valuation as valuation_service
 from domain.duphong import reserve as rules
 from domain.duphong.reserve import Change, Toggle
 from repositories.duphong import reserve as reserve_repo
@@ -41,11 +43,11 @@ def essential(day):
 
 def fund_rows(day):
     """Các tài sản tính vào quỹ: [(tên, giá trị)] theo giá/lãi hiện tại."""
-    data = ts.load()
+    data = assets_repo.load()
     ids = {str(it["id"]) for it in data["items"] if it.get("duphong")}
     if not ids:
         return []
-    return [(name, value) for kind, rid, name, value, _, _ in ts.valuation(day)["rows"] if rid in ids]
+    return [(name, value) for kind, rid, name, value, _, _ in valuation_service.valuation(day)["rows"] if rid in ids]
 
 
 def status(day):
@@ -53,14 +55,14 @@ def status(day):
     essentials = essential(day)
     rows = fund_rows(day)
     labels = {c: ct.name(c) for c in essentials[1]}
-    other = any(not ts.same_name(n, rules.FUND_NAME) for n, _ in rows)
-    return rules.build_status(reserve_repo.load(), day, essentials, rows, ts.monthly_flows(day), labels, other)
+    other = any(not accounts.same_name(n, rules.FUND_NAME) for n, _ in rows)
+    return rules.build_status(reserve_repo.load(), day, essentials, rows, flows.monthly_flows(day), labels, other)
 
 
 def fund_item(data):
-    item = next((it for it in data["items"] if it["loai"] == "tien" and ts.same_name(it["ten"], rules.FUND_NAME)), None)
+    item = next((it for it in data["items"] if it["loai"] == "tien" and accounts.same_name(it["ten"], rules.FUND_NAME)), None)
     if item is None:
-        item = {"id": ts.new_id(data), "loai": "tien", "ten": rules.FUND_NAME, "tien": 0, "ngay": ct.today().isoformat(),
+        item = {"id": assets_repo.new_id(data), "loai": "tien", "ten": rules.FUND_NAME, "tien": 0, "ngay": ct.today().isoformat(),
                 "duphong": True}
         data["items"].append(item)
     item["duphong"] = True
@@ -70,14 +72,14 @@ def fund_item(data):
 def change(amount, day, from_main=True):
     """Thêm (amount > 0) hoặc rút (amount < 0) tiền ở tài khoản "Quỹ dự phòng". Có tài khoản chính thì tiền đi từ đó
     (rút thì về đó); from_main=False: tiền có sẵn, không trừ tài khoản nào."""
-    data = ts.load()
+    data = assets_repo.load()
     item = fund_item(data)
     before = status(day)
     old = item["tien"]
     item["tien"] = max(0, item["tien"] + amount)
     item["ngay"] = day.isoformat()
-    moved = ts.move_main(data, old - item["tien"], "quỹ dự phòng", day) if from_main else None
-    ts.save(data)
+    moved = accounts.move_main(data, old - item["tien"], "quỹ dự phòng", day) if from_main else None
+    assets_repo.save(data)
     reserve_repo.save(rules.record_deposit(reserve_repo.load(), day, amount))
     after = status(day)
     return Change(amount, before, after, moved, rules.milestone(before, after) if amount >= 0 else None)
@@ -88,19 +90,19 @@ KINDS = ("tien", "tietkiem", "quy")
 
 def toggle(name):
     """Tính (hoặc bỏ) tài sản tên name vào quỹ dự phòng."""
-    data = ts.load()
+    data = assets_repo.load()
     target = next((it for it in data["items"] if it["loai"] in KINDS
-                   and ts.same_name(it.get("ten") or it.get("ma", ""), name)), None)
+                   and accounts.same_name(it.get("ten") or it.get("ma", ""), name)), None)
     if not target:
         return Toggle(name, False, available=[it.get("ten") or it.get("ma") for it in data["items"] if it["loai"] in KINDS])
     target["duphong"] = not target.get("duphong")
-    ts.save(data)
+    assets_repo.save(data)
     return Toggle(name, True, label=target.get("ten") or target.get("ma"), enabled=target["duphong"])
 
 
 def savings_books():
     """[(tên sổ, lãi %/năm, đã tính vào quỹ)] các sổ tiết kiệm đã khai báo."""
-    return [(it["ten"], it["lai"], bool(it.get("duphong"))) for it in ts.load()["items"] if it["loai"] == "tietkiem"]
+    return [(it["ten"], it["lai"], bool(it.get("duphong"))) for it in assets_repo.load()["items"] if it["loai"] == "tietkiem"]
 
 
 def set_months(n):

@@ -67,7 +67,7 @@ from interface.dautu import fund as dautu  # noqa: E402
 from infrastructure import clock  # noqa: E402
 from services.dautu import market as dautu_market  # noqa: E402
 import sochitieu as ct  # noqa: E402
-import taisan as ts  # noqa: E402
+from interface.taisan import assets as ts  # noqa: E402
 from infrastructure import telegram as tg  # noqa: E402
 
 VN_TZ = bantin.VN_TZ

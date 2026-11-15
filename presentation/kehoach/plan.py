@@ -2,7 +2,7 @@
 import html
 
 import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
-import taisan as ts  # module cũ ở gốc: định dạng tiền
+from domain.taisan import text as taisan_text
 from domain.duphong.reserve import MIN_DAYS
 from domain.kehoach.plan import INVEST, STEP_MIN
 from domain.no.debt import is_due, month_left, ym_text
@@ -11,7 +11,7 @@ from presentation.no.debt import short as debt_short
 
 
 def short(x):
-    return ts.short(x) if abs(x) >= 1000 else "0đ"
+    return taisan_text.short(x) if abs(x) >= 1000 else "0đ"
 
 
 def mark(done, need):

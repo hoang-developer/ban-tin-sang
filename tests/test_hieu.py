@@ -6,7 +6,7 @@ from tests.test_dongtien import item, main_balance, set_main
 
 import danhgia
 from infrastructure import kho
-import taisan as ts
+from interface.taisan import assets as ts
 
 
 def ask(sentence, reply):

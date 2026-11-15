@@ -12,7 +12,7 @@ from infrastructure import kho
 import menu
 import sochitieu as ct
 from interface.no import debt as sono
-import taisan as ts
+from interface.taisan import assets as ts
 
 
 def main_balance():

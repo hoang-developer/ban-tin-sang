@@ -21,7 +21,6 @@ from datetime import datetime, timedelta
 
 import phantich as pt  # module cũ ở gốc: vẽ biểu đồ
 import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày hôm nay
-import taisan as ts  # module cũ ở gốc: giá quỹ khi bắt đầu
 from domain.common.money import number
 from domain.dautu.calendar import months, ym_add, ym_of, ym_text  # noqa: F401
 from domain.dautu.plan import (DEFAULT_FUND, DEFAULT_GOP, DEFAULT_TANG, MIN_ORDER, STEP, WATCH,  # noqa: F401
@@ -39,6 +38,7 @@ from services.dautu.market import (current_period, find_fund, fund_info, is_dead
                                    next_trading, session)
 from services.dautu.orders import (add_money, fix_units, match_details, match_orders, order_spec,  # noqa: F401
                                    record_order, record_plan, record_switch, skip, take_money)
+from services.taisan.prices import prices as asset_prices
 from services.dautu.reports import daily_report, evening_line, holdings_alert, salary_part  # noqa: F401
 from services.dautu.status import close_periods, status, wait_item  # noqa: F401
 from services.dautu.switch import finish_switch, nav_on, open_switches, switch_calc, switch_preview, switch_prompts  # noqa: F401
@@ -123,7 +123,7 @@ def start(args, switch=False):
     hold = next((it for it in data["items"] if it["loai"] == "quy" and it["ma"] == code), None)
     base = 0
     if hold:  # đã có ccq từ trước: tính vào điểm xuất phát của kế hoạch
-        price = ts.prices("quy", [code])[0].get(code)
+        price = asset_prices("quy", [code])[0].get(code)
         base = round(hold["sl"] * price) if price else round(hold["sl"] * (hold.get("gia_von") or 0))
     cfg = {"ma": code, "id": fund[0], "ten": fund[1], "bat_dau": ym, "goc": base, "gop": {ym: gop},
            "tang": DEFAULT_TANG, "nap": {}, "ky": {}, "lenh": []}

@@ -271,7 +271,7 @@ ngày, nội dung; bot ghi như tin nhắn thường, vẫn có nút ✏️ đ�
 
 ### Thu nhập, tài sản, khám sức khỏe tài chính
 
-Code ở [taisan.py](taisan.py).
+Code ở [interface/taisan/assets.py](interface/taisan/assets.py) (lệnh, nút) và [services/taisan](services/taisan) (định giá, bán, mua bán cổ phiếu, khai báo).
 
 - **Thu nhập**: `+ lương 25tr`, `+ thưởng 3tr`, `+ cổ tức VNM 1tr2`. Báo cáo chia thu theo loại: lương,
   thưởng, đầu tư (lãi bán cổ phiếu, cổ tức, lãi tiết kiệm), làm thêm, khác. `/luong 10 25tr`: từ ngày 10
@@ -279,7 +279,7 @@ Code ở [taisan.py](taisan.py).
 - **Mua bán cổ phiếu, ETF**: nhắn `mua 1000 FPT giá 95`, `mua 500 E1VFVN30 giá 33,6` hoặc `bán 500 FPT giá 120` (giá
   nghìn đồng hoặc đồng).
   Mua: cộng vào danh mục, tính giá vốn bình quân. Bán: trừ thuế thu nhập 0,1% giá trị bán (DNSE miễn phí
-  giao dịch nên không có phí; công ty khác sửa `BROKER_FEE` trong taisan.py), tính lãi/lỗ so với giá vốn,
+  giao dịch nên không có phí; công ty khác sửa `BROKER_FEE` trong domain/taisan/trade.py), tính lãi/lỗ so với giá vốn,
   phần **lãi** ghi vào Thu nhập (phần vốn chỉ là đổi cổ phiếu ra tiền). Có khai báo tài khoản tiền tên
   "DNSE" (`/taisan tien DNSE 50tr`) thì bot tự trừ/cộng tiền trong đó. Mua cổ phiếu không tính là khoản chi.
 - **Tài sản** (`/taisan`, `/taisan huongdan` xem cách khai báo):
@@ -308,7 +308,7 @@ Code ở [taisan.py](taisan.py).
 
 ### Một dòng tiền: tài khoản chính, chuyển giữa các ngăn
 
-Code ở [taisan.py](taisan.py) (phần "Tài khoản chính"), [kehoach.py](kehoach.py) (làm hết theo kế hoạch, mỗi ngày
+Code ở [services/taisan/accounts.py](services/taisan/accounts.py) (phần "Tài khoản chính"), [interface/kehoach/plan.py](interface/kehoach/plan.py) (làm hết theo kế hoạch, mỗi ngày
 được tiêu). Tiền của bạn nằm ở nhiều ngăn: tài khoản ngân hàng, ví, quỹ dự phòng, quỹ chờ đầu tư, sổ tiết kiệm,
 vàng, cổ phiếu, khoản nợ. Bot nối các ngăn thành một dòng tiền:
 
@@ -336,7 +336,7 @@ vàng, cổ phiếu, khoản nợ. Bot nối các ngăn thành một dòng tiề
 
 ### Đối chiếu tài sản tháng
 
-Code ở [doichieu.py](doichieu.py). Ngày **15** hằng tháng (lương ngày 5, trả nợ quanh ngày 10, lệnh quỹ cuối tháng và
+Code ở [interface/doichieu/reconcile.py](interface/doichieu/reconcile.py). Ngày **15** hằng tháng (lương ngày 5, trả nợ quanh ngày 10, lệnh quỹ cuối tháng và
 hoán đổi ~ngày 8 đã xong), tin ☀️ sáng nhắc một lần, 🏠 Hôm nay có việc "Đối chiếu tài sản" tới khi xong; mở bất cứ lúc
 nào bằng 💰 Tiền của tôi → 🔄 Đối chiếu tháng hoặc `/doichieu`.
 
@@ -352,7 +352,7 @@ nào bằng 💰 Tiền của tôi → 🔄 Đối chiếu tháng hoặc `/doich
 
 ### Quỹ dự phòng (bước đầu xây dựng tài chính)
 
-Code ở [duphong.py](duphong.py). `/duphong` cho xem:
+Code ở [interface/duphong/reserve.py](interface/duphong/reserve.py). `/duphong` cho xem:
 
 - **Chi thiết yếu mỗi tháng**, tính từ sổ 90 ngày qua (cần ít nhất 14 ngày ghi chép): ăn uống, đi chợ, đi lại
   (bỏ khoản đột biến), nhà cửa và hóa đơn, sức khỏe, học tập, gia đình, nhóm "Trả nợ" nếu đã tạo. Không tính mua
@@ -372,7 +372,7 @@ Code ở [duphong.py](duphong.py). `/duphong` cho xem:
 
 ### Sổ nợ
 
-Code ở [sono.py](sono.py). Khoản nợ lưu chung với tài sản (loại "Nợ" trong `/taisan`) nên tài sản ròng luôn đúng;
+Code ở [interface/no/debt.py](interface/no/debt.py). Khoản nợ lưu chung với tài sản (loại "Nợ" trong `/taisan`) nên tài sản ròng luôn đúng;
 `/no` thêm phần trả dần:
 
 - **Khai báo**: `/no chú Tư 300tr đã trả 32tr, trả 5tr/tháng, không lãi` ·
@@ -393,7 +393,7 @@ Code ở [sono.py](sono.py). Khoản nợ lưu chung với tài sản (loại "N
 
 ### Kế hoạch: lộ trình xây tài sản và chia lương
 
-Code ở [kehoach.py](kehoach.py). `/kehoach` cho xem lộ trình 5 bước, bot tự đánh dấu ✅ đã xong, 👉 đang làm:
+Code ở [interface/kehoach/plan.py](interface/kehoach/plan.py). `/kehoach` cho xem lộ trình 5 bước, bot tự đánh dấu ✅ đã xong, 👉 đang làm:
 
 1. Ghi chép chi tiêu ít nhất 2 tuần
 2. Quỹ dự phòng mốc đầu: 1 tháng chi thiết yếu
@@ -460,7 +460,7 @@ Code ở [interface/dautu/fund.py](interface/dautu/fund.py). Bật: `/dautu batd
 
 ### Tiết kiệm từ khi dùng bot, chuỗi ngày ghi chép
 
-Code ở [tietkiem.py](tietkiem.py). `/tietkiem` cho xem chi lặt vặt so với **trước khi dùng bot**, để thấy ghi chép đều
+Code ở [interface/tietkiem/progress.py](interface/tietkiem/progress.py). `/tietkiem` cho xem chi lặt vặt so với **trước khi dùng bot**, để thấy ghi chép đều
 giúp bớt được bao nhiêu.
 
 - **Mốc**: chi lặt vặt (mỗi khoản dưới 1 triệu, không tính thu nhập, trả nợ) trung bình mỗi ngày trước khi dùng bot,
