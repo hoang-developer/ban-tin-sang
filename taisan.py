@@ -17,6 +17,7 @@ from datetime import date, datetime, timedelta
 import chungkhoan
 import kho
 from repositories import keys
+from repositories import ledger as ledger_repo
 from domain.salary import Salary
 from repositories import assets as assets_repo
 from repositories import fund as fund_repo
@@ -738,7 +739,7 @@ def trade(text, now, pay_main=True):
              + (f"🟢 <b>lãi {ct.vnd(round(gain))}</b>" if gain >= 0 else f"🔴 <b>lỗ {ct.vnd(round(-gain))}</b>")
              + f" ({gain / cost * 100:+.1f}%)".replace(".", ",")]
     if gain > 0:  # phần lãi là thu nhập đầu tư; phần vốn chỉ là đổi cổ phiếu ra tiền
-        entry = {"id": kho.command("INCR", keys.COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
+        entry = {"id": ledger_repo.next_id(), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
                  "tien": round(gain), "ghichu": f"lãi bán {qty} {code}", "nhom": ct.INCOME,
                  "khong_tk": True}  # tiền bán đã cộng cả vào tài khoản bên dưới, không cộng lần nữa
         ct.save(entry)
@@ -772,7 +773,7 @@ def can_be_main(it):
 
 def pin_balance(it, amount):
     """Chốt số dư thật: tính lại từ đây (các khoản ghi trước lúc này đã nằm trong số dư)."""
-    it.update(tien=int(amount), moc=int(kho.get(keys.COUNTER) or 0), moc_ngay=ct.today().isoformat(), chuyen=[])
+    it.update(tien=int(amount), moc=ledger_repo.last_id(), moc_ngay=ct.today().isoformat(), chuyen=[])
 
 
 def main_flows(it, day=None):
@@ -895,7 +896,7 @@ def realize(data, now, code, qty, price, gain, note):
                                          "lai": round(gain)})
     data["lailo"] = data["lailo"][-200:]
     if gain > 0:
-        ct.save({"id": kho.command("INCR", keys.COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
+        ct.save({"id": ledger_repo.next_id(), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
                  "tien": round(gain), "ghichu": note, "nhom": ct.INCOME, "khong_tk": True})
 
 
@@ -1216,7 +1217,7 @@ def on_button(arg, message, now):
         return ("Đã xóa" if gone else "Mục này đã xóa rồi"), ("edit", edit_list)
     if arg.startswith("luong:"):
         amount = int(arg[6:])
-        entry = {"id": kho.command("INCR", keys.COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
+        entry = {"id": ledger_repo.next_id(), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
                  "tien": amount, "ghichu": f"lương tháng {day.month}", "nhom": ct.INCOME}
         ct.save(entry)
         done = f"✅ Đã ghi lương tháng {day.month}: {ct.vnd(amount)} vào 💰 Thu nhập"

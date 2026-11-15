@@ -89,8 +89,8 @@ class Khoa(unittest.TestCase):
         self.assertEqual(bad, [], "khóa chitieu: viết ngoài repositories/keys.py")
 
     def test_khoa_da_co_repo_chi_repo_duoc_dung(self):
-        """Dữ liệu đã có repository (ví vàng, tài sản, lịch sử tài sản, giá, lương, quỹ) chỉ đi qua repo."""
-        pattern = re.compile(r"keys\.(GOLD|ASSETS|ASSET_HISTORY|SALARY|FUND|price_cache)\b")
+        """Dữ liệu đã có repository (ví vàng, tài sản, lịch sử tài sản, giá, lương, quỹ, sổ thu chi) chỉ đi qua repo."""
+        pattern = re.compile(r"keys\.(GOLD|ASSETS|ASSET_HISTORY|SALARY|FUND|price_cache|COUNTER|ledger_month)\b")
         bad = [f"{path.name}: {m.group(0)}" for path in list(ROOT.glob("*.py")) + list((ROOT / "api").glob("*.py"))
                for m in pattern.finditer(path.read_text(encoding="utf-8"))]
         self.assertEqual(bad, [], "dùng repositories.<tên> thay vì gọi kho với khóa này")

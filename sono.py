@@ -17,6 +17,7 @@ from calendar import monthrange
 
 import kho
 from repositories import keys
+from repositories import ledger as ledger_repo
 from repositories import salary as salary_repo
 import phantich as pt
 import sochitieu as ct
@@ -373,7 +374,7 @@ def pay(debt_id, amount, now):
         return None, ["Khoản nợ này đã trả xong hoặc đã xóa"]
     group, note = debt_group(create=True)
     day = now.date()
-    e = {"id": kho.command("INCR", keys.COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
+    e = {"id": ledger_repo.next_id(), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
          "tien": int(amount), "ghichu": f"trả nợ {d['ten']}", "nhom": group or ct.OTHER, "no": d["id"]}
     if not group:
         e["dekhac"] = True

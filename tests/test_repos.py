@@ -6,7 +6,7 @@ from tests import harness as h
 
 import kho
 from domain.salary import Salary
-from repositories import assets, fund, keys, salary
+from repositories import assets, fund, keys, ledger, salary
 
 
 class AssetRepo(unittest.TestCase):
@@ -61,6 +61,50 @@ class FundRepo(unittest.TestCase):
         fund.save({"ma": "VMEEF", "lenh": []})
         self.assertEqual(kho.get("chitieu:dautu"), {"ma": "VMEEF", "lenh": []})
         self.assertEqual(fund.load()["ma"], "VMEEF")
+
+
+class LedgerRepo(unittest.TestCase):
+    def setUp(self):
+        h.reset()
+
+    def entry(self, rid, day="2026-11-15", **extra):
+        return {"id": rid, "ngay": day, "gio": "10:00", "nhom": "an", "tien": 35000, "ghichu": "cà phê", **extra}
+
+    def test_thang_trong(self):
+        self.assertEqual(ledger.load("2026-11"), [])
+
+    def test_ghi_doc_theo_thang_xep_theo_ma(self):
+        ledger.save(self.entry(3))
+        ledger.save(self.entry(1))
+        ledger.save(self.entry(2, day="2026-10-31"))
+        self.assertEqual([e["id"] for e in ledger.load("2026-11")], [1, 3])
+        self.assertEqual([e["id"] for e in ledger.load("2026-10")], [2])
+
+    def test_json_giu_tieng_viet_va_bo_khoa_tam(self):
+        ledger.save(self.entry(1, _chon=True, ai=True))
+        raw = kho.command("HGET", keys.ledger_month("2026-11"), 1)
+        self.assertIn("cà phê", raw)  # không escape unicode
+        self.assertEqual(json.loads(raw), self.entry(1, ai=True))  # khóa "_chon" không lưu
+
+    def test_ghi_de_cung_ma(self):
+        ledger.save(self.entry(1))
+        ledger.save(self.entry(1, tien=50000))
+        self.assertEqual(ledger.find("2026-11", 1)["tien"], 50000)
+        self.assertEqual(len(ledger.load("2026-11")), 1)
+
+    def test_tim_va_xoa(self):
+        ledger.save(self.entry(1))
+        self.assertEqual(ledger.find("2026-11", "1")["id"], 1)  # mã đi qua nút bấm là chuỗi
+        self.assertIsNone(ledger.find("2026-11", 9))
+        ledger.remove("2026-11", 1)
+        self.assertIsNone(ledger.find("2026-11", 1))
+        self.assertEqual(ledger.load("2026-11"), [])
+
+    def test_ma_khoan_tang_dan(self):
+        self.assertEqual(ledger.last_id(), 0)
+        self.assertEqual([ledger.next_id(), ledger.next_id()], [1, 2])
+        self.assertEqual(ledger.last_id(), 2)
+        self.assertEqual(kho.get("chitieu:dem"), 2)
 
 
 if __name__ == "__main__":

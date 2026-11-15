@@ -19,6 +19,7 @@ from datetime import date, datetime, timedelta
 
 import kho
 from repositories import keys
+from repositories import ledger as ledger_repo
 from bantin import VN_TZ, WEEKDAYS, vn_num
 
 # ---- Nhóm chi tiêu --------------------------------------------------------------
@@ -577,18 +578,12 @@ def ai_status(test=False):
 # ---- Lưu trữ: mỗi tháng một Redis hash, mỗi khoản một mục (id -> JSON) ---------------
 # Ghi/sửa/xóa từng mục riêng nên hai tin nhắn tới cùng lúc không đè mất khoản của nhau.
 
-def month_key(ym):
-    return keys.ledger_month(ym)
-
-
 def load(ym):
-    flat = kho.command("HGETALL", month_key(ym)) or []  # [id1, json1, id2, json2, ...]
-    return sorted((json.loads(v) for v in flat[1::2]), key=lambda e: e["id"])
+    return ledger_repo.load(ym)
 
 
 def save(e):
-    kept = {k: v for k, v in e.items() if not k.startswith("_")}  # khóa "_..." chỉ dùng tạm khi trả lời
-    kho.command("HSET", month_key(e["ngay"][:7]), e["id"], json.dumps(kept, ensure_ascii=False))
+    ledger_repo.save(e)
 
 
 def ref(e):
@@ -598,8 +593,7 @@ def ref(e):
 def find(reference):
     """'2026-11:12' -> khoản đó, None nếu đã xóa."""
     ym, _, rid = reference.partition(":")
-    value = kho.command("HGET", month_key(ym), rid)
-    return json.loads(value) if value else None
+    return ledger_repo.find(ym, rid)
 
 
 def add(text, now):
@@ -611,7 +605,7 @@ def add(text, now):
         learn_all(chosen)
     ask_ai(entries, learned)
     for e in entries:
-        e["id"] = kho.command("INCR", keys.COUNTER)
+        e["id"] = ledger_repo.next_id()
         e["gio"] = now.strftime("%H:%M")
         save(e)
     return entries
@@ -930,7 +924,7 @@ def delete(reference):
     """Xóa một khoản; trả về khoản đã xóa, None nếu đã xóa từ trước."""
     gone = find(reference)
     if gone:
-        kho.command("HDEL", month_key(gone["ngay"][:7]), gone["id"])
+        ledger_repo.remove(gone["ngay"][:7], gone["id"])
         if gone.get("no"):  # khoản trả nợ: cộng lại dư nợ
             try:
                 sono().undo(gone)

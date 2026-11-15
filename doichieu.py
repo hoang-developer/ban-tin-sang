@@ -14,6 +14,7 @@ import sys
 
 import kho
 from repositories import keys
+from repositories import ledger as ledger_repo
 import sochitieu as ct
 
 DAY = 15
@@ -197,7 +198,7 @@ def book_gap(item_id, now):
     if not rec or not rec["lech"] or rec.get("ghi"):
         return "Khoản lệch này đã xử lý rồi"
     gap = rec["lech"]
-    entry = {"id": kho.command("INCR", keys.COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
+    entry = {"id": ledger_repo.next_id(), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
              "tien": abs(gap), "ghichu": f"{'chi' if gap < 0 else 'thu'} chưa ghi (đối chiếu {rec['ten']})",
              "nhom": ct.INCOME if gap > 0 else ct.OTHER, "khong_tk": True}
     ct.save(entry)
