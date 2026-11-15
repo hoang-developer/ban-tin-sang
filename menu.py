@@ -111,7 +111,7 @@ def fund_deadline(now):
 def todo(day, n, now):
     """Việc cần làm hôm nay: [(chữ, nút hoặc None)], quan trọng trước."""
     import kehoach
-    import sono
+    from interface.no import debt as sono
     out = []
     deadline = part("hạn đặt lệnh quỹ", lambda: fund_deadline(now))
     if deadline:
@@ -154,7 +154,7 @@ def home(day, now=None):
     if not kho.ready():
         return ct.NEED_STORE
     import kehoach
-    import sono
+    from interface.no import debt as sono
     ts = ct.taisan()
     now = now or ts.now_vn()
     month = ct.load(day.strftime("%Y-%m"))
@@ -256,7 +256,7 @@ def money(day):
         if group:
             lines.append(f"{label} <b>{short(sum(r[3] for r in group))}</b>"
                          + ("" if kinds == ("tietkiem",) else gain(group)))
-    debt = part("nợ", lambda: __import__("sono").home_line(day))
+    debt = part("nợ", lambda: __import__("interface.no.debt", fromlist=["home_line"]).home_line(day))
     if debt:
         lines.append(debt)
     elif v["debts"]:

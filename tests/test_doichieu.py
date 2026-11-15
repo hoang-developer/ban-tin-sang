@@ -5,7 +5,7 @@ from tests import harness as h
 from tests.test_dongtien import item, main_balance, set_main
 
 from interface.doichieu import reconcile as doichieu
-import sono
+from interface.no import debt as sono
 import taisan as ts
 import thongbao
 

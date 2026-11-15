@@ -18,6 +18,12 @@ def save(data):
     store.put(keys.ASSETS, data)
 
 
+def new_id(data):
+    """Mã mới cho một mục tài sản (tăng bộ đếm trong cục tài sản, chưa lưu)."""
+    data["dem"] = data.get("dem", 0) + 1
+    return data["dem"]
+
+
 def save_snapshot(day_iso, record):
     """Tài sản ròng của một ngày: {"rong": số, "loai": {loại: giá trị}}."""
     store.hash_set(keys.ASSET_HISTORY, day_iso, json.dumps(record))

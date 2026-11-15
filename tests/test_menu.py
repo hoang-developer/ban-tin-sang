@@ -7,7 +7,7 @@ from tests.test_dongtien import setup_month
 from infrastructure import kho
 import lich
 import menu
-import sono
+from interface.no import debt as sono
 import thongbao
 from repositories.tietkiem import progress as tietkiem_repo
 

@@ -76,8 +76,7 @@ def save(data):
 
 
 def new_id(data):
-    data["dem"] = data.get("dem", 0) + 1
-    return data["dem"]
+    return assets_repo.new_id(data)
 
 
 # ---- Giá: lấy từ nguồn, nhớ trong kho; nguồn lỗi thì dùng giá gần nhất ---------------
@@ -1126,7 +1125,7 @@ def health_checks(day):
     else:
         checks.append((None, "❔", "Để dành: cần ghi thu nhập và ≥ 20 ngày dữ liệu"))
     if v["assets"]:
-        import sono  # nợ: chấm theo tiền trả mỗi tháng so với thu nhập, tách nợ không lãi
+        from interface.no import debt as sono  # nợ: chấm theo tiền trả mỗi tháng so với thu nhập, tách nợ không lãi
         checks.append(sono.health_check(day, v, income if income and days >= 20 else None))
         warnings = []
         for kind, _, name, value, _, _ in v["rows"]:

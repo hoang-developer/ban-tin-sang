@@ -11,12 +11,12 @@ from domain.tietkiem.progress import InvestMove, Milestones, NoSpend, PeriodInfo
 from repositories.duphong import reserve as reserve_repo
 from repositories.tietkiem import progress as progress_repo
 from services.duphong import reserve as reserve_service
+from services.no import debt as debt_service
 
 
 def debt_group():
     try:
-        import sono  # module cũ ở gốc
-        return sono.debt_group()[0]
+        return debt_service.debt_group()[0]
     except Exception as e:
         print(f"[lỗi] nhóm trả nợ: {e!r}", file=sys.stderr)
         return None
