@@ -22,6 +22,7 @@ from domain.luong.salary import Salary
 from repositories.taisan import assets as assets_repo
 from repositories.dautu import fund as fund_repo
 from repositories.luong import salary as salary_repo
+from domain.common import dates
 from domain.vang.gold import GoldLot, holdings_chi, sell_fifo
 from repositories.vang import gold as gold_repo
 import phantich as pt
@@ -171,9 +172,7 @@ def prices(kind, codes, fresh=False):
 # ---- Định giá -------------------------------------------------------------------------
 
 def add_months(d, months):
-    m = d.month - 1 + months
-    year, month = d.year + m // 12, m % 12 + 1
-    return date(year, month, min(d.day, monthrange(year, month)[1]))
+    return dates.add_months(d, months)
 
 
 def accrued(it, day):
@@ -1103,15 +1102,15 @@ def health_checks(day):
     fund = None
     if any(it.get("duphong") for it in load()["items"]):  # đã lập quỹ dự phòng: dùng đúng số liệu của quỹ
         try:
-            import duphong
-            fund = duphong.status(day)
+            from services.duphong import reserve as reserve_service
+            fund = reserve_service.status(day)
         except Exception as e:
             print(f"[lỗi] quỹ dự phòng trong khám sức khỏe: {e!r}", file=sys.stderr)
-    if fund and fund["monthly"]:
-        months = fund["covered"]
+    if fund and fund.monthly:
+        months = fund.covered
         score = 20 if months >= 6 else 15 if months >= 3 else 8 if months >= 1 else 0
         checks.append((score, "✅" if months >= 3 else "⚠️" if months >= 1 else "🚨",
-                       f"Quỹ dự phòng {vn_num(months, 1)}/{fund['months']} tháng chi ({short(fund['balance'])})"))
+                       f"Quỹ dự phòng {vn_num(months, 1)}/{fund.months} tháng chi ({short(fund.balance)})"))
     elif spend and v["rows"] and days >= 14:  # ít ngày quá thì một khoản lớn làm sai cả tháng
         months = liquid / spend
         score = 20 if months >= 6 else 15 if months >= 3 else 8 if months >= 1 else 0

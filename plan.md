@@ -156,6 +156,11 @@ Mỗi PR chức năng:
 - Service trả kết quả có cấu trúc (kiểu nằm ở `domain/<chức năng>/`), presentation dựng HTML từ kết quả; không hàm service nào trả HTML.
 - Gỡ các hàm nạp muộn liên quan; chuyển repo còn lại của chức năng (`SettingsRepo`, `ConversationRepo`, NAV quỹ, `CacheRepo`…).
 - Kiểu dữ liệu riêng (`Entry`, `AssetItem`…) thêm khi tách tới chức năng cần nó, thay dần dict.
+- File mới còn tạm import module cũ ở gốc (vì module cũ đó chưa được chuyển) thì khai báo trong `LEGACY_IMPORTS` của
+  `tests/test_kientruc.py`; danh sách phải khớp chính xác với thực tế nên chỉ rút ngắn được: chuyển xong module cũ nào thì
+  phải gỡ nó khỏi danh sách.
+- Kiểm chứng tin nhắn không đổi: chụp trước/sau (trên `main` và nhánh) chữ + nút của mọi màn hình và lệnh của chức năng, cả các
+  màn hình khác có đọc dữ liệu của chức năng (kế hoạch, menu, khám sức khỏe, tổng kết…), rồi so từng chữ cùng stderr.
 
 Xong khi: file cũ không còn; test kiến trúc xanh; ratchet giảm; toàn bộ lệnh ghi Redis trong test giống `main`; tin nhắn bot gửi
 không đổi (test hiện có, so thêm các chuỗi hiển thị chính); chạy bộ đo khi đụng `troly`/định tuyến.
@@ -173,8 +178,9 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 2 `GoldRepo` | xong, đã deploy ([#53](https://github.com/hoang-developer/ban-tin-sang/pull/53)) |
 | 3 `AssetRepo`, `SalaryRepo`, `FundRepo` | xong, đã deploy ([#54](https://github.com/hoang-developer/ban-tin-sang/pull/54)) |
 | 4 `LedgerRepo` | xong, đã deploy ([#55](https://github.com/hoang-developer/ban-tin-sang/pull/55)) |
-| 5 Khung lớp, luật phụ thuộc, `infrastructure` | đang làm |
-| 6… Từng chức năng vào đúng lớp | chưa |
+| 5 Khung lớp, luật phụ thuộc, `infrastructure` | xong, đã deploy ([#56](https://github.com/hoang-developer/ban-tin-sang/pull/56)) |
+| 6.1 `duphong` (quỹ dự phòng) | đang làm |
+| 6.2… các chức năng còn lại | chưa |
 | Cuối: dọn | chưa |
 
 Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.
@@ -203,8 +209,9 @@ Hoàn tác: mỗi bước là một PR riêng, `git revert` được.
 
 | Chỉ số | Lúc đầu | Hiện tại | Đích |
 |---|---|---|---|
-| File `.py` ở gốc repo (không tính `api/`) | 26 | 24 | 0 |
-| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 18 (143) | 1 (`repositories/store.py`) |
+| File `.py` ở gốc repo (không tính `api/`) | 26 | 23 | 0 |
+| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 17 (141) | 1 (`repositories/store.py`) |
+| Chức năng đã tách vào đủ các lớp | 0 | 1 (`duphong`) | mọi chức năng ở bảng "module cũ đi đâu" |
 | Chuỗi khóa Redis viết cứng ngoài `keys.py` | ~20 | 0 | 0 |
 | Hàm nạp muộn né import vòng | 9 | 9 | 0 |
 | Hàm nghiệp vụ trả HTML | nhiều | nhiều | 0 |

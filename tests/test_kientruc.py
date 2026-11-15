@@ -15,7 +15,14 @@ ALLOWED = {
     "presentation": {"domain", "presentation"},  # kiểu kết quả của service nằm ở domain
     "interface": set(LAYERS),
 }
-ROOT_PY_MAX = 24  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
+# Module cũ ở gốc mà file trong lớp mới còn tạm import, cho tới khi chức năng đó được chuyển. Phải khớp CHÍNH XÁC với
+# thực tế: thêm import cũ mới thì test đỏ, bỏ được import cũ mà không xóa khỏi danh sách cũng đỏ (ratchet: chỉ rút ngắn).
+LEGACY_IMPORTS = {
+    "services/duphong/reserve.py": {"phantich", "sochitieu", "taisan"},
+    "presentation/duphong/reserve.py": {"phantich", "sochitieu", "taisan", "bantin"},
+    "interface/duphong/reserve.py": {"sochitieu", "kehoach"},
+}
+ROOT_PY_MAX = 23  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
 
 
 def py_files(folder):
@@ -39,10 +46,19 @@ class Kientruc(unittest.TestCase):
         bad = []
         for layer in LAYERS:
             for path in py_files(layer):
-                for name in imported_roots(path):
-                    if (name in LAYERS and name not in ALLOWED[layer]) or name in legacy:
-                        bad.append(f"{path.relative_to(ROOT)} import {name}")
-        self.assertEqual(bad, [], "lớp import sai chiều, hoặc lớp mới import module cũ ở gốc")
+                rel = str(path.relative_to(ROOT))
+                roots = imported_roots(path)
+                for name in roots:
+                    if name in LAYERS and name not in ALLOWED[layer]:
+                        bad.append(f"{rel} import {name}: sai chiều giữa các lớp")
+                used = roots & legacy
+                allowed = LEGACY_IMPORTS.get(rel, set())
+                if used - allowed:
+                    bad.append(f"{rel} import module cũ {sorted(used - allowed)}: chưa có trong LEGACY_IMPORTS")
+                if allowed - used:
+                    bad.append(f"{rel}: LEGACY_IMPORTS còn {sorted(allowed - used)} không dùng nữa, hãy bỏ khỏi danh sách")
+        stale = [f for f in LEGACY_IMPORTS if not (ROOT / f).exists()]
+        self.assertEqual(bad + [f"{f}: không còn file" for f in stale], [])
 
     def test_so_file_o_goc_chi_giam(self):
         root_files = sorted(p.name for p in ROOT.glob("*.py"))

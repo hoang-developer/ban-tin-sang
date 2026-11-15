@@ -519,12 +519,12 @@ def finance_facts(day):
 
     def fund():
         f = n["fund"]
-        if not f["monthly"]:
+        if not f.monthly:
             return "Quỹ dự phòng: chưa tính được (cần thêm ngày ghi chép)"
-        if not f["missing"]:
-            return f"Quỹ dự phòng {short(f['balance'])}: đã đủ mục tiêu {f['months']} tháng chi"
-        return (f"Quỹ dự phòng {short(f['balance'])} / mục tiêu {short(f['target'])} ({f['months']} tháng chi thiết yếu "
-                f"{short(f['monthly'])}) · cần {short(f['per_month'])}/tháng để đủ trước {f['deadline']:%m/%Y}")
+        if not f.missing:
+            return f"Quỹ dự phòng {short(f.balance)}: đã đủ mục tiêu {f.months} tháng chi"
+        return (f"Quỹ dự phòng {short(f.balance)} / mục tiêu {short(f.target)} ({f.months} tháng chi thiết yếu "
+                f"{short(f.monthly)}) · cần {short(f.per_month)}/tháng để đủ trước {f.deadline:%m/%Y}")
 
     def debts():
         items = sono.active(n["data"])

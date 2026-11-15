@@ -16,13 +16,16 @@ import html
 import sys
 from datetime import date, timedelta
 
-import duphong
+from domain.duphong.reserve import MIN_DAYS
 from infrastructure import kho
 from repositories import keys
+from repositories.duphong import reserve as reserve_repo
 from repositories.luong import salary as salary_repo
 import sochitieu as ct
 import sono
 import taisan as ts
+from interface.duphong import reserve as duphong_ui
+from services.duphong import reserve as reserve_service
 
 INVEST = (("tietkiem", "tiết kiệm"), ("vang", "vàng"), ("etf", "ETF"), ("quy", "quỹ mở"), ("cp", "cổ phiếu"))
 
@@ -39,12 +42,12 @@ def spending_estimate(day, group, debt_need):
     items = [e for e in ct.between(day - timedelta(days=89), day)
              if e["nhom"] not in (ct.INCOME, group) and not e.get("no")]
     if not items:
-        manual = duphong.config().get("chi")
+        manual = reserve_repo.load().get("chi")
         return (manual, "tự đặt") if manual else (0, None)
     days = (day - date.fromisoformat(min(e["ngay"] for e in items))).days + 1
     average = sum(e["tien"] for e in items) / days * 30.4
-    if days < duphong.MIN_DAYS:
-        manual = duphong.config().get("chi")
+    if days < MIN_DAYS:
+        manual = reserve_repo.load().get("chi")
         if manual:
             return manual, "tự đặt"
         return average, f"TB {days} ngày"
@@ -78,13 +81,13 @@ def numbers(day):
     spent = sum(e["tien"] for e in spending)
     spent_today = sum(e["tien"] for e in spending if e["ngay"] == day.isoformat())
     spend, spend_basis = spending_estimate(day, group, debt_need)
-    fund = duphong.status(day)
-    added = duphong.month_added(ym)
+    fund = reserve_service.status(day)
+    added = reserve_repo.deposited_in(ym)
     freed, freed_names = sono.freed(data, ym)
     target = ideal = 0
-    if fund["monthly"] and fund["missing"] > 0:
-        base = fund["missing"] + added  # còn thiếu tính từ đầu tháng: nạp đủ mức tháng này thì không bị gợi ý thêm
-        ideal = min(max(base / fund["months_left"], freed), base)
+    if fund.monthly and fund.missing > 0:
+        base = fund.missing + added  # còn thiếu tính từ đầu tháng: nạp đủ mức tháng này thì không bị gợi ý thêm
+        ideal = min(max(base / fund.months_left, freed), base)
         ideal = int(round(ideal, -5)) or 100_000
         target = ideal
         if income:  # không gợi ý nạp quá phần thu còn lại sau trả nợ và chi tiêu
@@ -140,13 +143,13 @@ def plan(day):
         lines.append(f"🛟 Quỹ dự phòng <b>{short(n['fund_target'])}</b> {mark(n['fund_added'], n['fund_target'])}"
                      + (f" đã nạp {short(n['fund_added'])}" if n["fund_added"] else ""))
         if n["fund_target"] < n["fund_ideal"]:
-            lines.append(f"   ⏳ Kịp hạn {f['deadline']:%m/%Y} cần {short(n['fund_ideal'])}/tháng (đổi hạn: /duphong)")
+            lines.append(f"   ⏳ Kịp hạn {f.deadline:%m/%Y} cần {short(n['fund_ideal'])}/tháng (đổi hạn: /duphong)")
         if n["freed"] and n["fund_target"] >= n["freed"]:
             lines.append(f"   🔁 gồm {short(n['freed'])} trước trả {html.escape(', '.join(n['freed_names']))} ✅")
-    elif f["monthly"]:
-        lines.append(f"🛟 Quỹ dự phòng đủ {f['months']} tháng chi ✅")
+    elif f.monthly:
+        lines.append(f"🛟 Quỹ dự phòng đủ {f.months} tháng chi ✅")
     else:
-        lines.append(f"🛟 Quỹ dự phòng: cần {duphong.MIN_DAYS} ngày ghi chép (hoặc /duphong chi 10tr)")
+        lines.append(f"🛟 Quỹ dự phòng: cần {MIN_DAYS} ngày ghi chép (hoặc /duphong chi 10tr)")
     inv = n["invest"]
     if inv:
         if inv["gop"]:
@@ -323,7 +326,7 @@ def do_all(now):
                 e, _ = sono.pay(ref, amount, now)
                 ok = e is not None
             elif kind == "dp":
-                duphong.change(amount, day)
+                duphong_ui.change(amount, day)
                 ok = True
             else:
                 import dautu
@@ -354,8 +357,8 @@ def next_actions(day, n=None):
     topped = n["fund_added"] and n["fund_left"] < 0.3 * n["fund_target"]  # đã nạp gần đủ: số lệch nhỏ do trung bình chi đổi
     if n["fund_left"] >= 100_000 and month_income and not topped:
         out.append(f"Nạp quỹ dự phòng {short(n['fund_left'])}")
-    if not n["fund"]["monthly"]:
-        out.append(f"Ghi chép đủ {duphong.MIN_DAYS} ngày ({n['fund']['days']}/{duphong.MIN_DAYS})")
+    if not n["fund"].monthly:
+        out.append(f"Ghi chép đủ {MIN_DAYS} ngày ({n['fund'].days}/{MIN_DAYS})")
     pending = sum(ct.pending(e) for e in ct.load(n["ym"]))
     if pending:
         out.append(f"Xếp nhóm {pending} khoản chưa rõ: /chuaxep")
@@ -380,11 +383,11 @@ def roadmap_steps(day, n):
     bearing = [d for d in debts if sono.has_interest(d)]
     zero = [d for d in debts if not sono.has_interest(d)]
     steps = []
-    steps.append((days >= duphong.MIN_DAYS, "📒 Ghi chép ≥ 2 tuần"
-                  + ("" if days >= duphong.MIN_DAYS else f" ({days}/{duphong.MIN_DAYS} ngày)")))
-    first = f["monthly"] and f["covered"] >= 1
+    steps.append((days >= MIN_DAYS, "📒 Ghi chép ≥ 2 tuần"
+                  + ("" if days >= MIN_DAYS else f" ({days}/{MIN_DAYS} ngày)")))
+    first = f.monthly and f.covered >= 1
     steps.append((first, "🛟 Quỹ dự phòng 1 tháng chi"
-                  + (f" ({short(f['balance'])}/{short(f['monthly'])})" if f["monthly"] else "")))
+                  + (f" ({short(f.balance)}/{short(f.monthly)})" if f.monthly else "")))
     if bearing:
         ends = [sono.schedule(d, day) for d in bearing]
         last = max(s[1] for s in ends) if all(ends) else None
@@ -394,9 +397,9 @@ def roadmap_steps(day, n):
     else:
         text = "💳 Trả hết nợ có lãi" + ("" if debts else " (không có nợ)")
     steps.append((not bearing, text))
-    full = f["monthly"] and not f["missing"]
-    steps.append((full, f"🛟 Quỹ dự phòng {f['months']} tháng chi"
-                  + (f" ({short(f['target'])}): {f['balance'] / f['target'] * 100:.0f}%" if f["target"] else "")))
+    full = f.monthly and not f.missing
+    steps.append((full, f"🛟 Quỹ dự phòng {f.months} tháng chi"
+                  + (f" ({short(f.target)}): {f.balance / f.target * 100:.0f}%" if f.target else "")))
     held = invest_summary(day)
     inv = n["invest"]
     plan_text = (f"{inv['ma']} {short(inv['gop'])}/tháng (Value Averaging)" if inv and inv["gop"] else
