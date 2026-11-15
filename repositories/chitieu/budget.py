@@ -5,3 +5,7 @@ from repositories import keys, store
 
 def load():
     return store.get(keys.BUDGET, {}) or {}
+
+
+def save(budgets):
+    store.put(keys.BUDGET, budgets)

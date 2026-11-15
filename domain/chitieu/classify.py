@@ -62,3 +62,13 @@ def find_group(text, cfg, include_hidden=False):
         if score and (best is None or score > best[0]):
             best = (score, code)
     return best[1] if best else None
+
+
+def find_category(text, cfg):
+    """Tên nhóm người dùng gõ ('ăn uống', 'di lai', 'tổng') -> mã, None nếu không rõ."""
+    if plain(text).strip() in ("tong", "tat ca", "tong chi"):
+        return "tong"
+    if plain(text).strip() in ("hang ngay", "hangngay", "sinh hoat", "thuong ngay", "chi hang ngay"):
+        return "hangngay"
+    code = find_group(text, cfg) or classify(text, None, cfg)
+    return None if code == OTHER else code

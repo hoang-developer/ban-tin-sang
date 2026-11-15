@@ -20,7 +20,7 @@ from datetime import date, datetime, timedelta
 from domain.chitieu import classify as classify_rules
 from domain.chitieu import income as income_rules
 from domain.chitieu import period as periods
-from domain.chitieu import refs
+from domain.chitieu import labels
 from domain.chitieu import text as chitieu_text
 from domain.chitieu.learn import MAX_LEARNED, NOISE, learn_key, pending  # noqa: F401
 from domain.chitieu import parse as parse_rules
@@ -65,50 +65,6 @@ def today():
 config, reset, save_config = groups_repo.config, groups_repo.reset, groups_repo.save
 
 
-def name(code, cfg=None):
-    """Tên nhóm kèm biểu tượng ('🍜 Ăn uống'), kể cả nhóm đã ẩn; mã lạ thì là Khác."""
-    return classify_rules.name(code, config() if cfg is None else cfg)
-
-
-bare = classify_rules.bare
-
-
-def groups(cfg=None):
-    """Các nhóm đang dùng, theo thứ tự hiện trên nút: mã -> (tên, từ khóa tự thêm, từ khóa có sẵn)."""
-    return classify_rules.groups(config() if cfg is None else cfg)
-
-
-def rules(learned=None, cfg=None):
-    """Bảng so khớp (mẫu có dấu, mẫu không dấu, điểm, mã): cụm từ đã học > từ khóa tự thêm > có sẵn."""
-    return classify_rules.rules(learned, config() if cfg is None else cfg)
-
-
-pick = classify_rules.pick
-
-
-def classify(note, learned=None, cfg=None):
-    """Mã nhóm của ghi chú. Cụm từ đã học (người dùng sửa nhóm) thắng từ khóa."""
-    return classify_rules.classify(note, learned, config() if cfg is None else cfg)
-
-
-def find_group(text, include_hidden=False, cfg=None):
-    """Tên nhóm người dùng gõ ('ăn uống', 'di lai', 'ăn', 'trả nợ') -> mã, None nếu không có nhóm nào."""
-    return classify_rules.find_group(text, config() if cfg is None else cfg, include_hidden)
-
-
-parse_date = parse_rules.parse_date
-
-
-def read_tag(line):
-    """'#nhóm' trong dòng: (mã nhóm, tên nhóm chưa có, dòng đã bỏ phần #nhóm)."""
-    return parse_rules.read_tag(line, config())
-
-
-def parse_line(line, day, learned=None):
-    """Một dòng tin nhắn -> khoản chi/thu (chưa có id), None nếu không có số tiền."""
-    return parse_rules.parse_line(line, day, learned, config())
-
-
 
 
 
@@ -128,9 +84,26 @@ from infrastructure import ai as ai_client  # noqa: E402
 env_list, gemini_key, openrouter_key = ai_client.env_list, ai_client.gemini_key, ai_client.openrouter_key
 ai_key, ai_models, ai_providers = ai_client.key, ai_client.openrouter_models, ai_client.providers
 ai_post, ai_chat, first_json = ai_client.post, ai_client.chat, ai_client.first_json
-from presentation.chitieu import view as cview  # noqa: E402
-from services.chitieu import ai_sort, budget as budget_service, ledger as ledger_service  # noqa: E402
-from services.chitieu import report as report_service  # noqa: E402
+from services.chitieu import ai_sort, ledger as ledger_service  # noqa: E402
+from interface.chitieu import commands  # noqa: E402
+from interface.chitieu.context import (BACK, CHI_BUTTONS, INCOME_KINDS, REPORT_BUTTONS, SORT_TITLE, bare, budget_label,  # noqa: E402,F401
+                                       budget_lines, budget_status, button_ref, classify, entries_message, entry_text,
+                                       find_group, full_month, groups, income_kind, income_kinds, name, parse_date,
+                                       parse_line, period, pick, picker, read_tag, ref, report, rules, short, vnd,
+                                       with_picker)
+
+baocao, thang, lichsu, delete, xoa_cuoi, ngansach = (commands.baocao, commands.thang, commands.lichsu, commands.delete,
+                                                     commands.xoa_cuoi, commands.ngansach)
+nhom_cmd, chuaxep, xuat = commands.nhom_cmd, commands.chuaxep, commands.xuat
+nhom_them, nhom_tukhoa, nhom_doiten, nhom_xoa = (commands.nhom_them, commands.nhom_tukhoa, commands.nhom_doiten,
+                                                 commands.nhom_xoa)
+add_words, after_change, NHOM_USAGE = commands.add_words, commands.after_change, commands.NHOM_USAGE
+split_spec, make_label = labels.split_spec, labels.make_label
+
+
+def find_category(text):
+    """Tên nhóm người dùng gõ ('ăn uống', 'di lai', 'tổng') -> mã, None nếu không rõ."""
+    return classify_rules.find_category(text, config())
 
 add, recent, learn_all, learn, tidy = (ledger_service.add, ledger_service.recent, ledger_service.learn_all,
                                        ledger_service.learn, ledger_service.tidy)
@@ -174,53 +147,6 @@ def between(start, end):
 # ---- Báo cáo ------------------------------------------------------------------------
 
 
-short = chitieu_text.short
-vnd = format_text.vnd
-ref, button_ref = refs.ref, refs.button_ref
-period, full_month = periods.period, periods.full_month
-income_kind, income_kinds, INCOME_KINDS = income_rules.income_kind, income_rules.income_kinds, income_rules.INCOME_KINDS
-SORT_TITLE, REPORT_BUTTONS, BACK, CHI_BUTTONS = cview.SORT_TITLE, cview.REPORT_BUTTONS, cview.BACK, cview.CHI_BUTTONS
-
-
-def entry_text(e, day):
-    return cview.entry_text(e, day, config())
-
-
-def budget_label(code):
-    return cview.budget_label(code, config())
-
-
-def budget_lines(codes, day):
-    """Tiến độ ngân sách tháng của các nhóm vừa ghi (và ngân sách tổng)."""
-    return cview.budget_lines(budget_service.progress(codes, day), config())
-
-
-def budget_status(day):
-    """Tiến độ mọi ngân sách đã đặt (từng nhóm và tổng) trong tháng này."""
-    return cview.budget_lines(budget_service.all_progress(day), config())
-
-
-def entries_message(entries, day, sorting=False, focus=None, extra=()):
-    """Tin báo các khoản vừa ghi, kèm nút ✏️ đổi nhóm và ❌ xóa từng khoản."""
-    notes = [] if sorting else budget_lines([e["nhom"] for e in entries if e["nhom"] != INCOME], day)
-    return cview.entries_message(entries, day, config(), notes, sorting, focus, extra)
-
-
-def picker(reference, keep="↩️ Thôi"):
-    """Nút chọn nhóm cho một khoản."""
-    return cview.picker(reference, config(), keep)
-
-
-def with_picker(rows, reference, keep="↩️ Thôi"):
-    """Thay hàng nút của một khoản bằng nút chọn nhóm, ngay tại chỗ."""
-    return cview.with_picker(rows, reference, config(), keep)
-
-
-def report(kind, day):
-    """(nội dung báo cáo, số khoản chi) của một kỳ."""
-    return cview.report_text(report_service.report_data(kind, day), config())
-
-
 def from_menu(message):
     """Tin này mở từ menu (có nút ⬅️ Menu): vẽ lại thì giữ nút menu."""
     return any(data.startswith("m:") for row in keyboard_rows(message) for _, data in row)
@@ -229,263 +155,6 @@ def from_menu(message):
 
 
 # ---- Lệnh ---------------------------------------------------------------------------
-
-def baocao(args):
-    kind = {"homnay": "ngay", "ngay": "ngay", "tuan": "tuan", "thang": "thang", "thangtruoc": "thangtruoc"}.get(
-        plain("".join(args)), "thang")
-    return report(kind, today())[0], REPORT_BUTTONS
-
-
-def thang(args):
-    if args and args[0].isdigit() and 1 <= int(args[0]) <= 12:
-        return report(str(int(args[0])), today())[0], REPORT_BUTTONS
-    return report("thang", today())[0], REPORT_BUTTONS
-
-
-def lichsu(args):
-    day = today()
-    items = recent(day, 10)
-    if not items:
-        return "Chưa có khoản nào. Nhắn kiểu: cà phê 35k"
-    lines = ["🧾 <b>10 khoản gần nhất</b>"] + [
-        f"{i}. {e['ngay'][8:]}/{e['ngay'][5:7]} {e.get('gio', '')} · {entry_text(e, day).split(' · ', 1)[0]} · "
-        f"{name(e['nhom']).split()[0]} {html.escape(e['ghichu'])}" for i, e in enumerate(items, 1)]
-    buttons = [(f"❌ {i}", f"xls:{ref(e)}") for i, e in enumerate(items, 1)]
-    return "\n".join(lines), [buttons[i:i + 5] for i in range(0, len(buttons), 5)]
-
-
-def delete(reference):
-    """Xóa một khoản; trả về khoản đã xóa, None nếu đã xóa từ trước."""
-    gone = find(reference)
-    if gone:
-        ledger_repo.remove(gone["ngay"][:7], gone["id"])
-        if gone.get("no"):  # khoản trả nợ: cộng lại dư nợ
-            try:
-                sono().undo(gone)
-            except Exception as e:
-                print(f"[lỗi] hoàn dư nợ khi xóa khoản: {e!r}", file=sys.stderr)
-    return gone
-
-
-def xoa_cuoi(args):
-    items = recent(today(), 1)
-    if not items:
-        return "Chưa có khoản nào để xóa"
-    gone = delete(ref(items[0]))
-    return f"🗑 Đã xóa: {entry_text(gone, today())}"
-
-
-def find_category(text):
-    """Tên nhóm người dùng gõ ('ăn uống', 'di lai', 'tổng') -> mã, None nếu không rõ."""
-    if plain(text).strip() in ("tong", "tat ca", "tong chi"):
-        return "tong"
-    if plain(text).strip() in ("hang ngay", "hangngay", "sinh hoat", "thuong ngay", "chi hang ngay"):
-        return "hangngay"
-    code = find_group(text) or classify(text)
-    return None if code == OTHER else code
-
-
-def ngansach(args):
-    usage = ("Đặt ngân sách tháng: /ngansach ăn uống 3tr · /ngansach tổng 15tr\n"
-             "Chi tiêu hằng ngày (ăn uống, đi chợ, đi lại…): /ngansach hằng ngày 9tr\n"
-             "Bỏ ngân sách: /ngansach ăn uống 0")
-    budgets = kho.get(keys.BUDGET, {})
-    if not args:
-        lines = budget_status(today())
-        return "\n".join(["🎯 <b>Ngân sách tháng này</b>"] + lines + ["", usage]) if lines else usage
-    code = find_category(" ".join(args[:-1]))
-    if code is None or code == INCOME:
-        return usage
-    if args[-1] == "0":
-        budgets.pop(code, None)
-        kho.put(keys.BUDGET, budgets)
-        return f"Đã bỏ ngân sách {budget_label(code)}"
-    found = parse_amount(args[-1])
-    if found is None:
-        return usage
-    budgets[code] = found[0]
-    kho.put(keys.BUDGET, budgets)
-    label = budget_label(code)
-    return "\n".join([f"🎯 Ngân sách {label}: {vnd(found[0])}/tháng"] + budget_lines([code], today()))
-
-
-NHOM_USAGE = ("<b>Tự chỉnh nhóm</b>\n"
-              "• Tạo nhóm: /nhom them 🏦 Trả nợ: trả nợ, trả góp, vay\n"
-              "• Thêm từ khóa: /nhom tukhoa Ăn uống: bún chả, bánh tráng\n"
-              "• Đổi tên: /nhom doiten Đi lại: 🚗 Xe cộ\n"
-              "• Ẩn nhóm không dùng: /nhom xoa Học tập\n"
-              "• Chọn nhóm ngay khi ghi: đóng họ 1tr #trả nợ\n"
-              "• Xếp các khoản đang ở Khác: /chuaxep")
-
-
-def split_spec(text):
-    """'Ăn uống: bún chả, bánh tráng' -> ('Ăn uống', ['bún chả', 'bánh tráng'])."""
-    head, sep, tail = text.partition(":")
-    words = [norm(w).strip(" .") for w in re.split(r"[,;\n]", tail)] if sep else []
-    return head.strip(), list(dict.fromkeys(w for w in words if 0 < len(w) <= 40))
-
-
-def make_label(text, old=None):
-    """'🏦 Trả nợ' giữ nguyên; 'Trả nợ' thì thêm biểu tượng (của tên cũ nếu đổi tên)."""
-    text = " ".join(re.sub(r"[<>&\"]", "", unicodedata.normalize("NFC", text)).split())[:40]  # tên an toàn cho HTML
-    m = re.match(r"([^\w\s]+)\s*(\w.*)$", text)
-    if m:
-        return f"{m[1]} {m[2]}"
-    emoji = old.split(" ", 1)[0] if old and " " in old else "🏷️"
-    return f"{emoji} {text}" if text else None
-
-
-def add_words(cfg, code, words):
-    """Thêm từ khóa cho một nhóm; từ khóa đó có ở nhóm tự chỉnh khác thì chuyển sang nhóm này,
-    cụm từ đã học trùng hẳn từ khóa đó (học từ lần sửa cũ) thì bỏ để từ khóa mới có tác dụng."""
-    if words:
-        learned = kho.get(keys.LEARN, {})
-        kept = {k: c for k, c in learned.items() if k not in words or c == code}
-        if len(kept) != len(learned):
-            kho.put(keys.LEARN, kept)
-    cfg.setdefault("tu", {})
-    for other, own in cfg["tu"].items():
-        if other != code:
-            own[:] = [w for w in own if w not in words]
-    cfg["tu"][code] = list(dict.fromkeys(cfg["tu"].get(code, []) + words))[-MAX_WORDS:]
-    cfg["tu"] = {c: w for c, w in cfg["tu"].items() if w}
-
-
-def after_change(cfg, text):
-    save_config(cfg)
-    moved = tidy(today())
-    return text + (f"\n↪️ Đã xếp lại {moved} khoản đang ở Khác theo nhóm mới" if moved else "")
-
-
-def nhom_them(rest):
-    head, words = split_spec(rest)
-    cfg = json.loads(json.dumps(config()))  # bản sao để sửa
-    label = make_label(head) if head else None
-    code = find_group(head, include_hidden=True, cfg=cfg) if label else None
-    if code and plain(bare(name(code, cfg))) != plain(bare(label)):
-        code = None  # chỉ khớp một phần tên ("Ăn" với "Ăn uống"): tạo nhóm mới
-    if code:
-        was_hidden = code in cfg.get("an", [])
-        cfg["an"] = [c for c in cfg.get("an", []) if c != code]
-        add_words(cfg, code, words)
-        text = (f"✅ Đã dùng lại nhóm {name(code, cfg)}" if was_hidden else f"Nhóm {name(code, cfg)} đã có")
-        return after_change(cfg, text + (f", thêm từ khóa: {html.escape(', '.join(words))}" if words else ""))
-    if not label:
-        return NHOM_USAGE
-    if len(cfg.get("moi", [])) >= MAX_GROUPS:
-        return f"Đã có {MAX_GROUPS} nhóm tự tạo, ẩn bớt nhóm không dùng (/nhom xoa tên nhóm) rồi tạo tiếp"
-    cfg["dem"] = cfg.get("dem", 0) + 1
-    code = f"r{cfg['dem']}"
-    cfg.setdefault("moi", []).append(code)
-    cfg.setdefault("ten", {})[code] = label
-    add_words(cfg, code, words)
-    text = f"✅ Đã tạo nhóm {html.escape(label)}" + (
-        f", từ khóa: {html.escape(', '.join(words))}" if words else
-        f"\nThêm từ khóa để bot tự xếp: /nhom tukhoa {html.escape(bare(label))}: từ khóa 1, từ khóa 2")
-    return after_change(cfg, text)
-
-
-def nhom_tukhoa(rest):
-    head, words = split_spec(rest)
-    cfg = json.loads(json.dumps(config()))
-    code = find_group(head, cfg=cfg) if head else None
-    if not code or not words:
-        return "Thêm từ khóa: /nhom tukhoa Ăn uống: bún chả, bánh tráng\n(tên nhóm, dấu hai chấm, các từ khóa cách nhau dấu phẩy)"
-    if code == OTHER:
-        return "Nhóm Khác dành cho khoản không khớp nhóm nào, không thêm từ khóa được"
-    add_words(cfg, code, words)
-    return after_change(cfg, f"✅ {name(code, cfg)} thêm từ khóa: {html.escape(', '.join(words))}")
-
-
-def nhom_doiten(rest):
-    head, _, new = rest.partition(":")
-    cfg = json.loads(json.dumps(config()))
-    code = find_group(head, cfg=cfg) if head.strip() else None
-    label = make_label(new, name(code, cfg)) if code and new.strip() else None
-    if not label:
-        return "Đổi tên: /nhom doiten Đi lại: 🚗 Xe cộ"
-    old = name(code, cfg)
-    cfg.setdefault("ten", {})[code] = label
-    save_config(cfg)
-    return f"✅ Đã đổi {html.escape(old)} thành {html.escape(label)}"
-
-
-def nhom_xoa(rest):
-    cfg = json.loads(json.dumps(config()))
-    code = find_group(rest, cfg=cfg) if rest.strip() else None
-    if not code:
-        return "Ẩn nhóm: /nhom xoa Học tập"
-    if code in (OTHER, INCOME):
-        return "Không ẩn được nhóm Khác và Thu nhập"
-    cfg.setdefault("an", []).append(code)
-    save_config(cfg)
-    return (f"✅ Đã ẩn nhóm {name(code, cfg)}: không còn trên nút chọn, bot không xếp vào nữa. Khoản cũ giữ "
-            f"nguyên. Dùng lại: /nhom them {html.escape(bare(name(code, cfg)))}")
-
-
-def nhom_cmd(args):
-    action = plain(args[0]) if args else ""
-    rest = " ".join(args[1:])
-    for words, handler in [(("them", "tao", "moi"), nhom_them), (("tukhoa", "tu", "tk"), nhom_tukhoa),
-                           (("doiten", "ten", "sua"), nhom_doiten), (("xoa",), nhom_xoa)]:
-        if action in words:
-            return handler(rest)
-    learned = kho.get(keys.LEARN, {})
-    cfg = config()
-    lines = ["🗂 <b>Các nhóm và vài từ khóa</b>"]
-    for code, (label, own, builtin) in groups().items():
-        sample = ", ".join(list(dict.fromkeys(own + builtin))[:6])
-        if code == OTHER:
-            sample = "những khoản không khớp nhóm nào"
-        mine = " (nhóm bạn tạo)" if code in cfg.get("moi", []) else ""
-        lines.append(f"{html.escape(label)}{mine}: <i>{html.escape(sample) or 'chưa có từ khóa'}</i>")
-    hidden = [name(c) for c in cfg.get("an", [])]
-    if hidden:
-        lines.append("Đã ẩn: " + html.escape(", ".join(hidden)))
-    lines.append(f"\nBot đã học {len(learned)} cụm từ từ những lần bạn tự chọn nhóm.")
-    guessed, fixed = ai_stats()
-    accuracy = f"; đã đoán {guessed} khoản, bạn sửa {fixed}" + (
-        f" (đúng {100 - fixed / guessed * 100:.0f}%)" if guessed else "") if guessed or fixed else ""
-    quota = quota_text() if ai_key() else ""
-    lines.append(f"✨ AI xếp nhóm cho khoản lạ: {'bật' if ai_key() else 'tắt'}{accuracy}"
-                 + (f"\n✨ AI {html.escape(quota)}" if quota else ""))
-    return "\n".join(lines + ["", NHOM_USAGE])
-
-
-def chuaxep(args):
-    """Các khoản đang ở Khác: xếp lại theo từ khóa, hỏi lại AI, còn lại thì hiện nút chọn từng khoản."""
-    day = today()
-    tidy(day)
-    items = [e for e in recent(day, 1000) if pending(e)][:8]
-    if not items:
-        return "✅ Không còn khoản nào chưa rõ nhóm. Khoản mới chưa rõ nhóm thì bot hỏi ngay khi ghi."
-    if ask_ai(items, kho.get(keys.LEARN, {})):
-        for e in items:
-            if e.get("ai"):
-                save(e)
-    return entries_message(items, day, sorting=True)
-
-
-def xuat(args):
-    day = today()
-    if args and args[0].isdigit() and 1 <= int(args[0]) <= 12:
-        month = int(args[0])
-        year = day.year if month <= day.month else day.year - 1
-    else:
-        year, month = day.year, day.month
-    items = sorted(load(f"{year}-{month:02d}"), key=lambda e: (e["ngay"], e.get("gio", ""), e["id"]))
-    if not items:
-        return f"Tháng {month}/{year} chưa có khoản nào"
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(["Ngày", "Giờ", "Số tiền", "Thu/Chi", "Nhóm", "Ghi chú"])
-    for e in items:
-        writer.writerow([f"{e['ngay'][8:]}/{e['ngay'][5:7]}/{e['ngay'][:4]}", e.get("gio", ""), e["tien"],
-                         "Thu" if e["nhom"] == INCOME else "Chi", bare(name(e["nhom"])), e["ghichu"]])
-    # BOM để Excel nhận đúng tiếng Việt
-    return {"file": ("\ufeff" + buf.getvalue()).encode("utf-8"), "name": f"chitieu-{year}-{month:02d}.csv",
-            "caption": f"Chi tiêu tháng {month}/{year}: {len(items)} khoản"}
-
 
 def taisan():
     from interface.taisan import assets as module  # tài sản, mua bán cổ phiếu, khám sức khỏe tài chính
