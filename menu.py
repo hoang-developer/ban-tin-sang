@@ -13,7 +13,7 @@ import sys
 from infrastructure import kho
 from repositories import keys
 import sochitieu as ct
-from bantin import WEEKDAYS
+from domain.common.dates import WEEKDAYS
 
 BOTTOM = {"🏠 Hôm nay": "home", "💰 Tiền của tôi": "tien", "🎯 Kế hoạch": "kh", "💬 Hỏi": "hoi"}
 OLD_BOTTOM = {"🏠 Menu": "home", "📊 Chi tiêu": "chi", "💼 Tài sản": "tien"}  # hàng nút cũ: vẫn chạy, gửi hàng mới

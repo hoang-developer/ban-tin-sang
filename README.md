@@ -79,7 +79,7 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
 - **🌙 Bản tin tối** (21h): thời tiết và gợi ý ngày mai, chứng khoán hôm nay, giá vàng so với hôm
   qua, ví vàng, ngày cần nhớ ngày mai, kết quả đoán. Bot cũng ghi giá vàng mỗi tối để `/neu vang` dùng.
 
-Nếu Vercel không chạy được (chưa có kho dữ liệu, lỗi...), GitHub tự chạy `canhbao.py` và `bantin.py`
+Nếu Vercel không chạy được (chưa có kho dữ liệu, lỗi...), GitHub tự chạy `canhbao.py` và `interface/bantin/bulletin.py`
 như trước, chỉ thiếu các việc mới; bản tin gửi theo cách này có dòng ⚠️ ở cuối. Lịch của GitHub rất
 thất thường (có ngày gần như không chạy), nên đừng trông vào nó: cronjob 15 phút ở bước 6 là chính.
 
@@ -541,7 +541,7 @@ GitHub không tự tắt lịch khi repo 60 ngày không có commit.
 ## Xem thử trên máy
 
 ```
-python bantin.py                    # bản tin sáng
+python -m interface.bantin.bulletin                    # bản tin sáng
 python lenh.py /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
 python thoitiet.py Đà Nẵng
 python tintuc.py giá vàng 24h

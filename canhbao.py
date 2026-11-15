@@ -16,8 +16,13 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bantin import (AQI_LEVELS, HANOI, PNJ_GOLD_URL, VN_TZ, fetch, fetch_json, index_history,
-                    load_env, send_telegram, vn_num)
+from domain.bantin.weather import AQI_LEVELS, HANOI
+from domain.common.format import vn_num
+from infrastructure.clock import VN_TZ
+from infrastructure.marketdata import PNJ_GOLD_URL
+from infrastructure.web import fetch, fetch_json
+from interface.bantin.bulletin import load_env, send_telegram
+from services.bantin.data import index_history
 
 # ---- Cấu hình -------------------------------------------------------------
 RAIN_LOOKAHEAD_SLOTS = 8   # nhìn trước 8 × 15 phút = 2 tiếng

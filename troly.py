@@ -18,7 +18,8 @@ from datetime import date, timedelta
 from infrastructure import kho
 from repositories import keys
 import sochitieu as ct
-from bantin import WEEKDAYS, vn_num
+from domain.common.dates import WEEKDAYS
+from domain.common.format import vn_num
 
 STATE_SECONDS, CARD_SECONDS = 900, 2 * 86400
 TRY_LIMIT = 40  # số lượt thử ?hieu= mỗi ngày trên trang tình trạng

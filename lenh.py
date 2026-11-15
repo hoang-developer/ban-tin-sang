@@ -17,8 +17,12 @@ from domain.vang.gold import GoldLot
 from repositories.vang import gold as gold_repo
 import nhandinh
 from infrastructure import telegram as tg
-from bantin import BUTTONS as BANTIN_BUTTONS
-from bantin import VN_TZ, WEEKDAYS, build_message, gold, gold_prices, index_history, section, vn_num
+from domain.common.dates import WEEKDAYS
+from domain.common.format import vn_num
+from infrastructure.clock import VN_TZ
+from interface.bantin.bulletin import BUTTONS as BANTIN_BUTTONS
+from interface.bantin.bulletin import build_message, gold, section
+from services.bantin.data import gold_prices, index_history
 from canhbao import KEYWORDS, normalize
 from chungkhoan import MAX_SYMBOLS, SYMBOL, dong, news, quote, quotes, stock_command
 from thoitiet import find_place, report

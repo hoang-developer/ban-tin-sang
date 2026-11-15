@@ -74,7 +74,7 @@ tách theo lớp rồi đặt từng mảnh vào `<lớp>/<chức năng>/`; file
 | `lich.py`, `lenh.py`, `bantin.py`, `canhbao.py`, `nhandinh.py` | `services/bantin`, `presentation/bantin`, `interface/bantin` (lịch tick, lệnh bot bản tin) |
 | `danhgia.py`, `danhgia_cau.py` | `tools/danhgia/` (công cụ đo, không phải lớp của app) |
 
-Workflow GitHub chạy thẳng `python3 bantin.py` và `python3 canhbao.py`: đổi sang `python3 -m interface.bantin.…` khi chuyển xong.
+Workflow `bantin.yml` đã chạy `python3 -m interface.bantin.bulletin`; `canhbao.py` còn chạy trực tiếp tới khi chuyển xong.
 
 ## 3. Luật bất di bất dịch
 
@@ -201,6 +201,7 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.8d `chitieu`: lệnh /baocao /thang /lichsu /xoa /ngansach /nhom /chuaxep /xuat (`interface/chitieu/{commands,context}`, `domain/chitieu/labels`) | xong, chờ deploy |
 | 6.8e `chitieu`: định tuyến bot (bảng lệnh, trả lời tin nhắn, nút bấm) ở `interface/chitieu/{bot,features}`, `sochitieu.py` chỉ còn tên cũ dùng tạm (174 dòng) | xong, chờ deploy |
 | 6.9 `phantich`: số liệu và câu hỏi ở `domain/phantich`, đọc sổ ở `services/phantich` + `repositories/chitieu/analysis`, màn hình ở `presentation/phantich`, lệnh ở `interface/phantich`, vẽ biểu đồ ở `infrastructure/quickchart` (xóa `phantich.py`, file gốc còn 16) | xong, chờ deploy |
+| 6.10 `amlich` vào `domain/amlich`; `bantin.py` tách: thời tiết/vàng/chỉ số/RSS ở `infrastructure/{openmeteo,marketdata,web}`, gợi ý ở `domain/bantin`, lấy số liệu ở `services/bantin/data`, chữ ở `presentation/bantin/view`, ghép và gửi ở `interface/bantin/bulletin` (workflow chạy `python3 -m interface.bantin.bulletin`; file gốc còn 14) | xong, chờ deploy |
 | 6.8… dọn `sochitieu.py` khi các module còn lại (`troly`, `menu`, `phantich`, `docanh`...) bỏ `ct.`; rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
 | Cuối: dọn | chưa |
 

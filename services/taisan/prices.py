@@ -3,7 +3,7 @@ import sys
 from datetime import datetime
 
 import chungkhoan  # module cũ ở gốc: giá cổ phiếu
-from bantin import gold_prices  # module cũ ở gốc: giá vàng
+from services.bantin.data import gold_prices
 from domain.taisan.kinds import COINS
 from infrastructure import clock, crypto, fmarket, vietcombank
 from repositories.taisan import assets as assets_repo
