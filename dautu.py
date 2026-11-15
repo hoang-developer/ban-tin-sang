@@ -1260,7 +1260,7 @@ def on_button(arg, message, now):
         toast = f"Đã để {money(int(value))} vào quỹ chờ ({money(left)})" + "".join(
             f" · {x[2:].replace('<b>', '').replace('</b>', '')}" for x in notes)
         if (message.get("text") or "").startswith("📋"):  # nút trên tin chia lương: vẽ lại tin đó
-            import kehoach
+            from interface.kehoach import plan as kehoach
             return toast, ("edit", lambda: kehoach.plan(now.date()))
         rows = [[b for b in row if not b[1].startswith("dt:nap")] for row in ct.keyboard_rows(message)]
         return toast, ("buttons", lambda: [r for r in rows if r])

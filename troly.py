@@ -471,7 +471,7 @@ def clean(raw, text=None):
 
 def finance_facts(day):
     """Số liệu tài chính bot tính sẵn, gửi kèm câu hỏi để AI trả lời thẳng (không tự tính). Phần nào lỗi thì bỏ."""
-    import kehoach
+    from interface.kehoach import plan as kehoach
     ts, sono = ct.taisan(), ct.sono()
     short = ts.short
     lines = [f"Hôm nay {WEEKDAYS[day.weekday()]} {day:%d/%m/%Y}."]

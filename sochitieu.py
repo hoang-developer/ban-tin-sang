@@ -1106,7 +1106,7 @@ def sono():
 
 
 def kehoach():
-    import kehoach as module  # lộ trình tài chính, chia lương
+    from interface.kehoach import plan as module  # lộ trình tài chính, chia lương
     return module
 
 

@@ -182,8 +182,9 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.1 `duphong` (quỹ dự phòng) | xong, đã deploy ([#57](https://github.com/hoang-developer/ban-tin-sang/pull/57)) |
 | 6.2 `tietkiem` (tiết kiệm từ khi dùng bot) | xong, đã deploy ([#58](https://github.com/hoang-developer/ban-tin-sang/pull/58)) |
 | 6.3 `doichieu` (đối chiếu tài sản tháng) | xong, đã deploy ([#59](https://github.com/hoang-developer/ban-tin-sang/pull/59)); tick sau deploy chạy bình thường |
-| 6.4 `no` (sổ nợ) | đang làm |
-| 6.5… các chức năng còn lại | chưa |
+| 6.4 `no` (sổ nợ) | xong, đã deploy ([#60](https://github.com/hoang-developer/ban-tin-sang/pull/60)); tick sau deploy chạy bình thường |
+| 6.5 `kehoach` (kế hoạch chia lương, lộ trình) | đang làm |
+| 6.6… các chức năng còn lại | chưa |
 | Cuối: dọn | chưa |
 
 Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.
@@ -218,9 +219,9 @@ Hoàn tác: mỗi bước là một PR riêng, `git revert` được.
 
 | Chỉ số | Lúc đầu | Hiện tại | Đích |
 |---|---|---|---|
-| File `.py` ở gốc repo (không tính `api/`) | 26 | 20 | 0 |
-| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 14 (132) | 1 (`repositories/store.py`) |
-| Chức năng đã tách vào đủ các lớp | 0 | 4 (`duphong`, `tietkiem`, `doichieu`, `no`) | mọi chức năng ở bảng "module cũ đi đâu" |
+| File `.py` ở gốc repo (không tính `api/`) | 26 | 19 | 0 |
+| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 13 (130) | 1 (`repositories/store.py`) |
+| Chức năng đã tách vào đủ các lớp | 0 | 5 (`duphong`, `tietkiem`, `doichieu`, `no`, `kehoach`) | mọi chức năng ở bảng "module cũ đi đâu" |
 | Chuỗi khóa Redis viết cứng ngoài `keys.py` | ~20 | 0 | 0 |
 | Hàm nạp muộn né import vòng | 9 | 9 | 0 |
 | Hàm nghiệp vụ trả HTML | nhiều | nhiều | 0 |

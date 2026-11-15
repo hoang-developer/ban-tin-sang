@@ -110,7 +110,7 @@ def fund_deadline(now):
 
 def todo(day, n, now):
     """Việc cần làm hôm nay: [(chữ, nút hoặc None)], quan trọng trước."""
-    import kehoach
+    from interface.kehoach import plan as kehoach
     from interface.no import debt as sono
     out = []
     deadline = part("hạn đặt lệnh quỹ", lambda: fund_deadline(now))
@@ -153,7 +153,7 @@ def home(day, now=None):
     """🏠 Hôm nay."""
     if not kho.ready():
         return ct.NEED_STORE
-    import kehoach
+    from interface.kehoach import plan as kehoach
     from interface.no import debt as sono
     ts = ct.taisan()
     now = now or ts.now_vn()
@@ -334,7 +334,7 @@ def chi_screen(day):
 
 
 def screen(name, day):
-    import kehoach
+    from interface.kehoach import plan as kehoach
     return {"home": lambda: home(day), "tien": lambda: money(day), "kh": lambda: kehoach.plan(day),
             "hoi": ask_screen, "chi": lambda: chi_screen(day), "ts": lambda: money(day),
             "no": lambda: ct.sono().view(day), "lt": lambda: kehoach.roadmap(day),

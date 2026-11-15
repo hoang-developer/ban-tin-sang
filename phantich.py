@@ -237,7 +237,7 @@ def daily_text(day):
         compare = f" · tháng trước {short(f['prev_total'])} {trend(change)}"
     lines.append(f"➡️ Cả tháng ~<b>{short(f['projected'])}</b>{compare}")
     if f["room"]:
-        import kehoach
+        from interface.kehoach import plan as kehoach
         over = f" · 🔴 dự báo vượt {short(f['projected'] - f['budget'])}" if f["projected"] > f["budget"] else ""
         lines.append(kehoach.room_text(*f["room"], bold=True, what=f"ngân sách {short(f['budget'])}") + over)
     else:
@@ -276,13 +276,13 @@ def dubao(args):
 
 def spendable(day):
     """Mỗi ngày được tiêu (một con số chung, xem kehoach.spendable); None nếu chưa tính được."""
-    import kehoach
+    from interface.kehoach import plan as kehoach
     return kehoach.spendable_safe(day)
 
 
 def spend_lines(day):
     """Dòng "mỗi ngày được tiêu" cho /dubao: con số chung và cách tính, hoặc cách để có con số đó."""
-    import kehoach
+    from interface.kehoach import plan as kehoach
     s = spendable(day)
     if not s:
         return ["<i>Nhắn «+ lương 19tr» hoặc «ngân sách tổng 15tr» để biết mỗi ngày được tiêu bao nhiêu</i>"]
@@ -325,13 +325,13 @@ def after_record(entries, day):
     if any(e["nhom"] in codes for e in entries) and ("hangngay" in budgets or all(c in budgets for c in codes)):
         f = daily_forecast(day)
         if f["room"]:
-            import kehoach
+            from interface.kehoach import plan as kehoach
             lines.append(kehoach.room_text(*f["room"], what="ngân sách hằng ngày").replace("Hôm nay", "Chi hằng ngày"))
             return lines
     if any(e["nhom"] != ct.INCOME for e in entries) and budgets.get("tong"):  # có ngân sách tổng mới hiện
         s = spendable(day)
         if s:
-            import kehoach
+            from interface.kehoach import plan as kehoach
             lines.append(kehoach.spend_text(s))
     return lines
 
