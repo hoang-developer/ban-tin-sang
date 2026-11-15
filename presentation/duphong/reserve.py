@@ -3,7 +3,7 @@ import html
 import math
 
 from domain.common.format import short as format_short
-import sochitieu as ct  # module cũ ở gốc: nút ⬅ Về
+from presentation.chitieu.view import BACK
 from domain.taisan import text as taisan_text
 from domain.common.format import vn_num
 from domain.duphong.reserve import DEADLINE_CHOICES, MIN_DAYS, MONTHS_CHOICES
@@ -24,7 +24,7 @@ def buttons(s):
         rows[0].insert(0, (f"➕ {money(round(s.per_month, -5))}", f"dp:nap:{int(round(s.per_month, -5))}"))
     rows.append([(f"{'🎯' if s.months == m else ''}{m} tháng", f"dp:thang:{m}") for m in MONTHS_CHOICES])
     rows.append([(f"{'⏳' if s.deadline_months == m else ''}đạt trong {m}t", f"dp:han:{m}") for m in DEADLINE_CHOICES])
-    rows.append([("🏦 Để quỹ ở đâu?", "dp:noi"), ct.BACK])
+    rows.append([("🏦 Để quỹ ở đâu?", "dp:noi"), BACK])
     return rows
 
 

@@ -4,7 +4,8 @@ Trả kết quả có cấu trúc (domain.doichieu.reconcile), không trả ch�
 """
 import sys
 
-import sochitieu as ct  # module cũ ở gốc: nhóm Thu/Khác của khoản lệch
+from domain.chitieu.kinds import INCOME
+from domain.chitieu.kinds import OTHER
 from repositories.taisan import assets as assets_repo
 from services.taisan import accounts
 from domain.doichieu import reconcile as rules
@@ -132,7 +133,7 @@ def book_gap(item_id, now):
     gap = rec["lech"]
     ledger_repo.save({"id": ledger_repo.next_id(), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
                       "tien": abs(gap), "ghichu": f"{'chi' if gap < 0 else 'thu'} chưa ghi (đối chiếu {rec['ten']})",
-                      "nhom": ct.INCOME if gap > 0 else ct.OTHER, "khong_tk": True})
+                      "nhom": INCOME if gap > 0 else OTHER, "khong_tk": True})
     month = reconcile_repo.load_month(ym)
     month["muc"][str(item_id)]["ghi"] = True
     reconcile_repo.save_month(ym, month)

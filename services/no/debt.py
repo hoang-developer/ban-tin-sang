@@ -2,7 +2,11 @@
 
 Trả kết quả có cấu trúc (domain.no.debt), không trả chữ.
 """
-import sochitieu as ct  # module cũ ở gốc: nhóm chi, khoản chi (ghi, tìm, học)
+from domain.chitieu.kinds import INCOME, OTHER
+from domain.chitieu.refs import ref
+from repositories.chitieu import ledger as ledger_repo
+from services.chitieu import groups as chitieu_groups
+from services.chitieu import ledger as ledger_service
 from infrastructure import clock
 from services.taisan import accounts
 from domain.no import debt as rules
@@ -46,12 +50,12 @@ def pay_day(d, day):
 
 def debt_group(create=False):
     """(mã nhóm chi Trả nợ, câu báo nếu vừa tạo). Chưa có nhóm thì tạo khi create=True."""
-    code = ct.find_group("trả nợ")
+    code = chitieu_groups.find_group("trả nợ")
     if code or not create:
         return code, ""
-    ct.nhom_them(rules.GROUP_LABEL)
-    ct.reset()
-    code = ct.find_group("trả nợ")
+    chitieu_groups.nhom_them(rules.GROUP_LABEL)
+    chitieu_groups.reset()
+    code = chitieu_groups.find_group("trả nợ")
     return code, ("🏦 Đã tạo nhóm chi «Trả nợ» để ghi các lần trả nợ" if code else "")
 
 
@@ -124,18 +128,18 @@ def pay(debt_id, amount, now):
     group, note = debt_group(create=True)
     day = now.date()
     e = {"id": ledger_repo.next_id(), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
-         "tien": int(amount), "ghichu": f"trả nợ {d['ten']}", "nhom": group or ct.OTHER, "no": d["id"]}
+         "tien": int(amount), "ghichu": f"trả nợ {d['ten']}", "nhom": group or OTHER, "no": d["id"]}
     if not group:
         e["dekhac"] = True
-    ct.save(e)
-    payment = rules.apply_payment(d, e, ct.ref(e), day)
+    ledger_repo.save(e)
+    payment = rules.apply_payment(d, e, ref(e), day)
     debt_repo.save(data)
     return PayResult("ok", e, payment, note)
 
 
 def after_record(entries, day):
     """Vừa ghi các khoản (tin nhắn hoặc ảnh): khoản nào là trả nợ thì trừ dư nợ. Trả danh sách Paid/Ask."""
-    entries = [e for e in entries if e["nhom"] != ct.INCOME and not e.get("no")]
+    entries = [e for e in entries if e["nhom"] != INCOME and not e.get("no")]
     if not entries or not kho.ready():
         return []
     data = debt_repo.load()
@@ -145,19 +149,19 @@ def after_record(entries, day):
     group = debt_group()[0]
     events, changed, asked = [], False, False
     for e in entries:
-        d = rules.match(e, items, group, ct.OTHER)
+        d = rules.match(e, items, group, OTHER)
         if d:
-            if group and e["nhom"] != group and (e["nhom"] == ct.OTHER or e.get("ai")):
+            if group and e["nhom"] != group and (e["nhom"] == OTHER or e.get("ai")):
                 e["nhom"] = group
                 e.pop("ai", None)
-                ct.learn(e["ghichu"], group)  # lần sau ghi giống vậy vào thẳng nhóm Trả nợ
+                ledger_service.learn(e["ghichu"], group)  # lần sau ghi giống vậy vào thẳng nhóm Trả nợ
             e["no"] = d["id"]
-            ct.save(e)
-            events.append(Paid(d, rules.apply_payment(d, e, ct.ref(e), day), ct.ref(e)))
+            ledger_repo.save(e)
+            events.append(Paid(d, rules.apply_payment(d, e, ref(e), day), ref(e)))
             changed = True
         elif group and e["nhom"] == group and not asked:
             asked = True  # khoản trả nợ chưa rõ của khoản nợ nào: hỏi (một khoản mỗi tin)
-            events.append(Ask(e, ct.ref(e), items[:3]))
+            events.append(Ask(e, ref(e), items[:3]))
     if changed:
         debt_repo.save(data)
     return events
@@ -169,7 +173,7 @@ def undo(e):
     d = by_id(data, e.get("no"))
     if not d:
         return None
-    rules.undo_payment(d, e, ct.ref(e))
+    rules.undo_payment(d, e, ref(e))
     debt_repo.save(data)
     return d
 
@@ -181,8 +185,8 @@ def assign(e, debt_id, day):
     if not d or e.get("no"):
         return None
     e["no"] = d["id"]
-    ct.save(e)
-    payment = rules.apply_payment(d, e, ct.ref(e), day)
+    ledger_repo.save(e)
+    payment = rules.apply_payment(d, e, ref(e), day)
     debt_repo.save(data)
     return payment
 
@@ -191,7 +195,7 @@ def unassign(e):
     """Bỏ trừ nợ của khoản chi e: trả khoản nợ (đã cộng lại) hoặc None nếu không còn khoản nợ."""
     d = undo(e)
     e.pop("no", None)
-    ct.save(e)
+    ledger_repo.save(e)
     return d
 
 
