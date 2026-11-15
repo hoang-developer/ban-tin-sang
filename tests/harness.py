@@ -204,7 +204,7 @@ def month_entries():
 
 def run_jobs():
     """Chạy việc theo giờ của phần đầu tư và tin tối ở giờ hiện tại; trả các tin bot gửi: [(chữ, dữ liệu các nút)]."""
-    import lich
+    from interface.lich import jobs as lich
     SENT.clear()
     lich.dau_tu(CLOCK["now"], str(CHAT))
     lich.tong_ket_toi(CLOCK["now"], str(CHAT))  # lãi/lỗ quỹ nằm trong tin tối gộp

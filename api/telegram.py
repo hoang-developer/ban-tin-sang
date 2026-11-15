@@ -16,7 +16,7 @@ from infrastructure import kho  # noqa: E402
 from repositories import keys  # noqa: E402
 from infrastructure import telegram as tg  # noqa: E402
 from infrastructure.clock import VN_TZ  # noqa: E402
-from lenh import MENU, answer, answer_location, on_button  # noqa: E402
+from interface.lenh.bot import MENU, answer, answer_location, on_button  # noqa: E402
 
 
 def handle_message(message):

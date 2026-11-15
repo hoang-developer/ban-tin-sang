@@ -5,7 +5,7 @@ from tests import harness as h
 from tests.test_dongtien import setup_month
 
 from infrastructure import kho
-import lich
+from interface.lich import jobs as lich
 from interface.menu import screens as menu
 from interface.no import debt as sono
 from interface.thongbao import digest as thongbao

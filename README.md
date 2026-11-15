@@ -7,14 +7,14 @@ Bot Telegram riêng: bản tin mỗi sáng, bản tin tối, cảnh báo tức t
   chạy bộ), giá vàng, chứng khoán phiên trước, tin nổi bật. Dưới tin có nút 🔄 Cập nhật, 📈 VN30,
   🌧️ Mưa lúc nào?.
 - **Bot trên Vercel** ([api/telegram.py](api/telegram.py)) trả lời lệnh, và mỗi 15 phút chạy các việc theo
-  giờ ([api/tick.py](api/tick.py), [lich.py](lich.py)): bản tin sáng, cảnh báo, bảng điện ghim, đoán
+  giờ ([api/tick.py](api/tick.py), [interface/lich/jobs.py](interface/lich/jobs.py)): bản tin sáng, cảnh báo, bảng điện ghim, đoán
   xanh/đỏ, nhắc ngày, tin cổ tức, bản tin tối. Cài theo mục **Cài bot lên Vercel**.
 - **Bot chi tiêu** ([api/chitieu.py](api/chitieu.py), [sochitieu.py](sochitieu.py)): một bot Telegram thứ hai,
   nhắn "cà phê 35k" là bot ghi lại và tự xếp nhóm. Xem mục **Bot chi tiêu**.
 
 ## Lệnh trên Telegram
 
-Gõ trong chat với bot hoặc bấm nút **Menu** cạnh ô nhập ([lenh.py](lenh.py)):
+Gõ trong chat với bot hoặc bấm nút **Menu** cạnh ô nhập ([interface/lenh/bot.py](interface/lenh/bot.py)):
 
 | Lệnh | Làm gì |
 |---|---|
@@ -542,7 +542,7 @@ GitHub không tự tắt lịch khi repo 60 ngày không có commit.
 
 ```
 python -m interface.bantin.bulletin                    # bản tin sáng
-python lenh.py /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
+python -m interface.lenh.bot /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
 python -m interface.thoitiet.report Đà Nẵng
 python -m interface.tintuc.search giá vàng 24h
 python sochitieu.py "cà phê 35k"   # bot chi tiêu: chỉ đọc và xếp nhóm, không ghi
