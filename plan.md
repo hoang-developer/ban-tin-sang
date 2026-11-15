@@ -189,8 +189,9 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.6c `dautu`: lệnh, khớp lệnh, hoán đổi (`services/dautu/{orders,switch}`), định dạng số dùng chung (`domain/common/format`, `domain/dautu/text`) | xong, chờ deploy (câu báo còn nằm trong service, tách sang presentation ở bước sau) |
 | 6.6d dọn lớp `interface`: `interface/common.py` dùng chung (chặn khi chưa nối kho, nhận biết tin, bỏ nút, cắt thông báo), hàm nội bộ đổi tên riêng tư, bỏ import thừa | xong, đã deploy (#65) |
 | 6.6e `dautu`: màn hình (`presentation/dautu/view`): màn chính, nhắc hạn, lịch sử lệnh, biểu đồ, nút | xong, đã deploy (#66) |
-| 6.6f `dautu`: lệnh và nút (`interface/dautu/fund`), việc phục vụ chỗ khác (`services/dautu/reports`), xóa `dautu.py` | xong, chờ deploy: **`dautu` xong đủ 4 lớp** (câu báo của `orders`, `switch`, `reports` còn trong service) |
-| 6.6… các chức năng còn lại | chưa |
+| 6.6f `dautu`: lệnh và nút (`interface/dautu/fund`), việc phục vụ chỗ khác (`services/dautu/reports`), xóa `dautu.py` | xong, đã deploy (#67): **`dautu` xong đủ 4 lớp** (câu báo của `orders`, `switch`, `reports` còn trong service) |
+| 6.7a `taisan`: nguồn giá (`infrastructure/{clock,crypto,vietcombank,fmarket}`, `services/taisan/prices`, `domain/taisan/kinds`) | xong, chờ deploy |
+| 6.7… phần còn lại của `taisan` (định giá, tài khoản chính, bán/rút, mua bán cổ phiếu, khám sức khỏe, lệnh, nút), rồi các chức năng còn lại | chưa |
 | Cuối: dọn | chưa |
 
 Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.

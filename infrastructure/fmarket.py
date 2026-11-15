@@ -30,3 +30,12 @@ def fund_detail(product_id):
         {"ma": h.get("stockCode"), "nganh": h.get("industry"), "tyle": h.get("netAssetPercent")}
         for h in d.get("productTopHoldingList") or []],
         "top_luc": (d.get("productFund") or {}).get("updateAssetHoldingTime")}
+
+
+def fund_navs():
+    """{mã quỹ: NAV mới nhất} của 100 quỹ đầu danh sách Fmarket."""
+    body = {"types": ["NEW_FUND", "TRADING_FUND"], "issuerIds": [], "sortOrder": "DESC", "sortField": "navTo6Months",
+            "page": 1, "pageSize": 100, "isIpo": False, "fundAssetTypes": [], "bondRemainPeriods": [],
+            "searchField": "", "isBuyByReward": False, "thirdAppIds": []}
+    rows = web.http_json(f"{FMARKET}/products/filter", body)["data"]["rows"]
+    return {r["shortName"].upper(): float(r["nav"]) for r in rows if r.get("shortName") and r.get("nav")}

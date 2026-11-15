@@ -8,14 +8,10 @@
 import html
 import re
 import sys
-import urllib.request
-import xml.etree.ElementTree as ET
 from calendar import monthrange
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
-import chungkhoan
 from infrastructure import kho
-from infrastructure import web
 from repositories import keys
 from repositories.chitieu import ledger as ledger_repo
 from domain.luong.salary import Salary
@@ -24,20 +20,19 @@ from repositories.dautu import fund as fund_repo
 from repositories.luong import salary as salary_repo
 from domain.common import dates
 from domain.common.money import number  # noqa: F401
+from infrastructure import clock
+from services.taisan.prices import (SOURCES, coin_prices, fund_navs, fx_rates, gold_table, prices,  # noqa: F401
+                                    stock_prices)
 from domain.vang.gold import GoldLot, holdings_chi, sell_fifo
 from repositories.vang import gold as gold_repo
 import phantich as pt
 import sochitieu as ct
-from bantin import VN_TZ, gold_prices, vn_num
+from bantin import vn_num
 
 SELL_TAX = 0.001  # thuế thu nhập cá nhân khi bán chứng khoán: 0,1% giá trị bán
 BROKER_FEE = 0.0  # DNSE miễn phí giao dịch; công ty khác thường thu 0,1–0,35% mỗi chiều
 TYPES = {"tien": "🏦 Tiền, tài khoản", "tietkiem": "🐷 Tiết kiệm", "etf": "🧺 ETF", "cp": "📈 Cổ phiếu", "quy": "💹 Quỹ mở",
          "vang": "🥇 Vàng", "coin": "🪙 Tiền số", "ngoaite": "💵 Ngoại tệ", "khac": "🏠 Tài sản khác", "no": "💳 Nợ"}
-COINS = {"btc": "bitcoin", "eth": "ethereum", "usdt": "tether", "bnb": "binancecoin", "sol": "solana",
-         "xrp": "ripple", "ada": "cardano", "doge": "dogecoin", "ton": "the-open-network", "trx": "tron"}
-FMARKET = "https://api.fmarket.vn/res/products/filter"
-VCB_FX = "https://portal.vietcombank.com.vn/Usercontrols/TVPortal.TyGia/pXML.aspx"
 BUTTONS = [[("📊 Biểu đồ", "ts:bd"), ("🩺 Khám sức khỏe", "ts:sk")],
            [("🗂 Sửa, xóa", "ts:ds"), ("🔄 Cập nhật giá", "ts:xem")],
            [("🏦 Tài khoản chính", "ts:chinh"), ("➕ Thêm", "y:them"), ct.BACK]]
@@ -61,7 +56,7 @@ def gold_amount(taels):
 
 
 def now_vn():
-    return datetime.now(VN_TZ)
+    return clock.now_vn()
 
 
 def short(x):
@@ -80,86 +75,7 @@ def new_id(data):
     return assets_repo.new_id(data)
 
 
-# ---- Giá: lấy từ nguồn, nhớ trong kho; nguồn lỗi thì dùng giá gần nhất ---------------
-
-def stock_prices(codes):
-    quotes = chungkhoan.quotes(codes)
-    return {s: q["price"] or q["ref"] for s, q in quotes.items() if q["price"] or q["ref"]}
-
-
-def gold_table(codes=None):
-    p = gold_prices()  # triệu đồng/lượng, giá cửa hàng mua vào
-    return {"sjc": p["sjc"][0] * 1e6, "nhan": p["nhan"][0] * 1e6}
-
-
-def fund_navs(codes=None):
-    body = {"types": ["NEW_FUND", "TRADING_FUND"], "issuerIds": [], "sortOrder": "DESC", "sortField": "navTo6Months",
-            "page": 1, "pageSize": 100, "isIpo": False, "fundAssetTypes": [], "bondRemainPeriods": [],
-            "searchField": "", "isBuyByReward": False, "thirdAppIds": []}
-    rows = web.http_json(FMARKET, body)["data"]["rows"]
-    return {r["shortName"].upper(): float(r["nav"]) for r in rows if r.get("shortName") and r.get("nav")}
-
-
-def coin_prices(codes):
-    """Giá tiền số (đồng): CoinGecko; bị chặn hay quá lượt thì lấy giá USD trên Coinbase × tỷ giá Vietcombank."""
-    ids = {COINS.get(c, c): c for c in codes}
-    try:
-        data = web.http_json("https://api.coingecko.com/api/v3/simple/price?vs_currencies=vnd&ids=" + ",".join(ids))
-        got = {ids[i]: float(v["vnd"]) for i, v in data.items() if v.get("vnd")}
-        if got:
-            return got
-    except Exception as e:
-        print(f"[lỗi] CoinGecko, chuyển sang Coinbase: {e!r}", file=sys.stderr)
-    usd = prices("ngoaite", ["USD"])[0].get("USD")
-    if not usd:
-        raise RuntimeError("không có tỷ giá USD để đổi giá tiền số")
-    got = {}
-    for code in codes:
-        try:
-            got[code] = float(web.http_json(f"https://api.coinbase.com/v2/prices/{code.upper()}-USD/spot")["data"]["amount"]) * usd
-        except Exception as e:
-            print(f"[lỗi] Coinbase {code}: {e!r}", file=sys.stderr)
-    return got
-
-
-def fx_rates(codes=None):
-    req = urllib.request.Request(VCB_FX, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        root = ET.fromstring(r.read())
-    rates = {}
-    for row in root.iter("Exrate"):
-        for field in ("Transfer", "Buy"):  # giá Vietcombank mua chuyển khoản, không có thì mua tiền mặt
-            value = (row.get(field) or "").replace(",", "").strip()
-            if value and value != "-":
-                rates[row.get("CurrencyCode")] = float(value)
-                break
-    return rates
-
-
-SOURCES = {  # loại: (hàm lấy giá theo danh sách mã, số phút còn dùng được giá đã lưu)
-    "cp": (stock_prices, 5), "etf": (stock_prices, 5), "vang": (gold_table, 30), "quy": (fund_navs, 120), "coin": (coin_prices, 30),
-    "ngoaite": (fx_rates, 60)}
-
-
-def prices(kind, codes, fresh=False):
-    """(giá {mã: đồng}, lúc cập nhật, có phải giá cũ do nguồn lỗi). fresh=True thì bỏ qua giá đã lưu."""
-    codes = sorted(set(codes))
-    if not codes:
-        return {}, None, False
-    fetch, minutes = SOURCES[kind]
-    saved, when = assets_repo.price_cache(kind)
-    if not fresh and when and all(c in saved for c in codes) and \
-            (now_vn() - datetime.fromisoformat(when)).total_seconds() < minutes * 60:
-        return saved, when, False
-    try:
-        got = fetch(codes)  # mã nguồn không có (mã sai) thì không có trong got; không phải lỗi nguồn
-        when = now_vn().isoformat(timespec="minutes")
-        saved = {**saved, **got}
-        assets_repo.save_price_cache(kind, saved, when)
-        return saved, when, False
-    except Exception as e:
-        print(f"[lỗi] giá {kind}: {e!r}", file=sys.stderr)
-        return saved, when, True
+# ---- Giá: xem services/taisan/prices.py ---------------------------------------------------
 
 
 # ---- Định giá -------------------------------------------------------------------------
