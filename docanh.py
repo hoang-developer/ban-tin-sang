@@ -16,6 +16,7 @@ from datetime import date, timedelta
 
 import kho
 from repositories import keys
+from repositories import ledger as ledger_repo
 import sochitieu as ct
 import tg
 
@@ -249,7 +250,7 @@ def record(txs, now):
     learned, active, out = kho.get(keys.LEARN, {}), ct.groups(), []
     for tx in txs:
         e = entry_from(tx, learned, active)
-        e["id"] = kho.command("INCR", keys.COUNTER)
+        e["id"] = ledger_repo.next_id()
         e["gio"] = now.strftime("%H:%M")
         ct.save(e)
         kho.put(fingerprint(e["ngay"], e["tien"], tx["chieu"]), e["id"], 120 * 86400)
@@ -274,7 +275,7 @@ def single(tx, message, now, check_dup=True):
         e["nhom"] = chosen
         e.pop("ai", None)
         ct.learn(e["ghichu"], chosen)
-    e["id"] = kho.command("INCR", keys.COUNTER)
+    e["id"] = ledger_repo.next_id()
     e["gio"] = now.strftime("%H:%M")
     ct.save(e)
     kho.put(fingerprint(e["ngay"], e["tien"], tx["chieu"]), e["id"], 120 * 86400)
@@ -303,7 +304,7 @@ def on_button(arg, message, now):
     kind, _, rest = arg.partition(":")
     day = now.date()
     if kind == "diem" and rest.isdigit():
-        e = {"id": kho.command("INCR", keys.COUNTER), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
+        e = {"id": ledger_repo.next_id(), "ngay": day.isoformat(), "gio": now.strftime("%H:%M"),
              "tien": int(rest), "ghichu": "đổi điểm, voucher", "nhom": ct.INCOME}
         ct.save(e)
         rows = [row for row in ct.keyboard_rows(message) if not any(d.startswith("anh:diem") for _, d in row)]

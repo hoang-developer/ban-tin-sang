@@ -84,11 +84,13 @@ trong test giống `main` từng lệnh. Trong `taisan.py` còn gọi kho: `INCR
 và `kho.ready()` (kiểm tra cấu hình, không phải truy cập dữ liệu, được phép ở mọi nơi).
 
 ### Bước 4: `LedgerRepo` (sổ chi tiêu)
-Dùng nhiều nhất (`sochitieu.load/save/HSET/HGET/HDEL`).
-- `domain/ledger.py`: `Entry`.
-- `repositories/ledger.py`: `month(ym)`, `add(entry)`, `remove(id)`, `find(id)`, bộ đếm id.
+Dùng nhiều nhất (`sochitieu.load/save/HSET/HGET/HDEL`, và 8 chỗ xin mã khoản mới ở `docanh`, `doichieu`, `sono`, `taisan`).
+- `repositories/ledger.py`: `load(ym)`, `save(entry)`, `find(ym, id)`, `remove(ym, id)`, `next_id()`, `last_id()`.
+- Khoản thu/chi giữ dạng dict (như mục tài sản): kiểu `Entry` riêng làm cùng bước 5–6, vì `e["nhom"]`, `e["tien"]`… có ở hầu
+  hết module. `ct.load/save/find/delete` giữ làm cửa vào, ủy quyền cho repo.
 
-Xong khi: `sochitieu.py` không gọi `HSET/HGET/HDEL/HGETALL` trực tiếp.
+Xong khi: không file nào ngoài repo dùng `keys.COUNTER`, `keys.ledger_month` hay lệnh hash `HSET/HGET/HDEL` cho sổ (test chặn);
+toàn bộ lệnh ghi Redis trong test giống `main` từng lệnh.
 
 ### Bước 5: tách `taisan.py` thành domain / service / presentation
 - `sell_gold`, `close_saving`, `sell_fund`, `collect_loan`, `remove_named` trả `SaleResult` / `CloseResult`…; phần HTML chuyển sang `presentation/`.
@@ -112,8 +114,9 @@ Thêm số phiên bản vào `AssetRepo` để webhook và tick không ghi đè 
 | 0 Nền, `plan.md` | xong, đã deploy ([#52](https://github.com/hoang-developer/ban-tin-sang/pull/52)) |
 | 1 `keys.py` + `Store` | xong, đã deploy ([#52](https://github.com/hoang-developer/ban-tin-sang/pull/52)) |
 | 2 `GoldRepo` | xong, đã deploy ([#53](https://github.com/hoang-developer/ban-tin-sang/pull/53)) |
-| 3 `AssetRepo`, `SalaryRepo`, `FundRepo` | đang làm |
-| 4–7 | chưa |
+| 3 `AssetRepo`, `SalaryRepo`, `FundRepo` | xong, đã gộp ([#54](https://github.com/hoang-developer/ban-tin-sang/pull/54)) |
+| 4 `LedgerRepo` | đang làm |
+| 5–7 | chưa |
 
 ## 5. Chưa làm
 
