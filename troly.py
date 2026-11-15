@@ -160,7 +160,7 @@ TRIGGERS = ["chuyển", "nạp", "rút", "tiết kiệm", "vàng", "vay", "mư�
 # Câu hỏi về thứ ngoài sổ chi tiêu (nợ, tài sản, quỹ, kế hoạch): không trả lời bằng sổ chi tiêu
 BEYOND = ["nợ", "vay", "quỹ", "ccq", "vff", "vmeef", "tài sản", "tiết kiệm", "vàng", "cổ phiếu", "đầu tư", "dự phòng",
           "kế hoạch", "mục tiêu", "lãi", "lỗ", "ngân sách", "trả xong", "bao giờ", "khi nào", "tài khoản", "số dư",
-          "sức khỏe", "để dành", "được tiêu", "nên tiêu"]
+          "sức khỏe", "để dành", "được tiêu", "nên tiêu", "được không", "có nên", "nên mua", "có đủ"]
 
 
 def word_re(words):
@@ -272,7 +272,8 @@ def prompt(day, personal=True, facts=None, people=None):
         '- "tra_no": trả bớt một khoản nợ của mình (trả góp, trả thẻ, trả người thân). "ten" (dùng đúng tên khoản nợ đang '
         'có nếu khớp), "tien", "ngay".\n'
         '- "no_moi": vay thêm hoặc khai báo khoản nợ (vay ai, mượn ai, mua trả góp, nợ thẻ). "ten", "tien" (số còn nợ), '
-        '"moi_thang", "lai" (%/năm; 0 nếu nói không lãi), "ngay_tra" (ngày trả hằng tháng).\n'
+        '"moi_thang", "lai" (%/năm; 0 nếu nói không lãi), "ngay_tra" (ngày trả hằng tháng). Câu có cả tổng nợ lẫn '
+        '"mỗi tháng" là khai báo nợ mới, không phải trả nợ.\n'
         '- "cho_vay": mình cho người khác vay, mượn tiền. "ten" (người vay), "tien".\n'
         '- "thu_no": người mình cho vay trả lại tiền. "ten" (người trả), "tien".\n'
         "TIỀN, TÀI KHOẢN\n"
@@ -309,9 +310,10 @@ def prompt(day, personal=True, facts=None, people=None):
         '- "hoi": hỏi về các khoản chi, thu ĐÃ GHI (hết bao nhiêu, nhiều nhất, so sánh, liệt kê theo thời gian, nhóm).\n'
         + ('- "tra_loi": hỏi về tình hình tài chính (nợ, bao giờ trả xong, quỹ dự phòng, đầu tư lãi lỗ, nên mua bao nhiêu, '
            'tài sản, số dư, còn được tiêu, có mua được món gì không). "cau": câu trả lời 1–3 câu, xưng "bạn", CHỈ dùng số '
-           'trong phần SỐ LIỆU bên dưới, nêu đúng con số; không có số liệu thì nói chưa có. "man": màn hình liên quan '
-           '(cùng danh sách của "xem").\n' if facts else "")
-        + '- "xem": muốn mở một màn hình' + ("" if facts else ", hoặc hỏi về nợ, tài sản, quỹ, kế hoạch") + '. "man" là '
+           'trong phần SỐ LIỆU bên dưới, viết số y như SỐ LIỆU (8k, 1,01tr, ~10/2037); không có số liệu thì nói chưa có. '
+           '"man": màn hình liên quan (cùng danh sách của "xem"). Câu HỎI (bao nhiêu, bao giờ, khi nào, thế nào, được '
+           'không, có nên) luôn là "tra_loi", không phải "xem".\n' if facts else "")
+        + '- "xem": ra lệnh mở, xem một màn hình (mở…, xem…, cho xem…)' + ("" if facts else ", hoặc hỏi về nợ, tài sản, quỹ, kế hoạch") + '. "man" là '
         'một trong: tong_quan, chi_tieu (báo cáo chi tiêu; thêm "ky": ngay | tuan | thang | thangtruoc), tai_san, no, '
         'ke_hoach, chia_luong, du_phong, dau_tu, tiet_kiem, suc_khoe, lich_su, bieu_do, du_bao, ngan_sach, huong_dan.\n'
         '- "khac": không thuộc việc nào ở trên, hoặc không hiểu.\n'
@@ -328,6 +330,10 @@ def prompt(day, personal=True, facts=None, people=None):
         'bán 40 ccq VMEEF được 600k → {"viec": "ban_quy", "ma": "VMEEF", "ccq": 40, "tien": 600000}\n'
         'Nam trả mình 1tr → {"viec": "thu_no", "ten": "Nam", "tien": 1000000}\n'
         'vay anh Nam 10tr không lãi → {"viec": "no_moi", "ten": "anh Nam", "tien": 10000000, "lai": 0}\n'
+        'mua trả góp xe máy 30tr mỗi tháng 2tr5 → {"viec": "no_moi", "ten": "xe máy", "tien": 30000000, "moi_thang": '
+        '2500000}\n'
+        'rút quỹ dự phòng 3tr đi khám bệnh → {"viec": "nhieu", "ds": [{"viec": "du_phong", "tien": 3000000, "chieu": '
+        '"rut"}, {"viec": "chi", "tien": 3000000, "ghi_chu": "khám bệnh"}]}\n'
         'chuyển 5tr vào tiết kiệm → {"viec": "tiet_kiem", "tien": 5000000}\n'
         'trả nợ chú Tư 5tr → {"viec": "tra_no", "ten": "chú Tư", "tien": 5000000}\n'
         'chuyển khoản tiền nhà 5tr → {"viec": "chi", "tien": 5000000, "ghi_chu": "tiền nhà"}\n'
@@ -341,7 +347,9 @@ def prompt(day, personal=True, facts=None, people=None):
         'tháng này cà phê hết bao nhiêu → {"viec": "hoi"}\n'
         + ('còn nợ bao nhiêu → {"viec": "tra_loi", "cau": "Bạn còn nợ … (theo SỐ LIỆU)", "man": "no"}\n'
            'tháng này mua tai nghe 2tr được không → {"viec": "tra_loi", "cau": "… (so với số còn được tiêu, kế hoạch '
-           'trong SỐ LIỆU)", "man": "chia_luong"}\n' if facts else
+           'trong SỐ LIỆU)", "man": "chia_luong"}\n'
+           'bao giờ trả xong thẻ → {"viec": "tra_loi", "cau": "Thẻ … trả xong khoảng … (theo SỐ LIỆU)", "man": "no"}\n'
+           if facts else
            'tôi còn nợ bao nhiêu → {"viec": "xem", "man": "no"}\n')
         + 'mở sổ nợ → {"viec": "xem", "man": "no"}'
         + (("\n" + personal_context()) if personal else "") + (("\n" + people) if people else "")
