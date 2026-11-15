@@ -31,6 +31,7 @@ LEGACY_IMPORTS = {
     "presentation/no/debt.py": {"phantich", "sochitieu", "taisan"},
     "interface/no/debt.py": {"sochitieu", "menu"},
     "interface/common.py": {"sochitieu"},
+    "services/taisan/prices.py": {"chungkhoan", "bantin"},
     "presentation/dautu/view.py": {"sochitieu"},
     "services/dautu/orders.py": {"taisan"},
     "interface/dautu/fund.py": {"phantich", "sochitieu", "taisan"},

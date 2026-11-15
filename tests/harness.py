@@ -64,6 +64,7 @@ kho.ready = lambda: True
 
 import bantin  # noqa: E402
 from interface.dautu import fund as dautu  # noqa: E402
+from infrastructure import clock  # noqa: E402
 from services.dautu import market as dautu_market  # noqa: E402
 import sochitieu as ct  # noqa: E402
 import taisan as ts  # noqa: E402
@@ -76,6 +77,7 @@ SENT = []  # tin bot tự gửi (việc theo giờ)
 ct.today = lambda: CLOCK["now"].date()
 dautu_market.now_vn = lambda: CLOCK["now"]  # service dữ liệu quỹ có đồng hồ riêng
 ts.now_vn = lambda: CLOCK["now"]
+clock.now_vn = lambda: CLOCK["now"]  # giá tài sản và taisan.now_vn dùng đồng hồ chung
 tg.send_reply = lambda chat, reply, tok=None: SENT.append(reply)
 tg.send = lambda chat, text, buttons=None, tok=None: SENT.append((text, buttons))
 
