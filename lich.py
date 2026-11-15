@@ -14,7 +14,7 @@ from infrastructure import kho
 from repositories import keys
 from repositories.vang import gold as gold_repo
 import lenh
-import nhandinh
+from interface.nhandinh import analysis as nhandinh
 from interface.phantich import analysis as phantich
 import sochitieu as chitieu
 from interface.no import debt as sono

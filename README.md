@@ -42,7 +42,7 @@ Các lệnh `/theodoi`, `/nho`, `/vivang`, `/doan` và nút ⭐ cần **kho dữ
 
 ### Nhận định trong phiên
 
-Ngày giao dịch, bot tự gửi lúc **10h15** và **13h45** (tắt: `/nhandinh tat`). Code ở [nhandinh.py](nhandinh.py).
+Ngày giao dịch, bot tự gửi lúc **10h15** và **13h45** (tắt: `/nhandinh tat`). Code ở [interface/nhandinh/analysis.py](interface/nhandinh/analysis.py).
 
 - **Dữ liệu** (bot tự tính): ngành theo phân ngành ICB cấp 3 của VNDirect, % thay đổi theo vốn hóa của ~430 mã
   HOSE (giá Vietcap), giá trị giao dịch, khối ngoại ròng; mã giao dịch nhiều nhất, tăng/giảm mạnh, khối ngoại mua

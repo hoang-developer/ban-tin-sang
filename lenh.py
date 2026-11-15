@@ -15,7 +15,7 @@ from infrastructure import kho
 from repositories import keys
 from domain.vang.gold import GoldLot
 from repositories.vang import gold as gold_repo
-import nhandinh
+from interface.nhandinh import analysis as nhandinh
 from infrastructure import telegram as tg
 from domain.common.dates import WEEKDAYS
 from domain.common.format import vn_num
