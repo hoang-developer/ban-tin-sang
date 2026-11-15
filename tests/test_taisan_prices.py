@@ -5,7 +5,7 @@ import urllib.request
 
 from tests import harness as h
 
-import chungkhoan
+from services.chungkhoan import market as chungkhoan
 from infrastructure import crypto, fmarket, vietcombank, web
 from repositories.taisan import assets as assets_repo
 from services.taisan import prices as svc

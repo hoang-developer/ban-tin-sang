@@ -2,7 +2,7 @@
 import sys
 from datetime import datetime
 
-import chungkhoan  # module cũ ở gốc: giá cổ phiếu
+from services.chungkhoan import market as chungkhoan  # giá cổ phiếu
 from services.bantin.data import gold_prices
 from domain.taisan.kinds import COINS
 from infrastructure import clock, crypto, fmarket, vietcombank

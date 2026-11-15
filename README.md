@@ -64,7 +64,7 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
 [canhbao.yml](.github/workflows/canhbao.yml) và [bantin.yml](.github/workflows/bantin.yml) gọi dự phòng):
 
 - **☀️ Bản tin sáng** (6:45, lỡ giờ thì gửi muộn tới 12h, mỗi ngày một lần).
-- **Cảnh báo** (6h–22h, [canhbao.py](canhbao.py)), chỉ nhắn khi có chuyện:
+- **Cảnh báo** (6h–22h, [interface/canhbao/runner.py](interface/canhbao/runner.py)), chỉ nhắn khi có chuyện:
   ☔ sắp mưa trong 2 tiếng tới · 😷 không khí xấu đi, vượt AQI 150 · 🪙 vàng SJC đổi từ 1 triệu/lượng
   (kèm giá trị ví vàng) · 📉 VN-Index tăng/giảm mỗi 1,5% · 🎯 mã chạm giá đặt bằng `/theodoi` hoặc
   `WATCHLIST` · 📰 tin có từ khóa trong `KEYWORDS` hoặc thêm bằng `/tukhoa` (tối đa 5 tin/lần).
@@ -79,7 +79,7 @@ Chạy mỗi lần có lời gọi `/api/tick` (cron-job.org mỗi 15 phút; l�
 - **🌙 Bản tin tối** (21h): thời tiết và gợi ý ngày mai, chứng khoán hôm nay, giá vàng so với hôm
   qua, ví vàng, ngày cần nhớ ngày mai, kết quả đoán. Bot cũng ghi giá vàng mỗi tối để `/neu vang` dùng.
 
-Nếu Vercel không chạy được (chưa có kho dữ liệu, lỗi...), GitHub tự chạy `canhbao.py` và `interface/bantin/bulletin.py`
+Nếu Vercel không chạy được (chưa có kho dữ liệu, lỗi...), GitHub tự chạy `interface/canhbao/runner.py` và `interface/bantin/bulletin.py`
 như trước, chỉ thiếu các việc mới; bản tin gửi theo cách này có dòng ⚠️ ở cuối. Lịch của GitHub rất
 thất thường (có ngày gần như không chạy), nên đừng trông vào nó: cronjob 15 phút ở bước 6 là chính.
 
@@ -543,11 +543,11 @@ GitHub không tự tắt lịch khi repo 60 ngày không có commit.
 ```
 python -m interface.bantin.bulletin                    # bản tin sáng
 python lenh.py /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
-python thoitiet.py Đà Nẵng
-python tintuc.py giá vàng 24h
+python -m interface.thoitiet.report Đà Nẵng
+python -m interface.tintuc.search giá vàng 24h
 python sochitieu.py "cà phê 35k"   # bot chi tiêu: chỉ đọc và xếp nhóm, không ghi
 python -m domain.amlich.lunar 17/2/2026
-python canhbao.py --xem             # cảnh báo, không gửi
+python -m interface.canhbao.runner --xem             # cảnh báo, không gửi
 ```
 
 Không có token Telegram thì bản tin chỉ in ra màn hình. Muốn gửi thật từ máy, tạo file `.env`:
@@ -561,6 +561,6 @@ TELEGRAM_CHAT_ID=...
 
 Open-Meteo (thời tiết, AQI, tìm địa danh), SJC (dự phòng: PNJ), VNDirect (dự phòng: SSI), RSS VnExpress
 và Dân trí. Chứng khoán trong phiên: VPS (chỉ số), Vietcap (giá từng mã, dự phòng: VPS). Google News:
-tìm tin theo từ khóa ([tintuc.py](tintuc.py), dự phòng: RSS VnExpress, Dân trí, Tuổi Trẻ, Thanh Niên),
+tìm tin theo từ khóa ([interface/tintuc/search.py](interface/tintuc/search.py), dự phòng: RSS VnExpress, Dân trí, Tuổi Trẻ, Thanh Niên),
 tin theo mã, tin cổ tức. Âm lịch tính theo thuật toán của Hồ Ngọc Đức ([domain/amlich/lunar.py](domain/amlich/lunar.py)).
 Lịch sử giá vàng không có nguồn công khai: bot tự ghi giá SJC mỗi tối.

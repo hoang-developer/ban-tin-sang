@@ -23,10 +23,10 @@ from infrastructure.clock import VN_TZ
 from interface.bantin.bulletin import BUTTONS as BANTIN_BUTTONS
 from interface.bantin.bulletin import build_message, gold, section
 from services.bantin.data import gold_prices, index_history
-from canhbao import KEYWORDS, normalize
-from chungkhoan import MAX_SYMBOLS, SYMBOL, dong, news, quote, quotes, stock_command
-from thoitiet import find_place, report
-from tintuc import headlines_text, parse_query, results_text
+from domain.canhbao.rules import KEYWORDS, normalize
+from interface.chungkhoan.stock import MAX_SYMBOLS, SYMBOL, dong, news, quote, quotes, stock_command
+from interface.thoitiet.report import find_place, report
+from interface.tintuc.search import headlines_text, parse_query, results_text
 
 # ---- Cấu hình -------------------------------------------------------------
 MAX_WATCH = 10            # số mã theo dõi tối đa
@@ -67,7 +67,7 @@ def watchlist():
 
 
 def price_alerts():
-    """Mã có đặt giá báo, theo dạng WATCHLIST của canhbao.py."""
+    """Mã có đặt giá báo, theo dạng WATCHLIST của interface/canhbao/runner.py."""
     return {s: tuple(levels) for s, levels in watchlist().items() if any(x is not None for x in levels)}
 
 
@@ -434,7 +434,7 @@ def fits(data):
 
 
 def keywords():
-    """Từ khóa báo tin mới người dùng thêm (ngoài KEYWORDS cài sẵn trong canhbao.py); [] nếu chưa có kho."""
+    """Từ khóa báo tin mới người dùng thêm (ngoài KEYWORDS cài sẵn trong interface/canhbao/runner.py); [] nếu chưa có kho."""
     if not kho.ready():
         return []
     try:
