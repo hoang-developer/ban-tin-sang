@@ -22,7 +22,7 @@ from domain.common.text import norm, plain  # noqa: F401
 from infrastructure import kho
 from repositories import keys
 from repositories.chitieu import ledger as ledger_repo
-from bantin import VN_TZ, WEEKDAYS, vn_num
+from bantin import VN_TZ, vn_num
 
 # ---- Nhóm chi tiêu --------------------------------------------------------------
 # mã -> (tên, từ khóa). Từ khóa so khớp nguyên từ; nhiều từ cùng khớp thì lấy cụm dài nhất

@@ -6,7 +6,6 @@
 - /suckhoe: khám sức khỏe tài chính từ số liệu của chính bạn; AI chỉ viết nhận xét, không khuyên mua bán mã nào.
 """
 import html
-import json
 import re
 import sys
 import urllib.request

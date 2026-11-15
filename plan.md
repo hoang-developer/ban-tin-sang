@@ -187,6 +187,7 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.6a `dautu`: dữ liệu Fmarket (`infrastructure/fmarket`, `repositories/dautu/market`), lịch phiên (`domain/dautu/calendar`), phiên kế tiếp (`services/dautu/market`) | xong, đã deploy (#62) |
 | 6.6b `dautu`: quy tắc VA (`domain/dautu/plan`), tình trạng kỳ + chốt kỳ (`services/dautu/status`) | xong, đã deploy (#63) |
 | 6.6c `dautu`: lệnh, khớp lệnh, hoán đổi (`services/dautu/{orders,switch}`), định dạng số dùng chung (`domain/common/format`, `domain/dautu/text`) | xong, chờ deploy (câu báo còn nằm trong service, tách sang presentation ở bước sau) |
+| 6.6d dọn lớp `interface`: `interface/common.py` dùng chung (chặn khi chưa nối kho, nhận biết tin, bỏ nút, cắt thông báo), hàm nội bộ đổi tên riêng tư, bỏ import thừa | xong, chờ deploy |
 | 6.6… các chức năng còn lại | chưa |
 | Cuối: dọn | chưa |
 
@@ -223,8 +224,8 @@ Hoàn tác: mỗi bước là một PR riêng, `git revert` được.
 | Chỉ số | Lúc đầu | Hiện tại | Đích |
 |---|---|---|---|
 | File `.py` ở gốc repo (không tính `api/`) | 26 | 19 | 0 |
-| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 13 (130) | 1 (`repositories/store.py`) |
-| Chức năng đã tách vào đủ các lớp | 0 | 5 (`duphong`, `tietkiem`, `doichieu`, `no`, `kehoach`) | mọi chức năng ở bảng "module cũ đi đâu" |
+| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 11 (116, đếm lại; lớp `interface` chỉ còn gọi qua `interface/common.py`) | 1 (`repositories/store.py`) |
+| Chức năng đã tách vào đủ các lớp | 0 | 5 (`duphong`, `tietkiem`, `doichieu`, `no`, `kehoach`); `dautu` mới có domain, repositories, services | mọi chức năng ở bảng "module cũ đi đâu" |
 | Chuỗi khóa Redis viết cứng ngoài `keys.py` | ~20 | 0 | 0 |
 | Hàm nạp muộn né import vòng | 9 | 9 | 0 |
 | Hàm nghiệp vụ trả HTML | nhiều | nhiều | 0 |

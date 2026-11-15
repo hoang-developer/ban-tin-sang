@@ -1,7 +1,7 @@
 """Đối chiếu tài sản tháng: lệnh /doichieu, nút dc:, tin sáng ngày 15, việc cần làm ở 🏠 Hôm nay."""
 import sochitieu as ct  # module cũ ở gốc: ngày hôm nay
 from domain.doichieu.reconcile import color  # noqa: F401 (các module khác gọi qua đây)
-from infrastructure import kho
+from interface import common
 from presentation.doichieu import reconcile as view
 from services.doichieu import reconcile as service
 
@@ -10,9 +10,8 @@ name = view.name
 amount_text = view.amount_text
 
 
+@common.needs_store
 def screen(day):
-    if not kho.ready():
-        return ct.NEED_STORE
     return view.screen_view(day, service.screen_state(day))
 
 
@@ -51,5 +50,5 @@ def on_button(arg, message, now):
         return f"✅ Đã đánh dấu khớp {n} ngăn", ("edit", lambda: screen(day))
     if kind == "ghi":
         note = view.gap_booked_text(service.book_gap(value, now))
-        return note[:190], ("edit", lambda: (note, view.screen_rows()))
+        return common.clip(note), ("edit", lambda: (note, view.screen_rows()))
     return None, None

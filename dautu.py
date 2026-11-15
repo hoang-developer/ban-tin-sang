@@ -17,7 +17,6 @@ import sys
 from datetime import date, datetime, timedelta
 
 from infrastructure import kho
-from repositories import keys
 from repositories.dautu import fund as fund_repo
 from repositories.luong import salary as salary_repo
 from domain.dautu.calendar import cutoff_day, months, weekdays_after, ym_add, ym_of, ym_text  # noqa: F401
@@ -36,7 +35,7 @@ from services.dautu.market import (current_period, find_fund, fund_info, is_dead
 import phantich as pt
 import sochitieu as ct
 import taisan as ts
-from bantin import VN_TZ, vn_num
+from bantin import vn_num
 
 # {"ma", "id", "ten", "bat_dau": "YYYY-MM", "goc": giá trị quỹ có sẵn lúc bắt đầu, "gop": {"YYYY-MM": số góp từ tháng đó},
 #  "tang": 0.01, "nap": {"YYYY-MM": đã góp vào hệ thống trong tháng}, "ky": {"YYYY-MM": {"chot", "bo", "muc", "gt"}},

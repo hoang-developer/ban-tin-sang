@@ -1,13 +1,13 @@
 """Quỹ dự phòng: lệnh /duphong và nút dp: của bot chi tiêu. Đọc lệnh, gọi service, nhờ presentation dựng tin."""
 import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày hôm nay, hàng nút
-from infrastructure import kho
+from interface import common
+from interface.kehoach import plan as kehoach
 from presentation.duphong import reserve as view
 from services.duphong import reserve as service
 
 
+@common.needs_store
 def text(day):
-    if not kho.ready():
-        return ct.NEED_STORE
     return view.status_view(service.status(day))
 
 
@@ -16,13 +16,12 @@ def change(amount, day, from_main=True):
     return view.change_note(service.change(amount, day, from_main))
 
 
-def where(day):
+def _where(day):
     return view.where_text(service.savings_books())
 
 
+@common.needs_store
 def duphong(args):
-    if not kho.ready():
-        return ct.NEED_STORE
     day = ct.today()
     word = ct.plain(args[0]) if args else ""
     rest = " ".join(args[1:])
@@ -60,7 +59,7 @@ def duphong(args):
     if word == "tinh":
         return view.toggle_text(service.toggle(rest)) if rest.strip() else usage
     if word in ("noi", "odau"):
-        return where(day)
+        return _where(day)
     return usage
 
 
@@ -73,14 +72,12 @@ def on_button(arg, message, now):
     if kind == "nap" and value.isdigit():
         lines = change(int(value), day).split("\n")
         toast = lines[0][2:] + "".join(f" · {x[2:]}" for x in lines[1:] if x.startswith("🎉"))
-        title = message.get("text") or ""
-        if title.startswith("🛟 Quỹ dự phòng"):  # nút trên tin quỹ: vẽ lại tin
+        if common.title_starts(message, "🛟 Quỹ dự phòng"):  # nút trên tin quỹ: vẽ lại tin
             return toast, ("edit", lambda: text(day))
-        if title.startswith("📋"):  # nút trên tin chia lương: vẽ lại tin đó
-            from interface.kehoach import plan as kehoach
+        if common.title_starts(message, "📋"):  # nút trên tin chia lương: vẽ lại tin đó
             return toast, ("edit", lambda: kehoach.plan(day))
-        rows = [[b for b in row if not b[1].startswith("dp:nap")] for row in ct.keyboard_rows(message)]
-        return toast, ("buttons", lambda: [row for row in rows if row])  # nút dưới tin "Đã ghi lương": bỏ nút đó
+        rows = common.without_buttons(message, "dp:nap")
+        return toast, ("buttons", lambda: rows)  # nút dưới tin "Đã ghi lương": bỏ nút đó
     if kind == "thang" and value.isdigit():
         service.set_months(int(value))
         return None, ("edit", lambda: text(day))
@@ -88,5 +85,5 @@ def on_button(arg, message, now):
         service.set_deadline(int(value), day)
         return None, ("edit", lambda: text(day))
     if kind == "noi":
-        return None, ("send", lambda: where(day))
+        return None, ("send", lambda: _where(day))
     return None, None

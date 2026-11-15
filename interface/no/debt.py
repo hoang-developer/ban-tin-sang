@@ -3,11 +3,10 @@
 Các hàm ở đây giữ tên và dạng giá trị trả về mà các màn hình khác (kế hoạch chia lương, menu, khám sức khỏe, tin sáng,
 ghi chi tiêu) đang gọi: kết quả của service được presentation dựng thành chữ.
 """
-import re
-
 import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày hôm nay, tìm khoản chi, hàng nút
 from domain.no import debt as rules
-from infrastructure import kho
+from interface import common
+from interface.kehoach import plan as kehoach
 from presentation.no import debt as pview
 from services.no import debt as service
 
@@ -23,7 +22,7 @@ def view(day):
     return pview.view_view(service.view_state(day), day)
 
 
-def edit_list():
+def _edit_list():
     return pview.edit_list_view(service.debts())
 
 
@@ -64,15 +63,14 @@ def after_record(entries, day):
     return pview.after_record_view(service.after_record(entries, day))
 
 
+@common.needs_store
 def no_cmd(args):
-    if not kho.ready():
-        return ct.NEED_STORE
     day = ct.today()
     word = ct.plain(args[0]) if args else ""
     if not args:
         return view(day)
     if word in ("xoa", "sua", "ds"):
-        return edit_list()
+        return _edit_list()
     if word in ("huongdan", "help", "?"):
         return pview.USAGE
     if word == "tra" and len(args) > 1:  # /no tra chú Tư 5tr
@@ -95,27 +93,25 @@ def on_button(arg, message, now):
     if kind == "hd":
         return None, ("send", lambda: pview.USAGE)
     if kind == "ds":
-        return None, ("edit", edit_list)
+        return None, ("edit", _edit_list)
     if kind == "x":
         if service.remove(rest):
-            return "Đã xóa khoản nợ", ("edit", edit_list)
-        return "Khoản này đã xóa rồi", ("edit", edit_list)
+            return "Đã xóa khoản nợ", ("edit", _edit_list)
+        return "Khoản này đã xóa rồi", ("edit", _edit_list)
     if kind == "tra":
         debt_id, _, amount = rest.partition(":")
         if not amount.isdigit():
             return None, None
         e, lines = pay(debt_id, int(amount), now)
-        toast = re.sub(r"<[^>]+>", "", lines[0])[:190]
+        toast = common.clip(common.strip_tags(lines[0]))
         if not e:
             return toast, None
-        title = message.get("text") or ""
-        if title.startswith("📋"):
-            from interface.kehoach import plan as kehoach
+        if common.title_starts(message, "📋"):
             return toast, ("edit", lambda: kehoach.plan(day))
-        if title.startswith("🏠"):
-            import menu
+        if common.title_starts(message, "🏠"):
+            import menu  # nạp muộn để né vòng với menu (hết khi menu được tách)
             return toast, ("edit", lambda: menu.home(day))
-        if title.startswith("💳"):
+        if common.title_starts(message, "💳"):
             return toast, ("edit", lambda: view(day))
         rows = [row for row in ct.keyboard_rows(message) if not any(d == f"no:{arg}" for _, d in row)]
         return toast, ("buttons", lambda: rows)
@@ -123,18 +119,17 @@ def on_button(arg, message, now):
     e = ct.find(reference) if kind in ("gan", "kg", "bo") else None
     if kind in ("gan", "kg", "bo") and e is None:
         return "Khoản chi này đã xóa rồi", None
-    keep = [row for row in ct.keyboard_rows(message)
-            if not any(d.startswith((f"no:gan:{reference}:", f"no:kg:{reference}", f"no:bo:{reference}")) for _, d in row)]
+    keep = common.without_rows(message, (f"no:gan:{reference}:", f"no:kg:{reference}", f"no:bo:{reference}"))
     if kind == "gan":
         payment = service.assign(e, rest.rpartition(":")[2], day)
         if payment is None:
             return "Khoản này đã trừ nợ rồi hoặc khoản nợ không còn", ("buttons", lambda: keep)
-        return re.sub(r"<[^>]+>", "", pview.payment_lines(payment)[0])[:190], ("buttons", lambda: keep)
+        return common.clip(common.strip_tags(pview.payment_lines(payment)[0])), ("buttons", lambda: keep)
     if kind == "kg":
         return "Không trừ vào khoản nợ nào", ("buttons", lambda: keep)
     if kind == "bo":
         if not e.get("no"):
             return "Khoản này không trừ nợ", ("buttons", lambda: keep)
         d = service.unassign(e)
-        return (f"Đã bỏ trừ nợ, {d['ten']} còn {pview.short(d['tien'])}" if d else "Đã bỏ trừ nợ")[:190], ("buttons", lambda: keep)
+        return common.clip(f"Đã bỏ trừ nợ, {d['ten']} còn {pview.short(d['tien'])}" if d else "Đã bỏ trừ nợ"), ("buttons", lambda: keep)
     return None, None
