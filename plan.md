@@ -210,6 +210,7 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 6.17 `nhandinh.py` tách: ngành, khuyến nghị, tin gộp ở `domain/nhandinh`, kho tạm và công tắc ở `repositories/nhandinh`, lấy dữ liệu và AI tổng hợp ở `services/nhandinh`, chữ ở `presentation/nhandinh`, lệnh và nút ở `interface/nhandinh`; file gốc còn 4 (troly, lenh, lich, sochitieu) | xong, chờ deploy |
 | 6.18 `lich.py` → `interface/lich/jobs.py` (việc theo giờ là điểm vào của lớp giao diện); khung giờ, ngày giao dịch, từ khóa cổ tức ở `domain/lich`, đánh dấu việc đã làm ở `repositories/lich`; chữ các tin tối/bảng điện còn trong jobs.py (hoãn, ghi ở mục dọn dẹp); file gốc còn 3 | xong, chờ deploy |
 | 6.19 `lenh.py` → `interface/lenh/bot.py`; giới hạn, mẫu số tiền/thời gian, đơn vị vàng, đổi tiền ra chữ ở `domain/lenh`, câu đoán xanh/đỏ và mức giá báo ở `presentation/lenh`; giá trị nhập ví vàng dùng chung cho `services/taisan/declare`; file gốc còn 2 (troly, sochitieu) | xong, chờ deploy |
+| 6.20 `troly.py` → `interface/troly/assistant.py`; khuôn việc (`F`), chữ báo hiệu, mẫu câu trả lời ngắn ở `domain/troly/spec`, ví dụ và menu ➕ ở `presentation/troly`; JOBS, AI hiểu câu, trạng thái hội thoại, thẻ xác nhận còn trong assistant.py (tách tiếp ở mục dọn dẹp); file gốc còn 1 (sochitieu) | xong, chờ deploy |
 | 6.8… dọn `sochitieu.py` khi các module còn lại (`troly`, `menu`, `phantich`, `docanh`...) bỏ `ct.`; rồi `phantich`, `troly`, `menu`, `docanh`, `thongbao`, `lich`, bot bản tin | chưa |
 | Cuối: dọn | chưa |
 

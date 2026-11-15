@@ -20,15 +20,13 @@ from repositories import keys
 import sochitieu as ct
 from domain.common.dates import WEEKDAYS
 from domain.common.format import vn_num
+from domain.troly.spec import (BEYOND, BEYOND_RE, CARD_SECONDS, CASH_IN, F, FILLER, GOLD_PRICE, NO_SPEND, PERIODS,  # noqa: F401
+                               SCREENS, SIMPLE, STATE_SECONDS, TERMS, TRIGGER_RE, TRIGGERS, TRY_LIMIT, beyond_spending,
+                               mentions, number_of, only_filler, word_re)
+from presentation.troly.view import ADD_MENU, EXAMPLES
 
-STATE_SECONDS, CARD_SECONDS = 900, 2 * 86400
-TRY_LIMIT = 40  # số lượt thử ?hieu= mỗi ngày trên trang tình trạng
 
 
-def F(ten, kieu, hoi=None, can=True, goi=False, chon=None):
-    """Một trường của việc. kieu: tien (đồng), so, chu, ngay (ISO), chon (một trong các lựa chọn), co (đúng/sai).
-    can: bắt buộc; goi: không bắt buộc nhưng hỏi một lần (có nút Bỏ qua); chon: [(giá trị, nhãn)] hoặc hàm trả danh sách."""
-    return {"ten": ten, "kieu": kieu, "hoi": hoi, "can": can, "goi": goi, "chon": chon}
 
 
 def debt_choices():
@@ -56,8 +54,6 @@ def loan_choices():
         return []
 
 
-GOLD_PRICE = (50, 300)  # triệu đồng/lượng: ngoài khoảng này gần như chắc nhập nhầm (giá một chỉ, thiếu số 0…)
-TERMS = [(0, "Không kỳ hạn"), (1, "1 tháng"), (3, "3 tháng"), (6, "6 tháng"), (12, "12 tháng")]
 JOBS = {
     "thu": {"nhan": "💰 Khoản thu", "xac_nhan": False, "truong": [
         F("tien", "tien", "Nhận được bao nhiêu?"), F("ghi_chu", "chu", can=False), F("ngay", "ngay", can=False)]},
@@ -132,51 +128,18 @@ JOBS = {
     "ngay_luong": {"nhan": "💼 Ngày lương", "xac_nhan": True, "truong": [
         F("ngay_luong", "so", "Lương về ngày mấy hằng tháng?"), F("tien", "tien", "Lương khoảng bao nhiêu?")]},
 }
-SCREENS = ("tong_quan", "chi_tieu", "tai_san", "no", "ke_hoach", "chia_luong", "du_phong", "dau_tu", "tiet_kiem",
-           "suc_khoe", "lich_su", "bieu_do", "du_bao", "ngan_sach", "huong_dan")
-PERIODS = ("ngay", "tuan", "thang", "thangtruoc")
-SIMPLE = ("chi", "hoi", "xem", "khong_tieu", "xoa_cuoi", "khac")
-# Thêm bằng nút: các loại hỏi được từng trường. Cổ phiếu, quỹ, tiền số có sẵn thì vẫn khai báo bằng /taisan.
-ADD_MENU = [[("🏦 Tài khoản, ví", "y:them:tai_khoan"), ("🐷 Sổ tiết kiệm", "y:them:tiet_kiem")],
-            [("🥇 Vàng", "y:them:vang"), ("🤝 Cho vay", "y:them:cho_vay")],
-            [("💳 Khoản nợ", "y:them:no_moi"), ("📈 Mua bán cổ phiếu", "y:them:co_phieu")],
-            [("🔁 Chuyển giữa tài khoản", "y:them:chuyen_tk"), ("🏦 Tài khoản chính", "ts:chinh")],
-            [("📖 Cổ phiếu, quỹ, tiền số có sẵn", "ts:hd"), ct.BACK]]
-EXAMPLES = ("• mua 2 chỉ vàng nhẫn hết 27tr\n• gửi tiết kiệm VCB 50tr lãi 4,7% 6 tháng\n• vay anh Nam 10tr, mỗi tháng trả "
-            "2tr\n• nạp 2tr vào quỹ dự phòng\n• tài khoản Techcombank còn 14tr\n• tôi còn nợ bao nhiêu?")
 
 
 # ---- Khi nào cần hiểu câu (không phải khoản chi thường) -------------------------------
 
-# Chữ báo hiệu tin không phải khoản chi thường. So trên chữ có dấu khi người dùng gõ có dấu ("váy" khác "vay",
-# "bạn" khác "bán"); gõ không dấu thì so trên chữ đã bỏ dấu.
-TRIGGERS = ["chuyển", "nạp", "rút", "tiết kiệm", "vàng", "vay", "mượn", "quỹ", "ccq", "chứng chỉ", "cổ phiếu", "bán",
-            "đầu tư", "tài khoản", "số dư", "ngân sách", "lương về", "nhận lương", "nhận tiền", "được thưởng",
-            "hoán đổi", "tất toán", "đáo hạn", "dự phòng", "vff", "vmeef", "không tiêu", "khớp lệnh", "đặt lệnh",
-            "nợ", "trả góp", "khoản vay", "trả lại", "sjc", "lượng", "nhẫn", "chốt lời", "cắt lỗ", "xóa", "sửa",
-            "còn lại"]
-# Câu hỏi về thứ ngoài sổ chi tiêu (nợ, tài sản, quỹ, kế hoạch): không trả lời bằng sổ chi tiêu
-BEYOND = ["nợ", "vay", "quỹ", "ccq", "vff", "vmeef", "tài sản", "tiết kiệm", "vàng", "cổ phiếu", "đầu tư", "dự phòng",
-          "kế hoạch", "mục tiêu", "lãi", "lỗ", "ngân sách", "trả xong", "bao giờ", "khi nào", "tài khoản", "số dư",
-          "sức khỏe", "để dành", "được tiêu", "nên tiêu", "được không", "có nên", "nên mua", "có đủ"]
 
 
-def word_re(words):
-    return re.compile(r"(?<!\w)(?:" + "|".join(re.escape(w) for w in words) + r")(?!\w)")
 
 
-TRIGGER_RE = (word_re(TRIGGERS), word_re([ct.plain(w) for w in TRIGGERS]))
-BEYOND_RE = (word_re(BEYOND), word_re([ct.plain(w) for w in BEYOND]))
 
 
-def mentions(text, pair):
-    """Tin có nhắc một trong các chữ? Gõ có dấu thì so chữ có dấu, gõ không dấu thì so chữ đã bỏ dấu."""
-    accented, bare = ct.norm(text), ct.plain(text)
-    return bool(pair[0].search(accented) if accented != bare else pair[1].search(bare))
 
 
-def beyond_spending(text):
-    return mentions(text, BEYOND_RE)
 
 
 def plain_notes():
@@ -356,15 +319,6 @@ def prompt(day, personal=True, facts=None, people=None):
         + (f"\nSỐ LIỆU (bot đã tính sẵn, đúng tới hôm nay):\n{facts}" if facts else ""))
 
 
-def number_of(value):
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    try:
-        return float(str(value).strip().rstrip("%").replace(",", "."))
-    except ValueError:
-        return None
 
 
 def value_of(f, value):
@@ -411,7 +365,6 @@ def text_amounts(text):
     return [v for v, _ in found], [v for v, explicit in found if explicit]
 
 
-CASH_IN = ("tat_toan", "ban_vang", "ban_quy", "thu_no")  # tiền tự về tài khoản chính
 
 
 def echo(job, jobs):
@@ -1234,7 +1187,6 @@ def handle(a, text, now, chat):
     return advance(a, chat, now)
 
 
-NO_SPEND = re.compile(r"(?<!\w)(?:khong|ko|k|chua) (?:tieu|chi|mua)(?: gi| dong nao| xu nao)?(?: ca| het)?(?!\w)")
 
 
 def quick(text, now):
@@ -1269,11 +1221,8 @@ def understand(text, now, chat, question=False):
 
 # ---- Trả lời câu bot đang hỏi dở ---------------------------------------------------------
 
-FILLER = {"khoang", "la", "tam", "het", "tong", "gan", "duoc", "co", "thoi", "a", "nhe", "da"}
 
 
-def only_filler(rest):
-    return all(w in FILLER for w in ct.plain(re.sub(r"[^\w\s]", " ", rest)).split())
 
 
 def parse_value(f, text):

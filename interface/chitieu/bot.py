@@ -69,7 +69,7 @@ def answer(text, now, chat=None):
     return reply
 
 def respond(text, now, chat=None):
-    """Trả lời một tin nhắn: lệnh, khoản chi/thu cần ghi, hoặc câu nói thường về việc khác (troly.py hiểu, hỏi lại
+    """Trả lời một tin nhắn: lệnh, khoản chi/thu cần ghi, hoặc câu nói thường về việc khác (interface/troly/assistant.py hiểu, hỏi lại
     khi thiếu, xin xác nhận trước khi ghi). chat: mã chat, để nhớ bot đang hỏi dở việc gì."""
     if not common.ready():
         return NEED_STORE

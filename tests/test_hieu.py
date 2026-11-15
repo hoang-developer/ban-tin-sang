@@ -97,7 +97,7 @@ class NhieuViec(unittest.TestCase):
 
 
     def test_bo_viec_thua_sau_khi_rut_tien(self):
-        import troly
+        from interface.troly import assistant as troly
         a = troly.clean({"viec": "nhieu", "ds": [{"viec": "tat_toan", "ten": "TCB"},
                                                   {"viec": "chuyen_tk", "den": "VCB"}]}, "sổ TCB đáo hạn, rút về VCB")
         self.assertEqual(a, {"viec": "tat_toan", "ten": "TCB"})

@@ -9,7 +9,7 @@ from infrastructure import kho
 from interface.no import debt as sono
 from interface.taisan import assets as ts
 from repositories.tietkiem import progress as tietkiem_repo
-import troly
+from interface.troly import assistant as troly
 
 
 class TroLy(unittest.TestCase):
