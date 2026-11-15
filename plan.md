@@ -70,13 +70,18 @@ Ví vàng được 3 file dùng chung (`lenh`, `lich` ×2, `taisan` ×6), cả h
 
 Xong khi: không file nào ngoài repo đọc/ghi ví vàng (test `test_vi_vang_chi_qua_repository` chặn); test bán vàng/mua vàng/hiển thị bảng vàng xanh; thêm test thuần cho `sell_fifo`; các giá trị ghi vào `vivang` trong toàn bộ test giống `main` từng lần.
 
-### Bước 3: `AssetRepo`
-`taisan.load/save` đã gần là repository.
-- `domain/assets.py`: `AssetItem`, `RealizedGain`, `new_id`, `find_item`.
-- `repositories/assets.py`: `AssetRepo.load()/save()`, gom `dem` và `lailo`, lịch sử tài sản (`K_HISTORY`), lương (`K_SALARY`).
-- `taisan.py` chỉ gọi repo.
+### Bước 3: `AssetRepo` (+ lương, cấu hình quỹ)
+`taisan.load/save` đã gần là repository. `ts.load()/ts.save()` được 8 module gọi ở ~60 chỗ, nên bước này giữ nguyên cửa vào đó
+và cho chúng ủy quyền cho repo; kiểu dữ liệu riêng cho từng loại tài sản (`AssetItem`…) làm cùng bước 5, khi tách `taisan.py`.
+- `repositories/assets.py`: `load()/save()` (cục `{"items", "dem", "lailo"}` giữ dạng dict), lịch sử tài sản ròng
+  (`save_snapshot`, `history`), giá đã lấy (`price_cache`, `save_price_cache`).
+- `domain/salary.py` + `repositories/salary.py`: `Salary(day, amount)`, `load/save/clear` (thay 4 chỗ đọc `keys.SALARY`).
+- `repositories/fund.py`: `load/save` cấu hình quỹ (taisan và dautu cùng đọc); NAV và thông tin quỹ thêm ở bước 6.
+- `taisan.py`, `dautu.py`, `kehoach.py`, `sono.py` không còn gọi kho với các khóa này.
 
-Xong khi: `kho` không còn được gọi trong `taisan.py`.
+Xong khi: không file nào ngoài repo dùng `keys.ASSETS/ASSET_HISTORY/SALARY/FUND/price_cache` (test chặn); toàn bộ lệnh ghi Redis
+trong test giống `main` từng lệnh. Trong `taisan.py` còn gọi kho: `INCR` bộ đếm sổ chi (bước 4), cờ nhắc đáo hạn (bước 6),
+và `kho.ready()` (kiểm tra cấu hình, không phải truy cập dữ liệu, được phép ở mọi nơi).
 
 ### Bước 4: `LedgerRepo` (sổ chi tiêu)
 Dùng nhiều nhất (`sochitieu.load/save/HSET/HGET/HDEL`).
@@ -106,8 +111,9 @@ Thêm số phiên bản vào `AssetRepo` để webhook và tick không ghi đè 
 |---|---|
 | 0 Nền, `plan.md` | xong, đã deploy ([#52](https://github.com/hoang-developer/ban-tin-sang/pull/52)) |
 | 1 `keys.py` + `Store` | xong, đã deploy ([#52](https://github.com/hoang-developer/ban-tin-sang/pull/52)) |
-| 2 `GoldRepo` | đang làm |
-| 3–7 | chưa |
+| 2 `GoldRepo` | xong, đã deploy ([#53](https://github.com/hoang-developer/ban-tin-sang/pull/53)) |
+| 3 `AssetRepo`, `SalaryRepo`, `FundRepo` | đang làm |
+| 4–7 | chưa |
 
 ## 5. Chưa làm
 

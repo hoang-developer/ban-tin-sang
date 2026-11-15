@@ -88,11 +88,12 @@ class Khoa(unittest.TestCase):
                     bad.append(f"{path.name}:{node.lineno}")
         self.assertEqual(bad, [], "khóa chitieu: viết ngoài repositories/keys.py")
 
-    def test_vi_vang_chi_qua_repository(self):
-        """keys.GOLD chỉ repositories/gold.py được dùng; nơi khác đi qua GoldRepo."""
-        bad = [path.name for path in list(ROOT.glob("*.py")) + list((ROOT / "api").glob("*.py"))
-               if re.search(r"keys\.GOLD\b(?!_)", path.read_text(encoding="utf-8"))]
-        self.assertEqual(bad, [], "ví vàng: dùng repositories.gold, không gọi kho với keys.GOLD")
+    def test_khoa_da_co_repo_chi_repo_duoc_dung(self):
+        """Dữ liệu đã có repository (ví vàng, tài sản, lịch sử tài sản, giá, lương, quỹ) chỉ đi qua repo."""
+        pattern = re.compile(r"keys\.(GOLD|ASSETS|ASSET_HISTORY|SALARY|FUND|price_cache)\b")
+        bad = [f"{path.name}: {m.group(0)}" for path in list(ROOT.glob("*.py")) + list((ROOT / "api").glob("*.py"))
+               for m in pattern.finditer(path.read_text(encoding="utf-8"))]
+        self.assertEqual(bad, [], "dùng repositories.<tên> thay vì gọi kho với khóa này")
 
 if __name__ == "__main__":
     unittest.main()

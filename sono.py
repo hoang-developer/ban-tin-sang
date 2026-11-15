@@ -17,6 +17,7 @@ from calendar import monthrange
 
 import kho
 from repositories import keys
+from repositories import salary as salary_repo
 import phantich as pt
 import sochitieu as ct
 import taisan as ts
@@ -132,8 +133,8 @@ def pay_day(d, day):
     last = monthrange(day.year, day.month)[1]
     if d.get("ngay_tra"):
         return min(d["ngay_tra"], last)
-    salary = kho.get(keys.SALARY) or {}
-    return min(salary["ngay"] + 2, last) if salary.get("ngay") else 10
+    salary = salary_repo.load()
+    return min(salary.day + 2, last) if salary and salary.day else 10
 
 
 def debt_group(create=False):
