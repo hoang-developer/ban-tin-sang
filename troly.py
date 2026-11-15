@@ -413,16 +413,31 @@ def text_amounts(text):
     return [v for v, _ in found], [v for v, explicit in found if explicit]
 
 
+CASH_IN = ("tat_toan", "ban_vang", "ban_quy", "thu_no")  # tiền tự về tài khoản chính
+
+
+def echo(job, jobs):
+    """Việc thừa AI hay thêm sau một việc rút tiền: "chuyển về VCB" không số tiền, hoặc "thu" đúng số vừa rút."""
+    cash_in = [j for j in jobs if j["viec"] in CASH_IN or (j["viec"] in ("quy_cho", "du_phong")
+                                                            and j.get("chieu") == "rut")]
+    if not cash_in or job in cash_in:
+        return False
+    if job["viec"] == "chuyen_tk" and not job.get("tien"):
+        return True
+    return job["viec"] == "thu" and any(job.get("tien") and job["tien"] == j.get("tien") for j in cash_in)
+
+
 def clean(raw, text=None):
     """JSON của AI -> việc hợp lệ: bỏ trường lạ, sai kiểu; số tiền chính đối chiếu với số code đọc được trong câu.
     Nhiều việc: {"viec": "_nhieu", "ds": [...]}; trả lời câu hỏi: {"viec": "tra_loi", "cau", "man"}."""
     job = raw.get("viec") if isinstance(raw, dict) else None
     if job == "nhieu":
-        jobs = [clean(x) for x in (raw.get("ds") or []) if isinstance(x, dict)][:6]
-        jobs = [x for x in jobs if x["viec"] not in ("khac", "nhieu", "_nhieu")]
-        if len(jobs) == 1:
-            return clean(raw["ds"][0], text)  # một việc: đối chiếu số tiền với câu như thường
-        return {"viec": "_nhieu", "ds": jobs} if jobs else {"viec": "khac"}
+        pairs = [(x, clean(x)) for x in (raw.get("ds") or []) if isinstance(x, dict)][:6]
+        pairs = [(x, j) for x, j in pairs if j["viec"] not in ("khac", "nhieu", "_nhieu")]
+        pairs = [(x, j) for x, j in pairs if not echo(j, [k for _, k in pairs])]
+        if len(pairs) == 1:
+            return clean(pairs[0][0], text)  # một việc: đối chiếu số tiền với câu như thường
+        return {"viec": "_nhieu", "ds": [j for _, j in pairs]} if pairs else {"viec": "khac"}
     if job == "tra_loi":
         answer = str(raw.get("cau") or "").strip()[:600]
         man = raw.get("man") if raw.get("man") in SCREENS else None

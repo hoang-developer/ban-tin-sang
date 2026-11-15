@@ -96,13 +96,22 @@ class NhieuViec(unittest.TestCase):
         self.assertEqual([e["tien"] for e in h.month_entries()], [200_000])
 
 
+    def test_bo_viec_thua_sau_khi_rut_tien(self):
+        import troly
+        a = troly.clean({"viec": "nhieu", "ds": [{"viec": "tat_toan", "ten": "TCB"},
+                                                  {"viec": "chuyen_tk", "den": "VCB"}]}, "sổ TCB đáo hạn, rút về VCB")
+        self.assertEqual(a, {"viec": "tat_toan", "ten": "TCB"})
+        a = troly.clean({"viec": "nhieu", "ds": [{"viec": "du_phong", "tien": 2000000, "chieu": "rut"},
+                                                  {"viec": "chi", "tien": 2000000, "ghi_chu": "sửa xe"}]})
+        self.assertEqual([j["viec"] for j in a["ds"]], ["du_phong", "chi"])  # rút ra rồi tiêu: giữ cả hai
+
+
 class TraLoi(unittest.TestCase):
     def setUp(self):
         h.reset()
         set_main(10_000_000)
 
     def test_cau_hoi_tai_chinh_tra_loi_bang_so_lieu(self):
-        h.say("vay anh Nam 10tr") if False else None
         sentence = "tôi còn nợ bao nhiêu"
         text, buttons = ask(sentence, {"viec": "tra_loi", "cau": "Bạn không còn khoản nợ nào.", "man": "no"})
         self.assertIn("💬 Bạn không còn khoản nợ nào.", text)
