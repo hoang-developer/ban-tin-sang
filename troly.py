@@ -1055,7 +1055,7 @@ def run(a, now, chat, option=None):
     if job == "xoa_tai_san":
         return ts.remove_named(a["ten"]), [[("💼 Tài sản", "m:ts"), ct.BACK]]
     if job in ("doi_chieu", "doi_chieu_sl"):
-        import doichieu
+        from interface.doichieu import reconcile as doichieu
         return doichieu.set_value(a["muc"], a["gia_tri"], now)
     if job == "doi_xong":
         order = switch_order(a)
@@ -1370,7 +1370,7 @@ def on_button(arg, message, now):
             return None, None
         extra = {"ma": preset.upper()} if preset and job == "sua_ccq" else {}
         if preset.isdigit() and job in ("doi_chieu", "doi_chieu_sl"):
-            import doichieu
+            from interface.doichieu import reconcile as doichieu
             found = next(((it, v, u) for it, v, u in doichieu.items(now.date()) if str(it["id"]) == preset), None)
             if not found:
                 return "Ngăn này không còn trong tài sản", None

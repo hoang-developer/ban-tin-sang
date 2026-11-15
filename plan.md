@@ -180,8 +180,9 @@ không đổi (test hiện có, so thêm các chuỗi hiển thị chính); ch�
 | 4 `LedgerRepo` | xong, đã deploy ([#55](https://github.com/hoang-developer/ban-tin-sang/pull/55)) |
 | 5 Khung lớp, luật phụ thuộc, `infrastructure` | xong, đã deploy ([#56](https://github.com/hoang-developer/ban-tin-sang/pull/56)) |
 | 6.1 `duphong` (quỹ dự phòng) | xong, đã deploy ([#57](https://github.com/hoang-developer/ban-tin-sang/pull/57)) |
-| 6.2 `tietkiem` (tiết kiệm từ khi dùng bot) | đang làm |
-| 6.3… các chức năng còn lại | chưa |
+| 6.2 `tietkiem` (tiết kiệm từ khi dùng bot) | xong, đã deploy ([#58](https://github.com/hoang-developer/ban-tin-sang/pull/58)) |
+| 6.3 `doichieu` (đối chiếu tài sản tháng) | đang làm |
+| 6.4… các chức năng còn lại | chưa |
 | Cuối: dọn | chưa |
 
 Bước 1–4 mới làm xong tầng lưu trữ (repo); các repo ở gốc `repositories/` và `domain/` sẽ xếp vào thư mục chức năng ở bước 5.
@@ -210,9 +211,9 @@ Hoàn tác: mỗi bước là một PR riêng, `git revert` được.
 
 | Chỉ số | Lúc đầu | Hiện tại | Đích |
 |---|---|---|---|
-| File `.py` ở gốc repo (không tính `api/`) | 26 | 22 | 0 |
-| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 16 (137) | 1 (`repositories/store.py`) |
-| Chức năng đã tách vào đủ các lớp | 0 | 2 (`duphong`, `tietkiem`) | mọi chức năng ở bảng "module cũ đi đâu" |
+| File `.py` ở gốc repo (không tính `api/`) | 26 | 21 | 0 |
+| File gọi dữ liệu qua `kho.*` trực tiếp (số chỗ gọi) | 18 (~170) | 15 (133) | 1 (`repositories/store.py`) |
+| Chức năng đã tách vào đủ các lớp | 0 | 3 (`duphong`, `tietkiem`, `doichieu`) | mọi chức năng ở bảng "module cũ đi đâu" |
 | Chuỗi khóa Redis viết cứng ngoài `keys.py` | ~20 | 0 | 0 |
 | Hàm nạp muộn né import vòng | 9 | 9 | 0 |
 | Hàm nghiệp vụ trả HTML | nhiều | nhiều | 0 |
