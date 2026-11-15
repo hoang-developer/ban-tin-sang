@@ -5,7 +5,8 @@ import unittest
 
 from tests import harness as h
 
-import duphong
+from interface.duphong import reserve as duphong
+from repositories.duphong import reserve as reserve_repo
 import kehoach
 from infrastructure import kho
 import menu
@@ -331,7 +332,7 @@ class ChuyenTien(unittest.TestCase):
         self.assertIn("MoMo còn 1.000.000đ", body)
         self.assertEqual((main_balance(), item("Quỹ dự phòng")["tien"], item("MoMo")["tien"]),
                          (15_000_000, 2_000_000, 1_000_000))
-        self.assertEqual(duphong.month_added("2026-11"), 2_000_000)
+        self.assertEqual(reserve_repo.deposited_in("2026-11"), 2_000_000)
 
 
 if __name__ == "__main__":

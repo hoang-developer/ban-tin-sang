@@ -4,7 +4,7 @@ import unittest
 
 from tests import harness as h
 
-import duphong
+from services.duphong import reserve as duphong
 from infrastructure import kho
 import sono
 import taisan as ts
@@ -27,10 +27,10 @@ class TroLy(unittest.TestCase):
         self.assertIn("Mình hiểu là", text)
         self.assertIn("1.000.000đ", text)
         self.assertEqual(h.month_entries(), [])  # chưa ghi gì, không thành khoản chi
-        self.assertEqual(duphong.status(h.CLOCK["now"].date())["balance"], 0)
+        self.assertEqual(duphong.status(h.CLOCK["now"].date()).balance, 0)
         _, done, _ = h.press(h.button(buttons, "y:ok"))
         self.assertIn("✅ +1tr quỹ dự phòng", done)
-        self.assertEqual(duphong.status(h.CLOCK["now"].date())["balance"], 1_000_000)
+        self.assertEqual(duphong.status(h.CLOCK["now"].date()).balance, 1_000_000)
         self.assertEqual(h.month_entries(), [])
         self.assertEqual(h.press(h.button(buttons, "y:ok"))[0], "Thẻ này đã xử lý hoặc hết hạn")  # bấm lại không ghi trùng
 

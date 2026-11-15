@@ -98,8 +98,8 @@ def real_saved(cfg, entries):
     ym = cfg["bat_dau"][:7]
     out = {"duphong": 0, "dautu": 0, "tra_no": 0}
     try:
-        import duphong
-        out["duphong"] = sum(v for k, v in duphong.config().get("nap", {}).items() if k >= ym)
+        from repositories.duphong import reserve as reserve_repo
+        out["duphong"] = sum(v for k, v in reserve_repo.load().get("nap", {}).items() if k >= ym)
     except Exception as e:
         print(f"[lỗi] quỹ dự phòng trong /tietkiem: {e!r}", file=sys.stderr)
     try:
@@ -340,8 +340,8 @@ def on_button(arg, message, now):
             note = f"Đã chuyển {money(amount)} vào quỹ chờ {cfg_dt['ma']} ({money(left)})" + "".join(
                 f" · {x[2:]}" for x in moved)
         else:
-            import duphong
-            note = duphong.change(amount, day).split("\n")[0][2:]
+            from interface.duphong import reserve as duphong_ui
+            note = duphong_ui.change(amount, day).split("\n")[0][2:]
         cfg = config()
         cfg["da_chuyen"] = cfg.get("da_chuyen", 0) + amount
         save(cfg)

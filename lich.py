@@ -341,11 +341,11 @@ def month_lines(day):
         print(f"[lỗi] sổ nợ trong tổng kết: {e!r}", file=sys.stderr)
     try:
         if any(it.get("duphong") for it in taisan.load()["items"]):
-            import duphong
-            f = duphong.status(day)
-            if f["target"]:
-                lines.append(f"🛟 Quỹ dự phòng {taisan.short(f['balance'])}/{taisan.short(f['target'])} · "
-                             f"{f['balance'] / f['target'] * 100:.0f}%")
+            from services.duphong import reserve as reserve_service
+            f = reserve_service.status(day)
+            if f.target:
+                lines.append(f"🛟 Quỹ dự phòng {taisan.short(f.balance)}/{taisan.short(f.target)} · "
+                             f"{f.balance / f.target * 100:.0f}%")
     except Exception as e:
         print(f"[lỗi] quỹ dự phòng trong tổng kết: {e!r}", file=sys.stderr)
     return lines

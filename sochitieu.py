@@ -1159,7 +1159,7 @@ def taisan():
 
 
 def duphong():
-    import duphong as module  # quỹ dự phòng
+    from interface.duphong import reserve as module  # quỹ dự phòng
     return module
 
 

@@ -358,8 +358,8 @@ def status(cfg, now=None, fresh=False):
     month_start = [v for d, v in navs if nav_day and d < nav_day.replace(day=1)]
     fund = None
     try:
-        import duphong
-        fund = duphong.status(now.date())
+        from services.duphong import reserve as reserve_service
+        fund = reserve_service.status(now.date())
     except Exception as e:
         print(f"[lỗi] quỹ dự phòng trong /dautu: {e!r}", file=sys.stderr)
     return {"ym": ym, "plan": plan, "value": value, "units": units, "nav": nav, "nav_day": nav_day, "pending": pending,
@@ -370,7 +370,7 @@ def status(cfg, now=None, fresh=False):
             "contributed": contributed_of(cfg),
             "drawdown": nav / peak - 1 if peak and nav else None,
             "month_change": nav / month_start[-1] - 1 if month_start and nav else None,
-            "fund": fund, "below_milestone": bool(fund and fund["monthly"] and fund["covered"] < 1)}
+            "fund": fund, "below_milestone": bool(fund and fund.monthly and fund.covered < 1)}
 
 
 # ---- Câu trả lời -----------------------------------------------------------------------
@@ -431,8 +431,8 @@ def decision_lines(cfg, s, final=True):
         lines.append(f"💰 Quỹ chờ {money(s['cash'])}" + (f" + chưa để {money(s['unpaid'])}" if s["unpaid"] else ""))
     if s["below_milestone"]:
         f = s["fund"]
-        lines.append(f"⚠️ Quỹ dự phòng mới {vn_num(f['covered'], 1)}/1 tháng chi (thiếu "
-                     f"{money(f['monthly'] - f['balance'])}): ưu tiên quỹ dự phòng trước")
+        lines.append(f"⚠️ Quỹ dự phòng mới {vn_num(f.covered, 1)}/1 tháng chi (thiếu "
+                     f"{money(f.monthly - f.balance)}): ưu tiên quỹ dự phòng trước")
     return lines
 
 
@@ -1290,9 +1290,9 @@ def salary_part(day):
     added = cfg.get("nap", {}).get(ym, 0)
     note = ""
     try:
-        import duphong
-        f = duphong.status(day)
-        if f["monthly"] and f["covered"] < 1:
+        from services.duphong import reserve as reserve_service
+        f = reserve_service.status(day)
+        if f.monthly and f.covered < 1:
             return {"ma": cfg["ma"], "gop": 0, "added": added, "note": "tạm dừng: ưu tiên quỹ dự phòng tới mốc 1 tháng chi"}
     except Exception as e:
         print(f"[lỗi] quỹ dự phòng khi chia lương: {e!r}", file=sys.stderr)

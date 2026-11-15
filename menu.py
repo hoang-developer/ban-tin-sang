@@ -136,8 +136,8 @@ def todo(day, n, now):
                 elif paid:
                     out.append((f"{'🛟' if kind == 'dp' else '📈'} {html.escape(label)} {short(amount)}",
                                 (f"✅ {label[:18]}", f"dp:nap:{int(amount)}" if kind == "dp" else f"dt:nap:{int(amount)}")))
-        if not n["fund"]["monthly"]:
-            out.append((f"📒 Ghi chép đủ 14 ngày để bot tính quỹ dự phòng (đang có {n['fund']['days']} ngày)", None))
+        if not n["fund"].monthly:
+            out.append((f"📒 Ghi chép đủ 14 ngày để bot tính quỹ dự phòng (đang có {n['fund'].days} ngày)", None))
     for text, rows in part("hoán đổi quỹ", lambda: ct.dautu().switch_prompts(day)) or []:
         out.append((text, rows[0][0]))
     check = part("đối chiếu", lambda: __import__("doichieu").todo(day))
@@ -241,10 +241,10 @@ def money(day):
     if other:
         lines.append(("👛 " if main else "🏦 ") + " · ".join(f"{html.escape(r[2])} {short(r[3])}" for r in other))
     if fund:
-        f = part("quỹ dự phòng", lambda: __import__("duphong").status(day))
+        f = part("quỹ dự phòng", lambda: __import__("services.duphong.reserve", fromlist=["status"]).status(day))
         total = sum(r[3] for r in fund)
         lines.append(f"🛟 Quỹ dự phòng <b>{short(total)}</b>" + (
-            f" / {short(f['target'])} ({total / f['target'] * 100:.0f}%)" if f and f["target"] else ""))
+            f" / {short(f.target)} ({total / f.target * 100:.0f}%)" if f and f.target else ""))
     funds = [r for r in rows if r[0] == "quy"]
     shown = ([f"<b>{short(sum(r[3] for r in funds))}</b>{gain(funds)}"] if funds else []) + [
         f"quỹ chờ {short(r[3])}" for r in wait if r[3]]
