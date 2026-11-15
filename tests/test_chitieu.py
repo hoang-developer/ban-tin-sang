@@ -47,6 +47,23 @@ class ChiTieu(unittest.TestCase):
         self.assertEqual(h.month_entries(), [])
         self.assertEqual(kho.get("vivang")[0]["gia"], 123.84)
 
+    def test_vang_gop_theo_loai_gia_theo_chi_tung_lan_mua(self):
+        h.say("/taisan vang nhan 0,1 chi 148,02 20/10\n/taisan vang nhan 0,2 chi 123,84 11/11")
+        h.say("/taisan cp HAG 100 12")
+        h.say("bán 100 HAG giá 12")  # bán hết: không còn dòng 0 cp
+        _, body, _ = h.press("ts:xem")
+        self.assertIn("Nhẫn 0,3 chỉ · vốn TB 13,19tr/chỉ · hôm nay 13,6tr/chỉ", body)
+        self.assertIn("• 20/10 0,1 chỉ giá 14,8tr/chỉ → 🔴 −120k (−8%)", body)
+        self.assertIn("• 11/11 0,2 chỉ giá 12,38tr/chỉ → 🟢 +243k (+10%)", body)
+        self.assertNotIn("HAG", body)
+
+    def test_mua_vang_qua_the_ghi_ngay_mua(self):
+        ask = "mua 0,1 chỉ vàng nhẫn hết 1tr3"
+        h.AI.replies[ask] = {"viec": "vang", "loai": "nhan", "chi": 0.1, "tien": 1300000}
+        _, buttons = h.say(ask)
+        h.press(h.button(buttons, "y:ok"))
+        self.assertEqual(kho.get("vivang")[-1]["ngay"], "2026-11-13")
+
 
 if __name__ == "__main__":
     unittest.main()

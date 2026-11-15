@@ -435,7 +435,20 @@ def add_fx(data, code, args):
 
 
 def add_gold(args):
+    """/taisan vang nhan 0,1 chi 148,02 [20/10]: loại, số lượng, đơn vị, giá mua triệu/lượng, ngày mua (không bắt buộc;
+    có thì hiện ở 💼 Tài sản)."""
     import lenh  # dùng chung cách nhập của /vivang bên bot bản tin
+    bought = None
+    if args and re.fullmatch(r"\d{1,2}/\d{1,2}(?:/\d{4})?", args[-1]):
+        parts = [int(x) for x in args[-1].split("/")]
+        today = ct.today()
+        try:
+            bought = date(parts[2] if len(parts) > 2 else today.year, parts[1], parts[0])
+        except ValueError:
+            return None
+        if bought > today:
+            bought = bought.replace(year=bought.year - 1)
+        args = args[:-1]
     try:
         kind = lenh.KINDS[args[0].lower()]
         taels = number(args[1]) * lenh.UNITS[args[2].lower()]
@@ -445,7 +458,7 @@ def add_gold(args):
     if not 0 < taels <= 1000:
         return None
     items = kho.get(K_GOLD, []) or []
-    items.append({"loai": kind, "luong": taels, "gia": paid})
+    items.append({"loai": kind, "luong": taels, "gia": paid, **({"ngay": bought.isoformat()} if bought else {})})
     kho.put(K_GOLD, items)
     return f"✅ Đã thêm {lenh.amount_text(taels)} {gold_name(kind).lower()} vào ví vàng (dùng chung với bot bản tin)"
 
@@ -489,6 +502,43 @@ def taisan(args):
     return result + "\nXem tổng: /taisan"
 
 
+def gain_text(gain, cost):
+    """'🟢 +190k (+8%)' / '🔴 −146k (−10%)'."""
+    pct = f" ({gain / cost * 100:+.0f}%)".replace("-", "−") if cost else ""
+    return f"{'🟢 +' if gain >= 0 else '🔴 −'}{short(abs(gain))}{pct}"
+
+
+def gold_lines(rows):
+    """Vàng theo từng loại: tổng số chỉ, giá vốn TB và giá cửa hàng mua vào hôm nay (theo chỉ), rồi mỗi lần mua một
+    dòng: ngày, số chỉ × giá mua một chỉ → lãi/lỗ."""
+    gold = kho.get(K_GOLD, []) or []
+    lots = {}
+    for _, rid, _, value, cost, _ in rows:
+        g = gold[int(rid[1:])]
+        lots.setdefault(g["loai"], []).append((g, value, cost))
+    out = []
+    for kind, items in lots.items():
+        chi = sum(g["luong"] for g, _, _ in items) * 10
+        value = sum(v for _, v, _ in items)
+        priced = [(g, v, c) for g, v, c in items if c]
+        price = value / chi if chi and value else None
+        head = f"  {gold_name(kind)} <b>{qty_text(round(chi, 2))} chỉ</b>"
+        if priced:
+            avg = sum(c for _, _, c in priced) / (sum(g["luong"] for g, _, _ in priced) * 10)
+            head += f" · vốn TB {short(avg)}/chỉ"
+        if price:
+            head += f" · hôm nay {short(price)}/chỉ"
+        out.append(head)
+        for g, v, c in items:
+            when = f"{g['ngay'][8:]}/{g['ngay'][5:7]} " if g.get("ngay") else ""
+            amount = f"{qty_text(round(g['luong'] * 10, 2))} chỉ"
+            if c:
+                out.append(f"   • {when}{amount} giá {short(c / (g['luong'] * 10))}/chỉ → {gain_text(v - c, c)}")
+            else:
+                out.append(f"   • {when}{amount} · chưa có giá mua")
+    return out
+
+
 def overview(day, fresh=False):
     v = valuation(day, fresh)
     if not v["rows"]:
@@ -512,7 +562,12 @@ def overview(day, fresh=False):
         elif kind == "tietkiem":
             head += f" · lãi tới nay {short(sum(r[3] - r[4] for r in rows))}"
         lines.append(head)
+        if kind == "vang":  # vàng: gộp theo loại, giá theo chỉ, mỗi lần mua một dòng có giá mua
+            lines += gold_lines(rows)
+            continue
         for _, _, name, value, cost, detail in rows:
+            if not value and not cost:
+                continue  # đã bán hết, quỹ chờ trống: không hiện dòng 0đ
             line = f"  • {html.escape(name)}: {short(value)}"
             if detail:
                 line += f" · {html.escape(detail)}"

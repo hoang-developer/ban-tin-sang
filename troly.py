@@ -722,6 +722,7 @@ def run(a, now, chat, option=None):
         args = [a["loai"], num(a["chi"]), "chi"]
         if a.get("tien"):
             args.append(f"{a['tien'] / (a['chi'] / 10) / 1e6:.2f}".replace(".", ","))
+            args.append(f"{day.day}/{day.month}/{day.year}")  # mua hôm nay: ghi ngày mua
         note = ts.add_gold(args)
         if note and a.get("tien") and paid:
             data = ts.load()
