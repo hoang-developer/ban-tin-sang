@@ -126,3 +126,16 @@ def remove_named(name):
     data["items"] = [x for x in data["items"] if x is not it]
     assets_repo.save(data)
     return f"🗑 Đã xóa {html.escape(it.get('ten') or it.get('ma'))} khỏi tài sản"
+
+
+def remove_by_id(rid):
+    """Xóa một mục theo mã dòng trên màn hình (vàng "v<số>" hoặc mã mục). True nếu có xóa."""
+    if rid.startswith("v"):
+        return gold_repo.remove_at(int(rid[1:]))
+    data = assets_repo.load()
+    kept = [it for it in data["items"] if str(it["id"]) != rid]
+    if len(kept) == len(data["items"]):
+        return False
+    data["items"] = kept
+    assets_repo.save(data)
+    return True

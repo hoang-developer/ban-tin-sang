@@ -29,6 +29,13 @@ from domain.taisan.rules import find_item, removable  # noqa: F401
 from domain.taisan.text import gain_line  # noqa: F401
 from services.taisan.sales import (close_saving, collect_loan, realize, remove_named, sell_fund,  # noqa: F401
                                    sell_gold)
+from domain.taisan.kinds import ALIASES, FX_CODES  # noqa: F401
+from domain.taisan.rules import is_etf, money_and_name, stock_price  # noqa: F401
+from domain.taisan.trade import BROKER_FEE, SELL_TAX, parse_trade  # noqa: F401
+from services.taisan.declare import add_fx, add_gold, add_holding, add_saving, add_saving_item, add_simple  # noqa: F401
+from services.taisan.flows import monthly_flows  # noqa: F401
+from services.taisan.reminders import maturity_notes, salary_due  # noqa: F401
+from services.taisan.trade import broker_cash, trade  # noqa: F401
 from services.taisan.valuation import compare_line, history, pending_orders, snapshot, valuation  # noqa: F401
 from services.taisan.prices import (SOURCES, coin_prices, fund_navs, fx_rates, gold_table, prices,  # noqa: F401
                                     stock_prices)
@@ -38,8 +45,6 @@ import phantich as pt
 import sochitieu as ct
 from bantin import vn_num
 
-SELL_TAX = 0.001  # thuế thu nhập cá nhân khi bán chứng khoán: 0,1% giá trị bán
-BROKER_FEE = 0.0  # DNSE miễn phí giao dịch; công ty khác thường thu 0,1–0,35% mỗi chiều
 BUTTONS = [[("📊 Biểu đồ", "ts:bd"), ("🩺 Khám sức khỏe", "ts:sk")],
            [("🗂 Sửa, xóa", "ts:ds"), ("🔄 Cập nhật giá", "ts:xem")],
            [("🏦 Tài khoản chính", "ts:chinh"), ("➕ Thêm", "y:them"), ct.BACK]]
@@ -84,155 +89,8 @@ USAGE = ("💼 <b>Khai báo tài sản</b> (số tiền viết kiểu 25tr, 1t�
          "• Nợ, trả dần mỗi tháng: /no chú Tư 100tr, trả 5tr/tháng (sổ nợ tự trừ khi trả)\n"
          "Mua bán cổ phiếu, ETF: nhắn <b>mua 1000 FPT giá 95</b>, <b>mua 500 E1VFVN30 giá 33,6</b>, <b>bán 500 FPT giá 120</b>\n"
          "Xem: /taisan · Sửa, xóa: /taisan xoa · Khám sức khỏe tài chính: /suckhoe")
-FX_CODES = {"usd", "eur", "jpy", "gbp", "aud", "cad", "chf", "cny", "sgd", "krw", "thb", "hkd", "twd"}
 
 
-def stock_price(text):
-    """Giá cổ phiếu/ccq: '95' hay '95k' là 95.000đ, '95500' là 95.500đ."""
-    text = text.lower().rstrip("kđ")
-    value = number(text)
-    return value * 1000 if value < 1000 else value
-
-
-def money_and_name(args):
-    """'VCB 25tr' -> ('VCB', 25000000); None nếu không có số tiền."""
-    text = " ".join(args)
-    found = ct.parse_amount(text)
-    if not found:
-        return None
-    amount, start, end = found
-    name = " ".join((text[:start] + " " + text[end:]).split()).strip(" ,.:-") or "Chưa đặt tên"
-    return name[:30], amount
-
-
-def add_simple(data, kind, args):
-    got = money_and_name(args)
-    if not got:
-        return None
-    name, amount = got
-    for it in data["items"]:
-        if it["loai"] == kind and same_name(it["ten"], name):  # cùng tên: cập nhật
-            it.update(tien=amount, ngay=ct.today().isoformat())
-            if it.get("chinh"):
-                pin_balance(it, amount)
-            return f"✅ Đã cập nhật {TYPES[kind]}: {html.escape(name)} {ct.vnd(amount)}"
-    data["items"].append({"id": new_id(data), "loai": kind, "ten": name, "tien": amount,
-                          "ngay": ct.today().isoformat()})
-    return f"✅ Đã thêm {TYPES[kind]}: {html.escape(name)} {ct.vnd(amount)}"
-
-
-def add_saving(data, args):
-    text = " ".join(args)
-    bare = ct.plain(text)
-    rate = re.search(r"(\d+(?:[.,]\d+)?)\s*%", text)
-    term = re.search(r"(?<!\w)(\d{1,2})\s*(?:thang|th|t)(?!\w)", bare)
-    when = re.search(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?:/(\d{4}))?(?![\d/])", text)
-    rest = text
-    for m in (rate, when):
-        if m:
-            rest = rest.replace(m[0], " ")
-    if term:  # bỏ "6 tháng" ở chữ gốc (cùng vị trí với chữ đã bỏ dấu)
-        rest = re.sub(r"(?<!\w)\d{1,2}\s*(?:tháng|thang|th|t)(?!\w)", " ", rest, count=1, flags=re.IGNORECASE)
-    rest = re.sub(r"(?i)không kỳ hạn|khong ky han|kkh", " ", rest)
-    got = money_and_name(rest.split())
-    if not got or not rate:
-        return None
-    name, amount = got
-    start = ct.today()
-    if when:
-        try:
-            start = date(int(when[3]) if when[3] else start.year, int(when[2]), int(when[1]))
-        except ValueError:
-            return None
-    months = 0 if re.search(r"khong ky han|kkh", bare) or not term else int(term[1])
-    return add_saving_item(data, name, amount, number(rate[1]), months, start)
-
-
-def add_saving_item(data, name, amount, rate, months, start):
-    """Thêm một sổ tiết kiệm (chưa lưu): tên, tiền gốc, lãi %/năm, kỳ hạn tháng (0 là không kỳ hạn), ngày gửi. Sổ
-    cùng tên đã có thì cập nhật (khai báo lại khi đối chiếu, gửi tiếp), không tạo sổ trùng."""
-    same = next((it for it in data["items"] if it["loai"] == "tietkiem" and same_name(it["ten"], name[:30])), None)
-    if same:
-        same.update(tien=amount, lai=rate, ky=months, ngay=start.isoformat())
-        due = f", đáo hạn {add_months(start, months):%d/%m/%Y}" if months else ", không kỳ hạn"
-        return f"✅ Đã cập nhật sổ tiết kiệm {html.escape(name[:30])} {ct.vnd(amount)}, lãi {qty_text(rate)}%/năm{due}"
-    data["items"].append({"id": new_id(data), "loai": "tietkiem", "ten": name[:30], "tien": amount,
-                          "lai": rate, "ky": months, "ngay": start.isoformat()})
-    due = f", đáo hạn {add_months(start, months):%d/%m/%Y}" if months else ", không kỳ hạn"
-    return f"✅ Đã thêm sổ tiết kiệm {html.escape(name[:30])} {ct.vnd(amount)}, lãi {qty_text(rate)}%/năm{due}"
-
-
-def is_etf(code):
-    """Mã chứng chỉ quỹ ETF trên HOSE: E1VFVN30 (DCVFMVN30 của Dragon Capital), FUEVFVND, FUESSVFL..."""
-    return code.upper().startswith(("E1VF", "FUE"))
-
-
-def add_holding(data, kind, args):
-    """cp/etf/quy/coin: mã, số lượng, giá vốn (không bắt buộc với coin). Mã đã có thì ghi đè (khai báo lại)."""
-    if len(args) < 2 or (kind != "coin" and len(args) < 3):
-        return None
-    code = args[0].upper() if kind != "coin" else args[0].lower()
-    try:
-        qty = number(args[1])
-        cost = (stock_price(args[2]) if kind in ("cp", "etf", "quy") else number(args[2])) if len(args) > 2 else None
-    except ValueError:
-        return None
-    if qty <= 0:
-        return None
-    if kind in ("cp", "etf"):
-        if not re.fullmatch(r"[A-Z0-9]{3,8}", code):
-            return None
-        kind = "etf" if is_etf(code) else "cp"  # "/taisan cp E1VFVN30 ..." cũng vào ETF
-        listed, _, stale = prices(kind, [code])
-        if code not in listed and not stale:
-            return f"Không thấy mã {html.escape(code)} trên sàn"
-    data["items"] = [it for it in data["items"] if not (it["loai"] in (kind, "cp", "etf") and it["ma"] == code)]
-    data["items"].append({"id": new_id(data), "loai": kind, "ma": code, "sl": qty, "gia_von": cost})
-    return (f"✅ Đã khai báo {TYPES[kind]} {html.escape(code.upper())}: {qty_text(qty)}"
-            + (f", giá vốn {ct.vnd(cost)}" if cost else ""))
-
-
-def add_fx(data, code, args):
-    try:
-        qty = number(args[0])
-    except (IndexError, ValueError):
-        return None
-    code = code.upper()
-    data["items"] = [it for it in data["items"] if not (it["loai"] == "ngoaite" and it["ma"] == code)]
-    data["items"].append({"id": new_id(data), "loai": "ngoaite", "ma": code, "sl": qty, "gia_von": None})
-    return f"✅ Đã khai báo ngoại tệ {code}: {qty_text(qty)}"
-
-
-def add_gold(args):
-    """/taisan vang nhan 0,1 chi 148,02 [20/10]: loại, số lượng, đơn vị, giá mua triệu/lượng, ngày mua (không bắt buộc;
-    có thì hiện ở 💼 Tài sản)."""
-    import lenh  # dùng chung cách nhập của /vivang bên bot bản tin
-    bought = None
-    if args and re.fullmatch(r"\d{1,2}/\d{1,2}(?:/\d{4})?", args[-1]):
-        parts = [int(x) for x in args[-1].split("/")]
-        today = ct.today()
-        try:
-            bought = date(parts[2] if len(parts) > 2 else today.year, parts[1], parts[0])
-        except ValueError:
-            return None
-        if bought > today:
-            bought = bought.replace(year=bought.year - 1)
-        args = args[:-1]
-    try:
-        kind = lenh.KINDS[args[0].lower()]
-        taels = number(args[1]) * lenh.UNITS[args[2].lower()]
-        paid = number(args[3]) if len(args) > 3 else None
-    except (KeyError, IndexError, ValueError):
-        return None
-    if not 0 < taels <= 1000:
-        return None
-    gold_repo.add(GoldLot(kind, taels, paid, bought.isoformat() if bought else None))
-    return f"✅ Đã thêm {lenh.amount_text(taels)} {gold_name(kind).lower()} vào ví vàng (dùng chung với bot bản tin)"
-
-
-ALIASES = {"tien": "tien", "taikhoan": "tien", "tk": "tien", "vi": "tien", "tietkiem": "tietkiem", "so": "tietkiem",
-           "sotietkiem": "tietkiem", "cp": "cp", "cophieu": "cp", "etf": "etf", "chungchiquy": "etf", "quy": "quy", "ccq": "quy", "vang": "vang",
-           "coin": "coin", "crypto": "coin", "khac": "khac", "nha": "khac", "xe": "khac", "no": "no", "vay": "no"}
 
 
 def taisan(args):
@@ -424,109 +282,6 @@ def chart_reply(day):
 
 # ---- Mua bán cổ phiếu bằng tin nhắn ----------------------------------------------------
 
-TRADE = re.compile(r"^\s*(mua|ban)\s+(\d[\d.,]*)\s*(?:cp|ccq|co phieu|cổ phiếu|chung chi quy)?\s+([A-Za-z0-9]{3,8})\s*"
-                   r"(?:gia|giá|@)?\s*"
-                   r"(\d[\d.,]*)\s*(k|nghin|nghìn|đ|d|dong|đồng)?\s*$", re.IGNORECASE)
-
-
-def parse_trade(text):
-    """'bán 500 FPT giá 120' -> ("ban", 500, "FPT", 120000); None nếu không phải lệnh mua bán cổ phiếu."""
-    if "\n" in text.strip():
-        return None
-    m = TRADE.match(ct.plain(text))
-    if not m:
-        return None
-    try:
-        qty, price = number(m[2]), stock_price(m[4])
-    except ValueError:
-        return None
-    raw_code = re.search(rf"(?i)(?<![\w]){m[3]}(?![\w])", text)
-    code = m[3].upper()
-    looks_like_stock = (raw_code and raw_code[0].isupper()) or re.search(r"(?i)\b(gia|giá|cp|cổ phiếu|co phieu)\b", text)
-    if not looks_like_stock or qty <= 0 or not qty.is_integer():
-        return None
-    return m[1].lower(), int(qty), code, price
-
-
-def broker_cash(data):
-    """Tài khoản tiền tên có chữ DNSE (tiền chờ trong tài khoản chứng khoán), None nếu chưa khai báo."""
-    return next((it for it in data["items"] if it["loai"] == "tien" and "dnse" in ct.plain(it["ten"])), None)
-
-
-def trade(text, now, pay_main=True):
-    """Xử lý tin mua/bán cổ phiếu; None nếu tin không phải mua bán cổ phiếu (để ghi như khoản chi thường).
-    Tiền đi/về tài khoản DNSE nếu đã khai báo, không thì tài khoản chính (pay_main=False: tiền có sẵn, không trừ)."""
-    found = parse_trade(text)
-    if not found:
-        return None
-    side, qty, code, price = found
-    data = load()
-    kind = "etf" if is_etf(code) else "cp"
-    holding = next((it for it in data["items"] if it["loai"] in ("cp", "etf") and it["ma"] == code), None)
-    cash = broker_cash(data)
-    value = qty * price
-    if side == "mua":
-        listed, _, stale = prices(kind, [code])
-        if code not in listed and not stale:
-            return None  # không phải mã chứng khoán: để ghi như khoản chi
-        paid = value * (1 + BROKER_FEE)
-        if holding:
-            total_cost = holding["sl"] * (holding.get("gia_von") or price) + paid
-            holding["sl"] += qty
-            holding["gia_von"] = total_cost / holding["sl"]
-        else:
-            holding = {"id": new_id(data), "loai": kind, "ma": code, "sl": qty, "gia_von": paid / qty}
-            data["items"].append(holding)
-        lines = [f"📈 Mua {vn_num(qty, 0)} {code} × {ct.vnd(price)} = <b>{ct.vnd(round(paid))}</b>",
-                 f"Giữ {vn_num(holding['sl'], 0)} {code} · giá vốn {ct.vnd(round(holding['gia_von']))}"]
-        if cash:
-            cash["tien"] -= round(paid)
-            lines.append(f"🏦 Tiền tài khoản {html.escape(cash['ten'])}: còn {ct.vnd(cash['tien'])}")
-        elif pay_main:
-            moved = move_main(data, -paid, f"mua {vn_num(qty, 0)} {code}", now.date())
-            if moved:
-                lines.append(moved)
-        save(data)
-        return "\n".join(lines)
-    if not holding:
-        return (f"Chưa có {code} trong danh mục nên chưa tính được lãi/lỗ. Khai báo trước: "
-                f"/taisan cp {code} số_lượng giá_vốn (ví dụ /taisan cp {code} 1000 95)")
-    if qty > holding["sl"]:
-        return f"Bạn chỉ đang giữ {vn_num(holding['sl'], 0)} {code}, không bán được {vn_num(qty, 0)}"
-    tax, fee = value * SELL_TAX, value * BROKER_FEE
-    received = value - tax - fee
-    cost = qty * (holding.get("gia_von") or price)
-    gain = received - cost
-    holding["sl"] -= qty
-    if holding["sl"] == 0:
-        data["items"] = [it for it in data["items"] if it is not holding]
-    data.setdefault("lailo", []).append({"ngay": now.date().isoformat(), "ma": code, "sl": qty, "gia": price,
-                                         "lai": round(gain)})
-    data["lailo"] = data["lailo"][-200:]
-    lines = [f"💰 Bán {vn_num(qty, 0)} {code} × {ct.vnd(price)} = {ct.vnd(round(value))}",
-             f"Thuế 0,1% −{ct.vnd(round(tax))}" + (f" · phí −{ct.vnd(round(fee))}" if fee else "")
-             + f" → về <b>{ct.vnd(round(received))}</b>",
-             f"Giá vốn {ct.vnd(round(holding.get('gia_von') or price))} → "
-             + (f"🟢 <b>lãi {ct.vnd(round(gain))}</b>" if gain >= 0 else f"🔴 <b>lỗ {ct.vnd(round(-gain))}</b>")
-             + f" ({gain / cost * 100:+.1f}%)".replace(".", ",")]
-    if gain > 0:  # phần lãi là thu nhập đầu tư; phần vốn chỉ là đổi cổ phiếu ra tiền
-        entry = {"id": ledger_repo.next_id(), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
-                 "tien": round(gain), "ghichu": f"lãi bán {qty} {code}", "nhom": ct.INCOME,
-                 "khong_tk": True}  # tiền bán đã cộng cả vào tài khoản bên dưới, không cộng lần nữa
-        ct.save(entry)
-        lines.append("💰 Lãi đã ghi vào Thu nhập")
-    lines.append(f"Còn {vn_num(holding['sl'], 0)} {code}" if holding["sl"] else f"Hết {code}")
-    if cash:
-        cash["tien"] += round(received)
-        lines.append(f"🏦 Tiền tài khoản {html.escape(cash['ten'])}: {ct.vnd(cash['tien'])}")
-    elif pay_main:
-        moved = move_main(data, received, f"bán {vn_num(qty, 0)} {code}", now.date())
-        if moved:
-            lines.append(moved)
-    save(data)
-    return "\n".join(lines)
-
-
 # ---- Tài khoản chính: nơi lương về, tiền tiêu và tiền chuyển đi các ngăn khác ---------------
 # Số dư = số dư thật lúc chốt + thu − chi ghi sổ sau lúc chốt (khoản có số thứ tự lớn hơn mốc, ngày từ ngày chốt)
 # ± tiền chuyển qua lại với các ngăn khác (quỹ dự phòng, quỹ chờ đầu tư, sổ tiết kiệm, vàng, cổ phiếu...).
@@ -595,46 +350,7 @@ def luong(args):
     return f"✅ Ngày {int(args[0])} hằng tháng bot sẽ hỏi đã nhận lương {ct.vnd(found[0])} chưa"
 
 
-def salary_due(day):
-    """(tin nhắc, nút) nếu hôm nay trong 3 ngày từ ngày lương mà tháng này chưa ghi lương; None nếu không."""
-    s = salary_repo.load()
-    if not s:
-        return None
-    payday = min(s.day, monthrange(day.year, day.month)[1])
-    if not 0 <= day.day - payday <= 3:
-        return None
-    month = ct.between(day.replace(day=1), day)
-    if any(e["nhom"] == ct.INCOME and "luong" in ct.plain(e["ghichu"]) for e in month):
-        return None
-    return (f"💼 {'Hôm nay ngày lương' if day.day == payday else f'Đã qua ngày lương {payday}'}: đã nhận chưa?",
-            [[(f"✅ Đã nhận {pt.short(s.amount)}", f"ts:luong:{s.amount}"), ("Chưa", "ts:chua")]])
-
-
-def maturity_notes(day):
-    """Sổ tiết kiệm đáo hạn trong 3 ngày tới (mỗi sổ nhắc một lần)."""
-    notes = []
-    for it in load()["items"]:
-        if it["loai"] == "tietkiem" and it.get("ky"):
-            interest, maturity = accrued(it, day)
-            if 0 <= (maturity - day).days <= 3 and kho.put_new(keys.saving_maturity_reminder(it['id'], maturity), True,
-                                                               10 * 86400):
-                notes.append(f"🐷 Sổ {html.escape(it['ten'])} {short(it['tien'])} đáo hạn {maturity:%d/%m}"
-                             f" (lãi ~{short(interest)})")
-    return notes
-
-
 # ---- Khám sức khỏe tài chính -----------------------------------------------------------
-
-def monthly_flows(day):
-    """(chi trung bình/tháng, thu trung bình/tháng, số ngày có dữ liệu) trong tối đa 90 ngày qua."""
-    items = ct.between(day - timedelta(days=89), day)
-    if not items:
-        return 0, 0, 0
-    days = (day - date.fromisoformat(min(e["ngay"] for e in items))).days + 1
-    spend = sum(e["tien"] for e in items if e["nhom"] != ct.INCOME)
-    income = sum(e["tien"] for e in items if e["nhom"] == ct.INCOME)
-    return spend / days * 30.4, income / days * 30.4, days
-
 
 def health_checks(day):
     """[(điểm 0–20 hoặc None nếu thiếu dữ liệu, dấu, dòng mô tả)] và dữ liệu thô cho AI."""
