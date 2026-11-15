@@ -898,6 +898,155 @@ def pick_main(item_id):
     return it
 
 
+# ---- Bán, rút, thu về: tiền về tài khoản chính (nếu có), phần lãi ghi vào Thu nhập --------------------
+
+def realize(data, now, code, qty, price, gain, note):
+    """Ghi lãi/lỗ đã chốt; lãi dương thì ghi khoản thu (không cộng tài khoản chính lần nữa)."""
+    data.setdefault("lailo", []).append({"ngay": now.date().isoformat(), "ma": code, "sl": qty, "gia": price,
+                                         "lai": round(gain)})
+    data["lailo"] = data["lailo"][-200:]
+    if gain > 0:
+        ct.save({"id": kho.command("INCR", ct.K_COUNTER), "ngay": now.date().isoformat(), "gio": now.strftime("%H:%M"),
+                 "tien": round(gain), "ghichu": note, "nhom": ct.INCOME, "khong_tk": True})
+
+
+def gain_line(gain, cost):
+    return (f"{'🟢 lãi' if gain >= 0 else '🔴 lỗ'} {ct.vnd(round(abs(gain)))}"
+            + (f" ({gain / cost * 100:+.1f}%)".replace(".", ",").replace("-", "−") if cost else ""))
+
+
+def sell_gold(chi, received, now, kind=None, to_main=True):
+    """Bán vàng: lấy dần từ các lần mua cũ nhất (cùng loại nếu có nói). chi=None: bán hết. Trả câu báo."""
+    gold = kho.get(K_GOLD, []) or []
+    lots = [g for g in gold if not kind or g["loai"] == kind]
+    have = sum(g["luong"] for g in lots) * 10
+    if not lots or have <= 0:
+        return "Ví vàng đang trống, chưa có gì để bán"
+    chi = have if chi is None else chi
+    if chi > have + 1e-6:
+        return f"Ví chỉ có {qty_text(round(have, 2))} chỉ{' ' + gold_name(kind).lower() if kind else ''}, không bán được {qty_text(chi)} chỉ"
+    left, cost = chi / 10, 0.0
+    for g in sorted(lots, key=lambda x: x.get("ngay") or ""):
+        take = min(g["luong"], left)
+        cost += take * (g.get("gia") or 0) * 1e6
+        g["luong"] = round(g["luong"] - take, 6)
+        left = round(left - take, 6)
+        if left <= 0:
+            break
+    kho.put(K_GOLD, [g for g in gold if g["luong"] > 1e-6])
+    data = load()
+    gain = received - cost if cost else 0
+    if cost:
+        realize(data, now, "Vàng", chi, received / chi, gain, f"lãi bán {qty_text(chi)} chỉ vàng")
+    moved = move_main(data, received, f"bán {qty_text(chi)} chỉ vàng", now.date()) if to_main else None
+    save(data)
+    return "\n".join([f"🥇 Bán {qty_text(round(chi, 2))} chỉ vàng = <b>{ct.vnd(round(received))}</b>"
+                      + (f" · vốn {ct.vnd(round(cost))} → {gain_line(gain, cost)}" if cost else "")]
+                     + ([moved] if moved else []))
+
+
+def find_item(data, name, kinds):
+    """Mục tài sản theo tên/mã (trùng, không thì chứa nhau), trong các loại kinds; None nếu không thấy hoặc nhiều."""
+    key = ct.plain(name or "").strip()
+    pool = [it for it in data["items"] if it["loai"] in kinds]
+    if not key:
+        return pool[0] if len(pool) == 1 else None
+    label = lambda it: ct.plain(it.get("ten") or it.get("ma") or "")
+    exact = [it for it in pool if label(it).strip() == key]
+    near = exact or [it for it in pool if key in label(it) or label(it).strip() in key]
+    return near[0] if len(near) == 1 else None
+
+
+def close_saving(name, received, now, to_main=True):
+    """Tất toán sổ tiết kiệm: nhận về `received` (None: gốc + lãi tới hôm nay). Trả câu báo."""
+    data = load()
+    it = find_item(data, name, ("tietkiem",))
+    if not it:
+        books = [x["ten"] for x in data["items"] if x["loai"] == "tietkiem"]
+        return (f"Không thấy sổ «{html.escape(name or '')}»" + (f". Đang có: {html.escape(', '.join(books))}" if books
+                                                                  else ". Chưa có sổ tiết kiệm nào"))
+    interest, _ = accrued(it, now.date())
+    received = round(received if received else it["tien"] + interest)
+    gain = received - it["tien"]
+    data["items"] = [x for x in data["items"] if x is not it]
+    if gain > 0:
+        realize(data, now, f"Sổ {it['ten']}", 1, received, gain, f"lãi tiết kiệm {it['ten']}")
+        data["lailo"].pop()  # lãi tiết kiệm là thu nhập, không phải lãi/lỗ mua bán
+    moved = move_main(data, received, f"tất toán sổ {it['ten']}", now.date()) if to_main else None
+    save(data)
+    return "\n".join([f"🐷 Tất toán sổ {html.escape(it['ten'])}: gốc {ct.vnd(it['tien'])} → nhận <b>{ct.vnd(received)}</b>"
+                      + (f" (lãi {ct.vnd(gain)})" if gain else "")] + ([moved] if moved else []))
+
+
+def sell_fund(code, received, units, now, to_main=True):
+    """Bán chứng chỉ quỹ: số ccq (None: tính theo NAV gần nhất), tiền nhận về. Trả câu báo."""
+    data = load()
+    it = find_item(data, code, ("quy", "etf"))
+    if not it:
+        return f"Chưa có quỹ {html.escape((code or '').upper())} trong tài sản"
+    if not units:
+        nav = prices(it["loai"], [it["ma"]])[0].get(it["ma"])
+        if not nav:
+            return f"Chưa lấy được NAV {it['ma']}: nhắn kèm số ccq đã bán, ví dụ «bán 30 ccq {it['ma']} được 450k»"
+        units = round(received / nav, 2)
+    if units > it["sl"] + 1e-6:
+        return f"Chỉ đang có {qty_text(it['sl'])} ccq {it['ma']}, không bán được {qty_text(units)}"
+    cost = units * (it.get("gia_von") or 0)
+    it["sl"] = round(it["sl"] - units, 2)
+    if it["sl"] <= 0:
+        data["items"] = [x for x in data["items"] if x is not it]
+    gain = received - cost if cost else 0
+    if cost:
+        realize(data, now, it["ma"], units, received / units, gain, f"lãi bán {qty_text(units)} ccq {it['ma']}")
+    moved = move_main(data, received, f"bán {qty_text(units)} ccq {it['ma']}", now.date()) if to_main else None
+    save(data)
+    return "\n".join([f"💹 Bán {qty_text(units)} ccq {it['ma']} = <b>{ct.vnd(round(received))}</b>"
+                      + (f" · vốn {ct.vnd(round(cost))} → {gain_line(gain, cost)}" if cost else "")
+                      + (f" · còn {qty_text(it['sl'])} ccq" if it["sl"] > 0 else "")] + ([moved] if moved else []))
+
+
+def collect_loan(name, amount, now, to_main=True):
+    """Người vay trả lại: trừ khoản phải thu "Cho X vay", hết thì xóa. Trả câu báo."""
+    data = load()
+    loans = [x for x in data["items"] if x["loai"] == "khac" and ct.plain(x["ten"]).startswith("cho ")]
+    key = ct.plain(name or "")
+    hit = [x for x in loans if key and key in ct.plain(x["ten"])]
+    if len(hit) != 1:
+        return (f"Không thấy khoản cho «{html.escape(name or '')}» vay. Đang cho vay: "
+                + (html.escape(", ".join(x["ten"] for x in loans)) if loans else "chưa có khoản nào"))
+    it = hit[0]
+    took = min(amount, it["tien"])
+    it["tien"] -= took
+    note = f"🤝 {html.escape(it['ten'])}: đã thu {ct.vnd(took)}"
+    if it["tien"] <= 0:
+        data["items"] = [x for x in data["items"] if x is not it]
+        note += " · ✅ trả hết"
+    else:
+        note += f" · còn {ct.vnd(it['tien'])}"
+    if amount > took:
+        note += f" (thừa {ct.vnd(amount - took)} so với số cho vay)"
+    moved = move_main(data, took, f"{it['ten']} trả", now.date()) if to_main else None
+    save(data)
+    return note + (f"\n{moved}" if moved else "")
+
+
+def removable(data, name):
+    """Mục tài sản có thể xóa theo tên/mã (mọi loại trừ nợ, nợ xóa ở sổ nợ)."""
+    return find_item(data, name, ("tien", "tietkiem", "khac", "cp", "etf", "quy", "coin", "ngoaite"))
+
+
+def remove_named(name):
+    data = load()
+    it = removable(data, name)
+    if not it:
+        return f"Không thấy «{html.escape(name or '')}» trong tài sản"
+    if it.get("chinh"):
+        return "Đây là tài khoản chính: đổi tài khoản chính khác trước rồi mới xóa"
+    data["items"] = [x for x in data["items"] if x is not it]
+    save(data)
+    return f"🗑 Đã xóa {html.escape(it.get('ten') or it.get('ma'))} khỏi tài sản"
+
+
 # ---- Nhắc lương ------------------------------------------------------------------------
 
 def luong(args):

@@ -41,6 +41,23 @@ def debt_choices():
         return []
 
 
+def saving_choices():
+    try:
+        return [(it["ten"], it["ten"]) for it in ct.taisan().load()["items"] if it["loai"] == "tietkiem"][:6]
+    except Exception as e:
+        print(f"[lỗi] danh sách sổ: {e!r}", file=sys.stderr)
+        return []
+
+
+def loan_choices():
+    try:
+        return [(it["ten"][4:-4].strip() or it["ten"], it["ten"]) for it in ct.taisan().load()["items"]
+                if it["loai"] == "khac" and ct.plain(it["ten"]).startswith("cho ")][:6]
+    except Exception as e:
+        print(f"[lỗi] danh sách cho vay: {e!r}", file=sys.stderr)
+        return []
+
+
 GOLD_PRICE = (50, 300)  # triệu đồng/lượng: ngoài khoảng này gần như chắc nhập nhầm (giá một chỉ, thiếu số 0…)
 TERMS = [(0, "Không kỳ hạn"), (1, "1 tháng"), (3, "3 tháng"), (6, "6 tháng"), (12, "12 tháng")]
 JOBS = {
@@ -78,6 +95,19 @@ JOBS = {
     "chuyen_tk": {"nhan": "🔁 Chuyển tiền", "xac_nhan": True, "truong": [
         F("tien", "tien", "Chuyển bao nhiêu?"), F("den", "chu", "Chuyển sang tài khoản, ví nào?"),
         F("tu", "chu", "Chuyển từ tài khoản, ví nào?", can=False)]},
+    "ban_vang": {"nhan": "🥇 Bán vàng", "xac_nhan": True, "truong": [
+        F("tien", "tien", "Bán được bao nhiêu tiền?"), F("chi", "so", can=False),
+        F("loai", "chon", can=False, chon=[("nhan", "Nhẫn 24k"), ("sjc", "Miếng SJC")])]},
+    "tat_toan": {"nhan": "🐷 Tất toán sổ", "xac_nhan": True, "truong": [
+        F("ten", "chu", "Tất toán sổ nào?", chon=saving_choices),
+        F("tien", "tien", "Nhận về bao nhiêu? (bỏ qua: bot tính gốc + lãi)", can=False, goi=True)]},
+    "ban_quy": {"nhan": "💹 Bán quỹ", "xac_nhan": True, "truong": [
+        F("ma", "chu", "Bán quỹ nào?"), F("tien", "tien", "Nhận về bao nhiêu?"),
+        F("ccq", "so", "Bán bao nhiêu ccq? (bỏ qua: tính theo NAV gần nhất)", can=False, goi=True)]},
+    "thu_no": {"nhan": "🤝 Thu nợ", "xac_nhan": True, "truong": [
+        F("ten", "chu", "Ai trả?", chon=loan_choices), F("tien", "tien", "Trả bao nhiêu?")]},
+    "xoa_tai_san": {"nhan": "🗑 Xóa tài sản", "xac_nhan": True, "truong": [
+        F("ten", "chu", "Xóa tài khoản, sổ hay mã nào?")]},
     "doi_xong": {"nhan": "🔁 Hoán đổi xong", "xac_nhan": True, "truong": [
         F("ngay_ban", "ngay", "Bán {cho} khớp ngày nào? (lịch sử giao dịch Fmarket)"),
         F("ngay_mua", "ngay", "Mua {chinh} khớp ngày nào?"),
@@ -125,7 +155,8 @@ EXAMPLES = ("• mua 2 chỉ vàng nhẫn hết 27tr\n• gửi tiết kiệm VC
 TRIGGERS = ["chuyển", "nạp", "rút", "tiết kiệm", "vàng", "vay", "mượn", "quỹ", "ccq", "chứng chỉ", "cổ phiếu", "bán",
             "đầu tư", "tài khoản", "số dư", "ngân sách", "lương về", "nhận lương", "nhận tiền", "được thưởng",
             "hoán đổi", "tất toán", "đáo hạn", "dự phòng", "vff", "vmeef", "không tiêu", "khớp lệnh", "đặt lệnh",
-            "nợ", "trả góp", "khoản vay"]
+            "nợ", "trả góp", "khoản vay", "trả lại", "sjc", "lượng", "nhẫn", "chốt lời", "cắt lỗ", "xóa", "sửa",
+            "còn lại"]
 # Câu hỏi về thứ ngoài sổ chi tiêu (nợ, tài sản, quỹ, kế hoạch): không trả lời bằng sổ chi tiêu
 BEYOND = ["nợ", "vay", "quỹ", "ccq", "vff", "vmeef", "tài sản", "tiết kiệm", "vàng", "cổ phiếu", "đầu tư", "dự phòng",
           "kế hoạch", "mục tiêu", "lãi", "lỗ", "ngân sách", "trả xong", "bao giờ", "khi nào", "tài khoản", "số dư",
@@ -163,17 +194,43 @@ def remember_plain(text):
         kho.put(K_PLAIN, (notes + [key])[-300:])
 
 
-def wants(text):
+def wants(text, names=None):
     """Tin này cần hiểu bằng AI (không phải khoản chi thường)? Chưa bật AI thì không: bot chạy như trước."""
     t = text.strip()
     if not ct.ai_key() or not t or "\n" in t or t[0] in "+/" or "#" in t:
         return False
     if not ct.parse_amount(t):
         return True  # không có số tiền: không phải khoản chi
-    if not mentions(t, TRIGGER_RE):
+    if not (mentions(t, TRIGGER_RE) or ct.money_count(t) >= 2 or names_in(t, names)):
         return False
     e = ct.parse_line(t, ct.today())
     return not (e and ct.learn_key(e["ghichu"]) in plain_notes())
+
+
+def known_names():
+    """Tên tài khoản, sổ, khoản nợ, người đang vay của người dùng (đã bỏ dấu): nhắc tới là việc tài chính."""
+    try:
+        items = ct.taisan().load()["items"]
+    except Exception as e:
+        print(f"[lỗi] đọc tên tài sản: {e!r}", file=sys.stderr)
+        return []
+    out = []
+    for it in items:
+        name = it.get("ten") or ""
+        if it["loai"] == "khac" and ct.plain(name).startswith("cho ") and " vay" in ct.plain(name):
+            name = re.sub(r"(?i)^cho\s+|\s+vay.*$", "", name)
+        elif it["loai"] not in ("tien", "tietkiem", "no"):
+            continue
+        key = ct.plain(name).strip()
+        if len(key) >= 3:
+            out.append(key)
+    return out
+
+
+def names_in(text, names=None):
+    bare = ct.plain(text)
+    names = known_names() if names is None else [ct.plain(n) for n in names]
+    return any(re.search(r"(?<!\w)" + re.escape(n) + r"(?!\w)", bare) for n in names)
 
 
 # ---- Nhờ AI hiểu câu -------------------------------------------------------------------
@@ -198,75 +255,97 @@ def personal_context():
     return "\n".join(lines)
 
 
-def prompt(day, personal=True):
+def prompt(day, personal=True, facts=None, people=None):
     today = f"{WEEKDAYS[day.weekday()]} {day:%d/%m/%Y} ({day.isoformat()})"
     return (
-        f"Bạn là bộ hiểu tin nhắn của một bot quản lý tài chính cá nhân của người Việt. Hôm nay là {today}. Đọc tin nhắn "
-        "rồi trả về ĐÚNG MỘT dòng JSON, không giải thích. Trường \"viec\" là một trong:\n"
-        '- "chi": một khoản chi tiêu thường (mua đồ, ăn uống, hóa đơn, biếu tặng, chuyển khoản trả tiền hàng, nạp điện '
-        'thoại hay game, đóng quỹ lớp, mua vàng mã...). Không cần trường nào khác.\n'
-        '- "thu": tiền nhận được (lương, thưởng, được cho, bán đồ cũ, hoàn tiền). Trường: "tien", "ghi_chu" (ngắn, có '
-        'dấu), "ngay".\n'
-        '- "tra_no": trả bớt một khoản nợ. "ten" (tên khoản nợ, dùng đúng tên đang có nếu khớp), "tien", "ngay".\n'
-        '- "no_moi": vay thêm hoặc khai báo một khoản nợ (vay ai, mua trả góp, nợ thẻ). "ten", "tien" (số còn nợ), '
-        '"moi_thang" (mỗi tháng trả), "lai" (%/năm; 0 nếu nói không lãi), "ngay_tra" (ngày trả hằng tháng).\n'
-        '- "cho_vay": cho người khác vay hay mượn tiền. "ten" (người vay), "tien".\n'
-        '- "du_phong": nạp vào hoặc rút khỏi quỹ dự phòng (quỹ khẩn cấp). "tien", "chieu": "nap" | "rut".\n'
-        '- "tiet_kiem": gửi hoặc mở sổ tiết kiệm ở ngân hàng. "ten" (ngân hàng hay tên sổ), "tien", "lai" (%/năm), '
-        '"ky" (số tháng; 0 nếu không kỳ hạn), "ngay" (ngày gửi).\n'
-        '- "tai_khoan": báo số dư hiện có của một tài khoản, ví, tiền mặt. "ten", "tien", "chinh": true nếu nói là tài '
-        'khoản chính hay tài khoản nhận lương.\n'
-        '- "vang": MUA vàng tích trữ. "loai": "nhan" (nhẫn, vàng 24k/9999, vàng ép vỉ) | "sjc" (vàng miếng SJC), "chi" '
-        '(tổng số chỉ; 1 lượng = 1 cây = 10 chỉ), "tien" (tổng tiền đã trả).\n'
-        '- "co_phieu": mua hoặc bán cổ phiếu, ETF trên sàn. "chieu": "mua" | "ban", "ma", "sl" (số cổ phiếu), "gia" '
-        '(giá một cổ phiếu đúng như người dùng nói: 12 hay 95,5 nghĩa là nghìn đồng), "gia_von" (nếu có nói).\n'
-        '- "quy": mua chứng chỉ quỹ mở, hoặc hoán đổi từ quỹ này sang quỹ kia. "chieu": "mua" | "hoan_doi", "ma" (mã quỹ '
-        'mua; hoán đổi thì không cần), "tien" (số tiền mua), "ccq" (số ccq đem hoán đổi), "ngay" (ngày đặt lệnh, chỉ khi '
-        'người dùng nói rõ ngày hay buổi), "sau_gio": true nếu nói đặt sau 14h40.\n'
-        '- "sua_ccq": báo số ccq thực tế của lệnh quỹ vừa khớp. "ccq", "ma".\n'
-        '- "doi_xong": báo lệnh hoán đổi quỹ chờ sang quỹ chính (bán VFF rồi mua VMEEF) đã xong. "ngay_ban" (ngày bán '
-        'khớp), "ngay_mua" (ngày mua khớp), "ccq" (số ccq quỹ chính nhận được, nếu có nói).\n'
-        '- "quy_cho": để tiền vào, hoặc rút ra khỏi, quỹ chờ đầu tư (tiền chờ mua quỹ mở theo kế hoạch). "tien", "chieu": '
+        f"Bạn là bộ điều phối của một bot quản lý tài chính cá nhân của người Việt. Hôm nay là {today}. Đọc tin nhắn rồi "
+        "trả về ĐÚNG MỘT JSON, không giải thích. Tin chỉ có MỘT việc: {\"viec\": ..., các trường}. Tin có NHIỀU việc "
+        "(nối bằng dấu phẩy, \"và\", \"rồi\", \"xong\"): {\"viec\": \"nhieu\", \"ds\": [việc 1, việc 2, ...]}, mỗi "
+        "việc đủ trường của nó. Trường \"viec\" là một trong:\n"
+        "GHI SỔ\n"
+        '- "chi": khoản chi tiêu (ăn uống, mua đồ, hóa đơn, biếu tặng, chuyển tiền cho người khác, trả tiền điện nước, '
+        'nạp điện thoại, đóng quỹ lớp, vàng mã...). "tien", "ghi_chu" (ngắn, có dấu), "ngay".\n'
+        '- "thu": tiền nhận được (lương, thưởng, được cho, bán đồ cũ, hoàn tiền, cổ tức). "tien", "ghi_chu", "ngay".\n'
+        '- "khong_tieu": hôm nay hoặc hôm qua không tiêu gì. "ngay": "homnay" | "homqua".\n'
+        '- "xoa_cuoi": xóa khoản vừa ghi (ghi nhầm).\n'
+        "NỢ, CHO VAY\n"
+        '- "tra_no": trả bớt một khoản nợ của mình (trả góp, trả thẻ, trả người thân). "ten" (dùng đúng tên khoản nợ đang '
+        'có nếu khớp), "tien", "ngay".\n'
+        '- "no_moi": vay thêm hoặc khai báo khoản nợ (vay ai, mượn ai, mua trả góp, nợ thẻ). "ten", "tien" (số còn nợ), '
+        '"moi_thang", "lai" (%/năm; 0 nếu nói không lãi), "ngay_tra" (ngày trả hằng tháng).\n'
+        '- "cho_vay": mình cho người khác vay, mượn tiền. "ten" (người vay), "tien".\n'
+        '- "thu_no": người mình cho vay trả lại tiền. "ten" (người trả), "tien".\n'
+        "TIỀN, TÀI KHOẢN\n"
+        '- "tai_khoan": báo số dư hiện có của tài khoản, ví, tiền mặt. "ten", "tien", "chinh": true nếu nói là tài khoản '
+        'chính hay tài khoản nhận lương.\n'
+        '- "chuyen_tk": chuyển giữa hai tài khoản, ví của CHÍNH MÌNH (ngân hàng sang MoMo, rút tiền mặt ATM, nạp ví). '
+        '"tu" (nếu có nói), "den", "tien".\n'
+        '- "du_phong": nạp vào (để dành) hoặc rút khỏi quỹ dự phòng (quỹ khẩn cấp, quỹ phòng thân). "tien", "chieu": '
         '"nap" | "rut".\n'
-        '- "chuyen_tk": chuyển tiền giữa hai tài khoản, ví của CHÍNH MÌNH (ngân hàng sang ví MoMo, rút tiền mặt ở ATM). '
-        '"tu" (tài khoản đi, nếu có nói), "den" (tài khoản đến), "tien". Chuyển cho người khác là "chi".\n'
-        '- "ngan_sach": đặt ngân sách chi tiêu mỗi tháng. "nhom" ("tổng", "hằng ngày" hoặc tên nhóm chi như "ăn uống"), '
-        '"tien".\n'
-        '- "ngay_luong": cho biết ngày nhận lương hằng tháng. "ngay_luong" (1–31), "tien".\n'
-        '- "khong_tieu": nói hôm nay hoặc hôm qua không tiêu gì. "ngay": "homnay" | "homqua".\n'
-        '- "xoa_cuoi": muốn xóa khoản vừa ghi.\n'
-        '- "xem": muốn mở một màn hình, hoặc HỎI về nợ, tài sản, quỹ, kế hoạch, tiền để dành. "man" là một trong: '
-        'tong_quan, chi_tieu (báo cáo chi tiêu; thêm "ky": ngay | tuan | thang | thangtruoc), tai_san (tài sản ròng, '
-        'vàng, cổ phiếu, số dư), no (sổ nợ: còn nợ bao nhiêu, bao giờ trả xong), ke_hoach (lộ trình, mục tiêu), '
-        'chia_luong, du_phong (quỹ dự phòng), dau_tu (quỹ mở: lãi lỗ, tháng này mua bao nhiêu, hạn đặt lệnh), tiet_kiem '
-        '(đã bớt chi bao nhiêu, chuỗi ngày ghi), suc_khoe (khám sức khỏe tài chính), lich_su (các khoản vừa ghi), '
-        'bieu_do, du_bao (hôm nay còn được tiêu bao nhiêu), ngan_sach, huong_dan.\n'
-        '- "hoi": câu hỏi về các khoản chi, thu ĐÃ GHI (hết bao nhiêu, nhiều nhất, so sánh, liệt kê).\n'
-        '- "khac": không thuộc việc nào ở trên (kể cả bán vàng, rút tiết kiệm), hoặc không hiểu.\n'
-        "Quy tắc: số tiền là số nguyên đồng (35k = 35000; 1tr2 = 1200000; 2 củ = 2000000; 1 tỷ = 1000000000). Ngày viết "
-        "YYYY-MM-DD. Chỉ điền trường người dùng có nói, không tự đoán, không điền null. Câu thiếu thông tin (chưa nói "
-        "ngân hàng, lãi suất, số tiền...) thì VẪN chọn đúng việc và chỉ điền phần đã biết: bot sẽ hỏi phần còn thiếu. Chỉ "
-        "dùng \"khac\" khi câu không thuộc việc nào.\n"
+        '- "xoa_tai_san": xóa hẳn một tài khoản, sổ, mã khỏi danh sách tài sản. "ten".\n'
+        "TIẾT KIỆM, VÀNG\n"
+        '- "tiet_kiem": gửi, mở sổ tiết kiệm. "ten" (ngân hàng hay tên sổ), "tien", "lai" (%/năm), "ky" (số tháng; 0 nếu '
+        'không kỳ hạn), "ngay".\n'
+        '- "tat_toan": tất toán, rút sổ tiết kiệm, sổ đáo hạn rút về. "ten" (tên sổ), "tien" (số nhận về, nếu có nói).\n'
+        '- "vang": MUA vàng. "loai": "nhan" (nhẫn, 24k, 9999, ép vỉ) | "sjc" (vàng miếng), "chi" (tổng số chỉ; 1 lượng = '
+        '1 cây = 10 chỉ; 1 phân = 0,1 chỉ), "tien" (tổng tiền đã trả).\n'
+        '- "ban_vang": BÁN vàng. "chi" (số chỉ bán; bán hết thì bỏ trống), "tien" (tổng tiền nhận), "loai" (nếu có nói).\n'
+        "CHỨNG KHOÁN, QUỸ MỞ\n"
+        '- "co_phieu": mua, bán, chốt lời, cắt lỗ cổ phiếu, ETF. "chieu": "mua" | "ban", "ma", "sl", "gia" (giá một cổ '
+        'phiếu đúng như người dùng nói: 12 hay 95,5 là nghìn đồng), "gia_von" (nếu có nói).\n'
+        '- "quy": MUA chứng chỉ quỹ mở, hoặc hoán đổi quỹ chờ sang quỹ chính. "chieu": "mua" | "hoan_doi", "ma" (mã quỹ '
+        'mua), "tien" (số tiền mua), "ccq" (số ccq đem hoán đổi), "ngay" (ngày đặt lệnh nếu nói rõ), "sau_gio": true nếu '
+        'đặt sau 14h40.\n'
+        '- "ban_quy": BÁN, rút tiền từ quỹ mở về tài khoản. "ma", "tien" (số tiền nhận về), "ccq" (số ccq bán, nếu có '
+        'nói).\n'
+        '- "doi_xong": hoán đổi quỹ chờ sang quỹ chính đã xong. "ngay_ban", "ngay_mua", "ccq" (số ccq quỹ chính nhận được, '
+        'nếu có nói).\n'
+        '- "sua_ccq": số ccq thực tế của lệnh quỹ vừa khớp. "ccq", "ma".\n'
+        '- "quy_cho": để tiền vào, hoặc rút ra khỏi, quỹ chờ đầu tư. "tien", "chieu": "nap" | "rut".\n'
+        "CÀI ĐẶT\n"
+        '- "ngan_sach": đặt ngân sách mỗi tháng. "nhom" ("tổng", "hằng ngày" hoặc tên nhóm như "ăn uống"), "tien".\n'
+        '- "ngay_luong": ngày nhận lương hằng tháng. "ngay_luong" (1–31), "tien".\n'
+        "HỎI, XEM\n"
+        '- "hoi": hỏi về các khoản chi, thu ĐÃ GHI (hết bao nhiêu, nhiều nhất, so sánh, liệt kê theo thời gian, nhóm).\n'
+        + ('- "tra_loi": hỏi về tình hình tài chính (nợ, bao giờ trả xong, quỹ dự phòng, đầu tư lãi lỗ, nên mua bao nhiêu, '
+           'tài sản, số dư, còn được tiêu, có mua được món gì không). "cau": câu trả lời 1–3 câu, xưng "bạn", CHỈ dùng số '
+           'trong phần SỐ LIỆU bên dưới, nêu đúng con số; không có số liệu thì nói chưa có. "man": màn hình liên quan '
+           '(cùng danh sách của "xem").\n' if facts else "")
+        + '- "xem": muốn mở một màn hình' + ("" if facts else ", hoặc hỏi về nợ, tài sản, quỹ, kế hoạch") + '. "man" là '
+        'một trong: tong_quan, chi_tieu (báo cáo chi tiêu; thêm "ky": ngay | tuan | thang | thangtruoc), tai_san, no, '
+        'ke_hoach, chia_luong, du_phong, dau_tu, tiet_kiem, suc_khoe, lich_su, bieu_do, du_bao, ngan_sach, huong_dan.\n'
+        '- "khac": không thuộc việc nào ở trên, hoặc không hiểu.\n'
+        "Quy tắc: số tiền là số nguyên đồng (35k = 35000; 1tr2 = 1200000; 1tr287k = 1287000; 2 củ = 2000000; 1 tỷ = "
+        "1000000000). Ngày viết YYYY-MM-DD (\"hôm qua\" là ngày trước hôm nay). Chỉ điền trường người dùng có nói, không "
+        "tự đoán, không điền null. Câu thiếu thông tin thì VẪN chọn đúng việc và chỉ điền phần đã biết: bot sẽ hỏi phần "
+        "còn thiếu. Một khoản chi chỉ có số tiền và nội dung là \"chi\", kể cả khi có chữ \"chuyển\", \"trả tiền\".\n"
         "Ví dụ:\n"
         'gửi tiết kiệm tcb 50tr lãi 4,7% kỳ 6 tháng → {"viec": "tiet_kiem", "ten": "TCB", "tien": 50000000, "lai": 4.7, '
         '"ky": 6}\n'
         'mua 2 vỉ vàng 0,1 chỉ hết 2tr476 → {"viec": "vang", "loai": "nhan", "chi": 0.2, "tien": 2476000}\n'
+        'bán 0,5 chỉ vàng được 6tr7 → {"viec": "ban_vang", "chi": 0.5, "tien": 6700000}\n'
+        'rút sổ tiết kiệm VCB được 51tr2 → {"viec": "tat_toan", "ten": "VCB", "tien": 51200000}\n'
+        'bán 40 ccq VMEEF được 600k → {"viec": "ban_quy", "ma": "VMEEF", "ccq": 40, "tien": 600000}\n'
+        'Nam trả mình 1tr → {"viec": "thu_no", "ten": "Nam", "tien": 1000000}\n'
         'vay anh Nam 10tr không lãi → {"viec": "no_moi", "ten": "anh Nam", "tien": 10000000, "lai": 0}\n'
         'chuyển 5tr vào tiết kiệm → {"viec": "tiet_kiem", "tien": 5000000}\n'
-        'trả góp tủ lạnh còn 8tr2 mỗi tháng 4tr1 không lãi → {"viec": "no_moi", "ten": "trả góp tủ lạnh", "tien": '
-        '8200000, "moi_thang": 4100000, "lai": 0}\n'
         'trả nợ chú Tư 5tr → {"viec": "tra_no", "ten": "chú Tư", "tien": 5000000}\n'
-        'hôm nay còn được tiêu bao nhiêu → {"viec": "xem", "man": "du_bao"}\n'
-        'chuyển khoản tiền nhà 5tr → {"viec": "chi"}\n'
+        'chuyển khoản tiền nhà 5tr → {"viec": "chi", "tien": 5000000, "ghi_chu": "tiền nhà"}\n'
         'nạp 1tr vào quỹ dự phòng → {"viec": "du_phong", "tien": 1000000, "chieu": "nap"}\n'
         'chuyển 5tr từ VCB sang MoMo → {"viec": "chuyen_tk", "tu": "VCB", "den": "MoMo", "tien": 5000000}\n'
-        'rút 2tr tiền mặt → {"viec": "chuyen_tk", "den": "tiền mặt", "tien": 2000000}\n'
         'để 4tr vào quỹ chờ → {"viec": "quy_cho", "tien": 4000000, "chieu": "nap"}\n'
         'bán 1300 HAG giá 12 → {"viec": "co_phieu", "chieu": "ban", "ma": "HAG", "sl": 1300, "gia": 12}\n'
-        'tôi còn nợ bao nhiêu → {"viec": "xem", "man": "no"}\n'
-        'quỹ lãi lỗ thế nào rồi → {"viec": "xem", "man": "dau_tu"}\n'
-        'tháng này cà phê hết bao nhiêu → {"viec": "hoi"}'
-        + (("\n" + personal_context()) if personal else ""))
+        'nhận lương 19tr, nạp 3tr quỹ dự phòng rồi ăn tối 200k → {"viec": "nhieu", "ds": [{"viec": "thu", "tien": '
+        '19000000, "ghi_chu": "lương"}, {"viec": "du_phong", "tien": 3000000, "chieu": "nap"}, {"viec": "chi", "tien": '
+        '200000, "ghi_chu": "ăn tối"}]}\n'
+        'tháng này cà phê hết bao nhiêu → {"viec": "hoi"}\n'
+        + ('còn nợ bao nhiêu → {"viec": "tra_loi", "cau": "Bạn còn nợ … (theo SỐ LIỆU)", "man": "no"}\n'
+           'tháng này mua tai nghe 2tr được không → {"viec": "tra_loi", "cau": "… (so với số còn được tiêu, kế hoạch '
+           'trong SỐ LIỆU)", "man": "chia_luong"}\n' if facts else
+           'tôi còn nợ bao nhiêu → {"viec": "xem", "man": "no"}\n')
+        + 'mở sổ nợ → {"viec": "xem", "man": "no"}'
+        + (("\n" + personal_context()) if personal else "") + (("\n" + people) if people else "")
+        + (f"\nSỐ LIỆU (bot đã tính sẵn, đúng tới hôm nay):\n{facts}" if facts else ""))
 
 
 def number_of(value):
@@ -325,8 +404,21 @@ def text_amounts(text):
 
 
 def clean(raw, text=None):
-    """JSON của AI -> việc hợp lệ: bỏ trường lạ, sai kiểu; số tiền chính đối chiếu với số code đọc được trong câu."""
+    """JSON của AI -> việc hợp lệ: bỏ trường lạ, sai kiểu; số tiền chính đối chiếu với số code đọc được trong câu.
+    Nhiều việc: {"viec": "_nhieu", "ds": [...]}; trả lời câu hỏi: {"viec": "tra_loi", "cau", "man"}."""
     job = raw.get("viec") if isinstance(raw, dict) else None
+    if job == "nhieu":
+        jobs = [clean(x) for x in (raw.get("ds") or []) if isinstance(x, dict)][:6]
+        jobs = [x for x in jobs if x["viec"] not in ("khac", "nhieu", "_nhieu")]
+        if len(jobs) == 1:
+            return clean(raw["ds"][0], text)  # một việc: đối chiếu số tiền với câu như thường
+        return {"viec": "_nhieu", "ds": jobs} if jobs else {"viec": "khac"}
+    if job == "tra_loi":
+        answer = str(raw.get("cau") or "").strip()[:600]
+        man = raw.get("man") if raw.get("man") in SCREENS else None
+        if not answer:
+            return {"viec": "xem", "man": man or "tong_quan"}
+        return {"viec": "tra_loi", "cau": answer, **({"man": man} if man else {})}
     if job == "xem":
         man = raw.get("man")
         return {"viec": "xem", "man": man if man in SCREENS else "tong_quan",
@@ -336,7 +428,7 @@ def clean(raw, text=None):
     if job in ("chi", "hoi", "xoa_cuoi"):
         a = {"viec": job}
         if job == "chi":  # câu không có số tiền mà AI vẫn đọc ra ("ăn phở ba lăm nghìn")
-            for f in (F("tien", "tien"), F("ghi_chu", "chu")):
+            for f in (F("tien", "tien"), F("ghi_chu", "chu"), F("ngay", "ngay")):
                 v = value_of(f, raw.get(f["ten"]))
                 if v is not None:
                     a[f["ten"]] = v
@@ -355,10 +447,109 @@ def clean(raw, text=None):
     return a
 
 
+def finance_facts(day):
+    """Số liệu tài chính bot tính sẵn, gửi kèm câu hỏi để AI trả lời thẳng (không tự tính). Phần nào lỗi thì bỏ."""
+    import kehoach
+    ts, sono = ct.taisan(), ct.sono()
+    short = ts.short
+    lines = [f"Hôm nay {WEEKDAYS[day.weekday()]} {day:%d/%m/%Y}."]
+
+    def part(make):
+        try:
+            got = make()
+            if got:
+                lines.extend(got if isinstance(got, list) else [got])
+        except Exception as e:
+            print(f"[lỗi] số liệu cho AI: {e!r}", file=sys.stderr)
+
+    n = kehoach.numbers(day)
+
+    def month():
+        today = sum(e["tien"] for e in ct.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()
+                    and e["nhom"] != ct.INCOME and not e.get("no"))
+        return (f"Tháng {day.month}: đã thu {short(n['income'])}" + (f" ({n['income_basis']})" if n["income_basis"] else "")
+                + f" · đã chi {short(n['spent'])} (không tính trả nợ) · hôm nay đã chi {short(today)}")
+
+    def spend():
+        s = kehoach.spendable(day, n)
+        if not s:
+            return None
+        left = "còn" if s["today_left"] >= 0 else "đã quá"
+        return (f"Mỗi ngày được tiêu: hôm nay {left} {short(abs(s['today_left']))}, mức {short(s['per_day'])}/ngày "
+                f"({kehoach.basis_text(s)})")
+
+    def plan():
+        steps = kehoach.steps(n)
+        todo = " · ".join(f"{label} {short(amount)}" for _, label, amount, _ in steps) or "đã làm hết"
+        left = n["left"]
+        return (f"Kế hoạch chia lương tháng {day.month}: việc còn lại: {todo}"
+                + (f" · {'còn dư' if left >= 0 else 'thiếu'} {short(abs(left))}" if left is not None else ""))
+
+    def accounts():
+        data = ts.load()
+        rows = []
+        for it in data["items"]:
+            if it["loai"] != "tien" or it.get("duphong") or it.get("dautu"):
+                continue
+            value = ts.main_balance(it, day) if it.get("chinh") else it["tien"]
+            rows.append(f"{it['ten']}{' (chính)' if it.get('chinh') else ''} {short(value)}")
+        return "Tài khoản: " + " · ".join(rows) if rows else None
+
+    def fund():
+        f = n["fund"]
+        if not f["monthly"]:
+            return "Quỹ dự phòng: chưa tính được (cần thêm ngày ghi chép)"
+        if not f["missing"]:
+            return f"Quỹ dự phòng {short(f['balance'])}: đã đủ mục tiêu {f['months']} tháng chi"
+        return (f"Quỹ dự phòng {short(f['balance'])} / mục tiêu {short(f['target'])} ({f['months']} tháng chi thiết yếu "
+                f"{short(f['monthly'])}) · cần {short(f['per_month'])}/tháng để đủ trước {f['deadline']:%m/%Y}")
+
+    def debts():
+        items = sono.active(n["data"])
+        if not items:
+            return "Nợ: không có"
+        parts = []
+        for d in items:
+            s = sono.schedule(d, day)
+            parts.append(f"{d['ten']} {short(d['tien'])} ({sono.interest_text(d)}"
+                         + (f", {short(d['thang'])}/tháng, xong ~{sono.ym_text(s[1])}" if s else "") + ")")
+        return f"Nợ còn {short(sum(d['tien'] for d in items))}: " + " · ".join(parts)
+
+    def invest():
+        dt = ct.dautu()
+        cfg = dt.config()
+        if not dt.active(cfg):
+            return None
+        s = dt.status(cfg)
+        gain = s["value"] - s["invested"] if s["invested"] else 0
+        return (f"Đầu tư quỹ {cfg['ma']}: {dt.units_text(s['units'])} ccq ≈ {short(s['value'])}"
+                + (f", {'lãi' if gain >= 0 else 'lỗ'} {short(abs(gain))}" if s["invested"] else "")
+                + f" · kế hoạch tháng {short(s['plan'])} · nên mua tháng này ~{short(s['buy'])}"
+                + f" · quỹ chờ {short(s['cash'])}")
+
+    def assets():
+        v = ts.valuation(day)
+        kinds = {}
+        for kind, _, _, value, cost, _ in v["rows"]:
+            if kind != "no":
+                k = kinds.setdefault(kind, [0, 0])
+                k[0] += value
+                k[1] += cost or 0
+        names = {"cp": "cổ phiếu", "etf": "ETF", "quy": "quỹ mở", "vang": "vàng", "tietkiem": "tiết kiệm", "coin": "tiền số"}
+        held = [f"{names[k]} {short(a)}" + (f" ({'lãi' if a >= c else 'lỗ'} {short(abs(a - c))})" if c else "")
+                for k, (a, c) in kinds.items() if k in names]
+        return ([f"Đang giữ: {' · '.join(held)}"] if held else []) + [
+            f"Tài sản ròng {short(v['net'])} (tài sản {short(v['assets'])}, nợ {short(v['debts'])})"]
+
+    for make in (month, spend, plan, accounts, fund, debts, invest, assets):
+        part(make)
+    return "\n".join(lines)
+
+
 def ask_ai(text, day, context=None, personal=True, people=None, facts=None):
     """Nhờ AI hiểu một tin thành việc. context=(việc đang dở, câu bot vừa hỏi hoặc None): tin là câu trả lời/lời sửa.
     people: thay tên nợ, tài khoản, quỹ của người dùng (đo bằng danhgia.py dùng ngữ cảnh mẫu); facts: số liệu tài chính."""
-    system = prompt(day, personal and people is None) + (("\n" + people) if people else "")
+    system = prompt(day, personal and people is None, facts, people)
     if context:
         doing, asked = context
         system += ("\nĐang làm dở việc này: " + repr({k: v for k, v in doing.items() if not k.startswith("_")})
@@ -408,6 +599,8 @@ def price_dong(x):
 def missing(a):
     """Trường kế tiếp cần hỏi: trường bắt buộc còn thiếu, rồi trường nên hỏi một lần (chưa bỏ qua)."""
     job = a["viec"]
+    if job == "chi":
+        return None if a.get("tien") else F("tien", "tien", "Khoản chi bao nhiêu tiền?")
     if job == "quy":  # mua cần số tiền; hoán đổi cần số ccq
         need = "ccq" if a.get("chieu") == "hoan_doi" else "tien"
         if a.get(need) is None:
@@ -522,6 +715,24 @@ def describe(a):
             "" if a.get("lai") is None else ", không lãi" if not a["lai"] else f", lãi {num(a['lai'])}%/năm") + (
             f", hạn ngày {int(a['ngay_tra'])}" if a.get("ngay_tra") else "")
         return f"💳 Khoản nợ <b>{esc(a['ten'])}</b>: còn nợ <b>{money}</b>{extra}"
+    if job == "chi":
+        return f"🧾 Chi <b>{money}</b>" + (f" {esc(a['ghi_chu'])}" if a.get("ghi_chu") else "")
+    if job == "thu":
+        return f"💰 Thu <b>{money}</b>" + (f" {esc(a['ghi_chu'])}" if a.get("ghi_chu") else "")
+    if job == "tra_no":
+        return f"💳 Trả nợ <b>{esc(a.get('ten') or '')}</b> {money}"
+    if job == "ban_vang":
+        kind = (" miếng SJC" if a.get("loai") == "sjc" else " nhẫn") if a.get("loai") else ""
+        return f"🥇 Bán {num(a['chi']) + ' chỉ' if a.get('chi') else 'hết'} vàng{kind}, nhận <b>{money}</b>"
+    if job == "tat_toan":
+        return f"🐷 Tất toán sổ <b>{esc(a['ten'])}</b>" + (f", nhận <b>{money}</b>" if money else " (gốc + lãi tới hôm nay)")
+    if job == "ban_quy":
+        return (f"💹 Bán {num(a['ccq']) + ' ccq ' if a.get('ccq') else ''}<b>{esc(a['ma'].upper())}</b>, nhận "
+                f"<b>{money}</b>")
+    if job == "thu_no":
+        return f"🤝 <b>{esc(a['ten'])}</b> trả <b>{money}</b>"
+    if job == "xoa_tai_san":
+        return f"🗑 Xóa <b>{esc(a['ten'])}</b> khỏi tài sản"
     if job == "doi_xong":
         order = switch_order(a)
         if not order:
@@ -575,6 +786,8 @@ def money_move(a):
         return a["tien"] if a.get("chieu") == "rut" else -a["tien"]
     if job in ("tiet_kiem", "cho_vay", "vang") and a.get("tien"):
         return -a["tien"]
+    if job in ("ban_vang", "tat_toan", "ban_quy", "thu_no") and a.get("tien"):
+        return a["tien"]
     if job == "quy_cho" and a.get("tien"):
         return a["tien"] if a.get("chieu") == "rut" else -a["tien"]
     if job == "co_phieu" and a.get("sl") and a.get("gia"):
@@ -605,6 +818,59 @@ def source(a):
     line = (f"🏦 Về <b>{name}</b> → ~{ts.short(left + delta)}" if delta > 0 else
             f"🏦 Từ <b>{name}</b> → còn ~{ts.short(left + delta)}")
     return line, ("🔁 Không cộng vào tài khoản nào" if delta > 0 else "🔁 Tiền có sẵn, không trừ")
+
+
+MANY_JOBS = ("chi", "thu") + tuple(JOBS)  # việc làm được trong một câu nhiều việc
+
+
+def start_many(jobs, chat, now):
+    """Một câu nhiều việc: hỏi lần lượt phần còn thiếu của từng việc, rồi một thẻ chung, bấm ✅ một lần làm hết."""
+    jobs = [j for j in jobs if j.get("viec") in MANY_JOBS]
+    if not jobs:
+        return unsure("")
+    if len(jobs) == 1:
+        return advance(jobs[0], chat, now)
+    for i, job in enumerate(jobs):
+        if missing(job):
+            job["_nhom"] = {"ds": [None if k == i else j for k, j in enumerate(jobs)], "i": i}
+            return advance(job, chat, now)
+    cid = kho.command("INCR", K_CARD_ID)
+    kho.put(f"{K_CARD}{cid}", {"viec": "_nhieu", "ds": jobs}, CARD_SECONDS)
+    lines = [f"{i}. {describe(job)}" for i, job in enumerate(jobs, 1)]
+    return ("Mình hiểu là:\n" + "\n".join(lines),
+            [[(f"✅ Đúng, làm cả {len(jobs)} việc", f"y:ok:{cid}"), ("❌ Thôi", f"y:huy:{cid}")]])
+
+
+def run_many(jobs, now, chat):
+    """Làm lần lượt các việc của một câu nhiều việc; trả một tin gộp."""
+    out = []
+    for job in jobs:
+        try:
+            if job["viec"] == "chi":
+                reply = ct.record_text(dated(job, f"{job['tien']}đ {job.get('ghi_chu') or 'khoản chi'}", now.date()),
+                                       now)
+            elif job["viec"] == "thu":
+                reply = ct.record_text("+ " + dated(job, f"{job['tien']}đ {job.get('ghi_chu') or 'thu nhập'}",
+                                                    now.date()), now)
+            else:
+                reply = run(job, now, chat)
+        except Exception as e:
+            print(f"[lỗi] làm việc {job.get('viec')}: {e!r}", file=sys.stderr)
+            reply = f"⚠️ Chưa làm được: {describe(job)}"
+        text = reply[0] if isinstance(reply, tuple) else reply
+        out.append(text.split("\n🔥")[0])  # bỏ dòng chuỗi ngày ghi lặp lại ở mỗi khoản
+    return "\n\n".join(out), [[("🏠 Hôm nay", "m:home"), ("💰 Tiền của tôi", "m:tien")]]
+
+
+ANSWER_LINKS = {"no": "no:xem", "du_phong": "dp:xem", "dau_tu": "dt:xem", "tai_san": "m:tien", "ke_hoach": "m:lt",
+                "chia_luong": "kh:chia", "du_bao": "db", "tong_quan": "m:home", "chi_tieu": "m:chi", "tiet_kiem": "tk:xem",
+                "suc_khoe": "ts:sk", "ngan_sach": "m:ns"}
+
+
+def answer(a):
+    """Trả lời thẳng câu hỏi tài chính (AI viết từ số liệu bot tính sẵn), kèm nút mở màn hình liên quan."""
+    link = ANSWER_LINKS.get(a.get("man"))
+    return f"💬 {html.escape(a['cau'])}", [[("🔎 Xem chi tiết", link), ct.BACK] if link else [ct.BACK]]
 
 
 def card(a, chat, cid=None):
@@ -664,6 +930,10 @@ def advance(a, chat, now):
         kho.put(chat_key(chat), {"viec": a, "hoi": f["ten"]}, STATE_SECONDS)
         return question(a, f)
     forget(chat)
+    if a.get("_nhom"):  # việc trong một câu nhiều việc vừa đủ thông tin: quay lại cả nhóm
+        group = a.pop("_nhom")
+        group["ds"][group["i"]] = a
+        return start_many(group["ds"], chat, now)
     if JOBS[a["viec"]]["xac_nhan"]:
         return card(a, chat)
     return run(a, now, chat)
@@ -752,6 +1022,16 @@ def run(a, now, chat, option=None):
         return run_transfer(a, now, chat)
     if job == "quy":
         return run_fund(a, now, option)
+    if job == "ban_vang":
+        return ts.sell_gold(a.get("chi"), a["tien"], now, a.get("loai"), paid), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+    if job == "tat_toan":
+        return ts.close_saving(a["ten"], a.get("tien"), now, paid), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+    if job == "ban_quy":
+        return ts.sell_fund(a["ma"], a["tien"], a.get("ccq"), now, paid), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+    if job == "thu_no":
+        return ts.collect_loan(a["ten"], a["tien"], now, paid), [[("💼 Tài sản", "m:ts"), ct.BACK]]
+    if job == "xoa_tai_san":
+        return ts.remove_named(a["ten"]), [[("💼 Tài sản", "m:ts"), ct.BACK]]
     if job in ("doi_chieu", "doi_chieu_sl"):
         import doichieu
         return doichieu.set_value(a["muc"], a["gia_tri"], now)
@@ -917,6 +1197,10 @@ def handle(a, text, now, chat):
         return ct.phantich().hoi(text, now.date())
     if job == "xem":
         return screen(a, text, now)
+    if job == "tra_loi":
+        return answer(a)
+    if job == "_nhieu":
+        return start_many(a["ds"], chat, now)
     if job == "khong_tieu":
         day = now.date() - timedelta(days=1 if a.get("ngay") == "homqua" else 0)
         return ct.tietkiem().mark_no_spend(day.isoformat(), now.date())
@@ -943,7 +1227,13 @@ def understand(text, now, chat, question=False):
     """Hiểu một tin tự do. Trả câu trả lời; None nếu là khoản chi thường (để ghi như cũ). question: tin là câu hỏi,
     AI bận thì trả lời bằng sổ chi tiêu như trước."""
     try:
-        a = ask_ai(text, now.date())
+        facts = None
+        if question:
+            try:
+                facts = finance_facts(now.date())
+            except Exception as e:
+                print(f"[lỗi] số liệu cho AI: {e!r}", file=sys.stderr)
+        a = ask_ai(text, now.date(), facts=facts)
     except Exception as e:
         print(f"[lỗi] AI hiểu câu: {e!r}", file=sys.stderr)
         if question:
@@ -1106,6 +1396,10 @@ def on_button(arg, message, now):
     if kind == "sua":
         kho.put(chat_key(chat), {"viec": a, "sua": True, "the": cid}, STATE_SECONDS)
         return None, ("send", lambda: "✏️ Sửa chỗ nào? Nhắn phần đúng, ví dụ «giá 2tr5», «6 tháng» hay «ngày 9/11».")
+    if kind == "ok" and a.get("viec") == "_nhieu":
+        kho.delete(f"{K_CARD}{cid}")
+        forget(chat)
+        return "Đang làm…", ("edit", lambda: run_many(a["ds"], now, chat))
     if kind == "ok" and a.get("viec") in JOBS:
         kho.delete(f"{K_CARD}{cid}")
         forget(chat)

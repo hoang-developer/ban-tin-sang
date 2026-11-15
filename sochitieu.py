@@ -284,6 +284,11 @@ def parse_amount(text):
     return value, start, end
 
 
+def money_count(text):
+    """Số khoản tiền có ghi đơn vị (35k, 1tr, 35.000đ) trong câu: từ 2 trở lên thường là câu nhiều việc."""
+    return sum(1 for m in MONEY.finditer(text) if money(m)[0] and money(m)[1])
+
+
 def parse_date(text, day):
     """Ngày ghi trong câu ('hôm qua', '02/11'): (ngày, câu đã bỏ phần ngày)."""
     t = norm(text)

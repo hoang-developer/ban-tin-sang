@@ -72,7 +72,7 @@ CAU = [
     ("doi_xong", "hoán đổi vff xong rồi, bán 18/11 mua 21/11",
      [{"viec": "doi_xong", "ngay_ban": "2026-11-18", "ngay_mua": "2026-11-21"}]),
     ("ban_quy", "bán 30 ccq VMEEF được 450k", [{"viec": "ban_quy", "ma": "VMEEF", "ccq": 30, "tien": 450000}]),
-    ("ban_quy", "rút 5tr từ VFF về tài khoản", [{"viec": "ban_quy", "ma": "VFF", "tien": 5000000}]),
+    ("ban_quy", "rút 5tr từ VFF về tài khoản", [{"viec": "quy_cho", "tien": 5000000, "chieu": "rut"}]),  # VFF là quỹ chờ
     ("quy_cho", "để 4tr vào quỹ chờ", [{"viec": "quy_cho", "tien": 4000000}]),
     # ---- Nợ -----------------------------------------------------------------------------------
     ("no_moi", "vay anh Nam 10tr không lãi", [{"viec": "no_moi", "ten": "anh Nam", "tien": 10000000, "lai": 0}]),

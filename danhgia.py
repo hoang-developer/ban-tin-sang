@@ -20,6 +20,8 @@ DEMO_CONTEXT = ("Khoản nợ đang có: bác Vân; thẻ Techcombank trả góp
                 "Đang cho vay: Hùng; em gái\n"
                 "Vàng đang có: nhẫn 0,5 chỉ\n"
                 "Quỹ mở đang đầu tư định kỳ: VMEEF; quỹ chờ: VFF")
+DEMO_NAMES = ["bác Vân", "thẻ Techcombank trả góp", "VCB", "Techcombank", "MoMo", "tiền mặt", "DNSE", "TCB", "MB", "Hùng",
+              "em gái"]
 DEMO_FACTS = """Hôm nay thứ Sáu 20/11/2026. Lương 19tr về ngày 5.
 Tháng 11: đã thu 19tr · đã chi 3,2tr (không tính trả nợ) · hôm nay đã chi 205k
 Mỗi ngày được tiêu: hôm nay còn 217k, mức 422k/ngày (thu 19tr − trả nợ 6,39tr − quỹ dự phòng 4,4tr − đầu tư 5tr = 3,21tr chi tiêu/tháng, còn 11 ngày)
@@ -71,8 +73,8 @@ def plan(text, day=DAY, people=DEMO_CONTEXT, facts=DEMO_FACTS):
     question = ct.phantich().is_question(t)
     if question and not (ct.ai_key() and troly.beyond_spending(t)):
         return [{"viec": "hoi"}]
-    if question or troly.wants(t):
-        a = troly.ask_ai(t, day, people=people, facts=facts)
+    if question or troly.wants(t, DEMO_NAMES):
+        a = troly.ask_ai(t, day, people=people, facts=facts if question else None)  # như bot thật: số liệu chỉ đi kèm câu hỏi
         out = []
         for one in as_list(a):
             if one.get("viec") == "chi" and not one.get("tien"):  # AI bảo là khoản chi: bot ghi bằng luật
