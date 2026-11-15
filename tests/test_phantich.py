@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 from tests import harness as h
 
-import sochitieu as ct
+from interface.chitieu import commands as chitieu_commands
 from domain.phantich import numbers, query
 from infrastructure import ai as ai_client
 from infrastructure import quickchart
@@ -127,10 +127,10 @@ class DichVu(unittest.TestCase):
         h.reset()
         h.at(2026, 10, 20, 12)
         self.now = h.CLOCK["now"]
-        self.real = (ct.ai_chat, ai_client.chat, quickchart.chart_png)
-        self.addCleanup(lambda: (setattr(ct, "ai_chat", self.real[0]), setattr(ai_client, "chat", self.real[1]),
+        self.real = (None, ai_client.chat, quickchart.chart_png)
+        self.addCleanup(lambda: (setattr(ai_client, "chat", self.real[1]),
                                  setattr(quickchart, "chart_png", self.real[2])))
-        ai_client.chat = ct.ai_chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
+        ai_client.chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
         self.charts = []
         quickchart.chart_png = lambda chart, w=800, hh=500: (self.charts.append(chart), b"png")[1]
         for d in range(1, 21):
@@ -150,7 +150,7 @@ class DichVu(unittest.TestCase):
         self.assertEqual(service.daily_spent(DAY), service.daily_forecast(DAY)["spent"])
 
     def test_canh_bao_chi_bao_mot_lan(self):
-        ct.ngansach(["đi", "lại", "2tr"])
+        chitieu_commands.ngansach(["đi", "lại", "2tr"])
         first = service.alerts_data(DAY)
         again = service.alerts_data(DAY)
         self.assertTrue(first[1])  # đi lại đang trên đà vượt ngân sách
@@ -180,7 +180,7 @@ class DichVu(unittest.TestCase):
 class ManHinh(unittest.TestCase):
     def setUp(self):
         DichVu.setUp(self)  # cùng dữ liệu mẫu
-        self.addCleanup(lambda: (setattr(ct, "ai_chat", self.real[0]), setattr(ai_client, "chat", self.real[1]),
+        self.addCleanup(lambda: (setattr(ai_client, "chat", self.real[1]),
                                  setattr(quickchart, "chart_png", self.real[2])))
 
     def test_chu_ngan(self):

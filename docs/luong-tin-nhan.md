@@ -1,6 +1,6 @@
 # Bot chi tiêu: một tin nhắn đi qua những đâu
 
-Code không gửi mọi tin cho LLM. Các bước dùng luật (code) chạy trước, theo thứ tự trong `sochitieu.respond`. LLM (Gemini
+Code không gửi mọi tin cho LLM. Các bước dùng luật (code) chạy trước, theo thứ tự trong `bot.respond (interface/chitieu)`. LLM (Gemini
 gói miễn phí, OpenRouter dự phòng) chỉ được gọi ở các ô màu cam.
 
 ```mermaid
@@ -13,7 +13,7 @@ flowchart TD
     VK -- lệnh quỹ, mua vàng, bán cổ phiếu --> CARD
     P -- chữ --> R
 
-    subgraph R [sochitieu.respond: luật đi trước, theo thứ tự]
+    subgraph R [interface/chitieu/bot.respond: luật đi trước, theo thứ tự]
         R1{Nút dưới ô chat?<br/>🏠 💰 🎯 💬} -- có --> S[Mở màn hình]
         R1 -- không --> R2{Nhiều dòng,<br/>dòng nào cũng /lệnh?}
         R2 -- có --> CMD[Chạy từng lệnh]

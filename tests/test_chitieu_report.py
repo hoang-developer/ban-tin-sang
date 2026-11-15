@@ -4,7 +4,8 @@ from datetime import date
 
 from tests import harness as h
 
-import sochitieu as ct
+from infrastructure import kho
+from repositories import keys
 from domain.chitieu import income, period, refs
 from infrastructure import ai as ai_client
 from domain.chitieu import text as chitieu_text
@@ -48,16 +49,16 @@ class DichVu(unittest.TestCase):
         h.reset()
         h.at(2026, 10, 20, 10)
         self.now = h.CLOCK["now"]
-        real_ct, real_ai = ct.ai_chat, ai_client.chat
-        self.addCleanup(lambda: (setattr(ct, "ai_chat", real_ct), setattr(ai_client, "chat", real_ai)))
-        ai_client.chat = ct.ai_chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
+        real_ai = ai_client.chat
+        self.addCleanup(lambda: setattr(ai_client, "chat", real_ai))
+        ai_client.chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
         ledger.add("cà phê 35k\ngrab 80k\nbim bim 20k\nxyz lạ 15k", self.now)
         ledger.add("lương 25tr", self.now)
 
     def test_tien_do_ngan_sach(self):
         self.assertEqual(budget.progress(["an"], DAY), [])  # chưa đặt ngân sách
-        budget_repo_save = ct.kho.put
-        budget_repo_save(ct.keys.BUDGET, {"an": 100_000, "tong": 1_000_000, "xe": 50_000})
+        budget_repo_save = kho.put
+        budget_repo_save(keys.BUDGET, {"an": 100_000, "tong": 1_000_000, "xe": 50_000})
         self.assertEqual(budget.progress(["an", "khac"], DAY), [("an", 55_000, 100_000), ("tong", 150_000, 1_000_000)])
         self.assertEqual(budget.progress(["xe"], DAY)[0], ("xe", 80_000, 50_000))
         self.assertEqual([p[0] for p in budget.all_progress(DAY)], ["an", "xe", "tong"])  # ngân sách tổng đi kèm cuối

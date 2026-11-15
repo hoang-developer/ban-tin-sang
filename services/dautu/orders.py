@@ -1,5 +1,5 @@
 """Ghi lệnh mua/hoán đổi quỹ, góp và rút tiền quỹ chờ, khớp lệnh theo NAV, sửa số ccq, tạm dừng kỳ.
-Câu báo cho người dùng còn nằm trong module này (sẽ tách sang presentation khi taisan/sochitieu được chia)."""
+Câu báo cho người dùng còn nằm trong module này (sẽ tách sang presentation ở bước dọn dẹp cuối)."""
 import re
 from datetime import date, timedelta
 

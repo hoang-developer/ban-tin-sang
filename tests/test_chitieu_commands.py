@@ -4,7 +4,6 @@ from datetime import date
 
 from tests import harness as h
 
-import sochitieu as ct
 from domain.chitieu import classify, labels
 from infrastructure import ai as ai_client
 from interface.chitieu import commands
@@ -40,9 +39,9 @@ class Lenh(unittest.TestCase):
         h.reset()
         h.at(2026, 10, 20, 10)
         self.now = h.CLOCK["now"]
-        real_ct, real_ai = ct.ai_chat, ai_client.chat
-        self.addCleanup(lambda: (setattr(ct, "ai_chat", real_ct), setattr(ai_client, "chat", real_ai)))
-        ai_client.chat = ct.ai_chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
+        real_ai = ai_client.chat
+        self.addCleanup(lambda: setattr(ai_client, "chat", real_ai))
+        ai_client.chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
         ledger.add("cà phê 35k\ngrab 80k\nxyz lạ 15k\nlương 20tr", self.now)
 
     def test_bao_cao(self):

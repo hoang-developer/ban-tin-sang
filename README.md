@@ -9,7 +9,7 @@ Bot Telegram riêng: bản tin mỗi sáng, bản tin tối, cảnh báo tức t
 - **Bot trên Vercel** ([api/telegram.py](api/telegram.py)) trả lời lệnh, và mỗi 15 phút chạy các việc theo
   giờ ([api/tick.py](api/tick.py), [interface/lich/jobs.py](interface/lich/jobs.py)): bản tin sáng, cảnh báo, bảng điện ghim, đoán
   xanh/đỏ, nhắc ngày, tin cổ tức, bản tin tối. Cài theo mục **Cài bot lên Vercel**.
-- **Bot chi tiêu** ([api/chitieu.py](api/chitieu.py), [sochitieu.py](sochitieu.py)): một bot Telegram thứ hai,
+- **Bot chi tiêu** ([api/chitieu.py](api/chitieu.py), [interface/chitieu/bot.py](interface/chitieu/bot.py)): một bot Telegram thứ hai,
   nhắn "cà phê 35k" là bot ghi lại và tự xếp nhóm. Xem mục **Bot chi tiêu**.
 
 ## Lệnh trên Telegram
@@ -162,7 +162,7 @@ Số tiền hiểu được: `35k`, `35.000đ`, `35 nghìn`, `1tr2` (1.200.000đ
 dưới 1.000 hiểu là nghìn (`cà phê 35` là 35.000đ). Nhóm có sẵn: Ăn uống, Đi chợ, Đi lại, Nhà cửa và hóa
 đơn, Mua sắm, Sức khỏe, Giải trí và du lịch, Học tập, Hiếu hỷ và quà, Gia đình và con cái, Khác, Thu nhập.
 Xếp sai thì bấm **✏️ Đổi nhóm** dưới tin: bot đổi và nhớ, lần sau gặp nội dung đó tự xếp đúng.
-Từ khóa có sẵn của từng nhóm: phần "Nhóm chi tiêu" đầu [sochitieu.py](sochitieu.py).
+Từ khóa có sẵn của từng nhóm: [domain/chitieu/categories.py](domain/chitieu/categories.py).
 
 ### Tự xếp nhóm, ít khoản rơi vào Khác
 
@@ -545,7 +545,7 @@ python -m interface.bantin.bulletin                    # bản tin sáng
 python -m interface.lenh.bot /neu FPT 10tr 1nam   # thử bất kỳ lệnh nào của bot
 python -m interface.thoitiet.report Đà Nẵng
 python -m interface.tintuc.search giá vàng 24h
-python sochitieu.py "cà phê 35k"   # bot chi tiêu: chỉ đọc và xếp nhóm, không ghi
+python -m interface.chitieu.preview "cà phê 35k"   # bot chi tiêu: chỉ đọc và xếp nhóm, không ghi
 python -m domain.amlich.lunar 17/2/2026
 python -m interface.canhbao.runner --xem             # cảnh báo, không gửi
 ```

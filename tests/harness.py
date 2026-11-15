@@ -67,7 +67,9 @@ from interface.dautu import fund as dautu  # noqa: E402
 from infrastructure import ai as ai_client  # noqa: E402
 from infrastructure import clock  # noqa: E402
 from services.dautu import market as dautu_market  # noqa: E402
-import sochitieu as ct  # noqa: E402
+from interface.chitieu import bot as chitieu_bot  # noqa: E402
+from repositories.chitieu import groups as groups_repo  # noqa: E402
+from repositories.chitieu import ledger as ledger_repo  # noqa: E402
 from interface.taisan import assets as ts  # noqa: E402
 from infrastructure import telegram as tg  # noqa: E402
 
@@ -75,7 +77,6 @@ VN_TZ = _clock.VN_TZ
 CLOCK = {"now": datetime(2026, 11, 13, 9, 0, tzinfo=VN_TZ)}
 CHAT = 1
 SENT = []  # tin bot tự gửi (việc theo giờ)
-ct.today = lambda: CLOCK["now"].date()
 dautu_market.now_vn = lambda: CLOCK["now"]  # service dữ liệu quỹ có đồng hồ riêng
 ts.now_vn = lambda: CLOCK["now"]
 clock.now_vn = lambda: CLOCK["now"]  # giá tài sản và taisan.now_vn dùng đồng hồ chung
@@ -150,7 +151,6 @@ class FakeAI:
 
 
 AI = FakeAI()
-ct.ai_chat = AI.chat
 REAL_AI_CHAT = ai_client.chat  # bản thật, để test máy khách AI gọi lại được
 ai_client.chat = AI.chat  # service xếp nhóm gọi thẳng máy khách AI
 
@@ -164,7 +164,7 @@ def reset(now=None):
     AI.photo = None
     os.environ["GEMINI_API_KEY"] = "test"
     CLOCK["now"] = now or datetime(2026, 11, 13, 9, 0, tzinfo=VN_TZ)
-    ct.reset()
+    groups_repo.reset()
 
 
 def at(year, month, day, hour=9, minute=0):
@@ -182,13 +182,13 @@ def parts(reply):
 def say(text):
     """Người dùng nhắn một tin: (chữ bot trả lời, dữ liệu các nút). Chạy trong một lượt nhớ như webhook thật."""
     with kho.memo():
-        return parts(ct.answer(text, CLOCK["now"], CHAT))
+        return parts(chitieu_bot.answer(text, CLOCK["now"], CHAT))
 
 
 def press(data, text=""):
     """Người dùng bấm một nút: (thông báo nhỏ, chữ sau khi bấm, dữ liệu các nút)."""
     with kho.memo():
-        toast, action = ct.on_button(data, {"chat": {"id": CHAT}, "text": text}, CLOCK["now"])
+        toast, action = chitieu_bot.on_button(data, {"chat": {"id": CHAT}, "text": text}, CLOCK["now"])
         body, buttons = parts(action[1]()) if action else ("", [])
     return toast, body, buttons
 
@@ -199,7 +199,7 @@ def button(buttons, prefix):
 
 
 def month_entries():
-    return ct.load(CLOCK["now"].strftime("%Y-%m"))
+    return ledger_repo.load(CLOCK["now"].strftime("%Y-%m"))
 
 
 def run_jobs():

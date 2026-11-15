@@ -61,7 +61,7 @@ def as_list(a):
 
 
 def plan(text, day=DAY, people=DEMO_CONTEXT, facts=DEMO_FACTS):
-    """Đường đi của câu trong sochitieu.respond (luật trước, AI sau), không ghi gì: danh sách việc."""
+    """Đường đi của câu trong interface/chitieu/bot.respond (luật trước, AI sau), không ghi gì: danh sách việc."""
     troly = features.troly()
     t = text.strip()
     if t.startswith("/"):

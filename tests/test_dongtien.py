@@ -10,7 +10,7 @@ from repositories.duphong import reserve as reserve_repo
 from interface.kehoach import plan as kehoach
 from infrastructure import kho
 from interface.menu import screens as menu
-import sochitieu as ct
+from interface.chitieu import bot as chitieu_bot
 from interface.no import debt as sono
 from interface.taisan import assets as ts
 
@@ -237,10 +237,10 @@ class MoiNgayDuocTieu(unittest.TestCase):
         # 26 ngày (05/11 tới 30/11), hôm nay đã tiêu 50k
         self.assertEqual(round(s["per_day"]), round(s["limit"] / 26))
         self.assertEqual(round(s["today_left"]), round(s["limit"] / 26 - 50_000))
-        dubao = h.parts(ct.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
+        dubao = h.parts(chitieu_bot.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
         self.assertEqual(spend_number(dubao), after)
         self.assertIn("thu 19tr − trả nợ 2tr", dubao)
-        tatca = h.parts(ct.answer("/dubao tatca", h.CLOCK["now"], h.CHAT))[0]
+        tatca = h.parts(chitieu_bot.answer("/dubao tatca", h.CLOCK["now"], h.CHAT))[0]
         self.assertEqual(spend_number(tatca), after)
         home = h.parts(menu.home(day))[0]
         self.assertEqual(spend_number(home), after)
@@ -258,7 +258,7 @@ class MoiNgayDuocTieu(unittest.TestCase):
         s = kehoach.spendable(h.CLOCK["now"].date())
         self.assertEqual((s["basis"], s["limit"]), ("tong", 15_000_000))
         self.assertEqual(spend_number(text)[0], kehoach.short(s["today_left"]))  # có ngân sách tổng: hiện dưới tin
-        dubao = h.parts(ct.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
+        dubao = h.parts(chitieu_bot.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
         self.assertIn("ngân sách tổng 15tr/tháng", dubao)
 
     def test_ngan_sach_hang_ngay_van_rieng(self):
@@ -270,7 +270,7 @@ class MoiNgayDuocTieu(unittest.TestCase):
     def test_chua_co_thu_nhap_thi_chi_goi_y(self):
         text, _ = h.say("cơm trưa 50k")
         self.assertNotIn("được tiêu", text)
-        dubao = h.parts(ct.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
+        dubao = h.parts(chitieu_bot.answer("/dubao", h.CLOCK["now"], h.CHAT))[0]
         self.assertIn("Nhắn «+ lương 19tr» hoặc «ngân sách tổng 15tr»", dubao)
 
     def test_hoi_bang_cau_thuong(self):

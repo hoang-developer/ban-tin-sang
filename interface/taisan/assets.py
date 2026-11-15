@@ -213,7 +213,7 @@ def health(day):
 
 
 def on_button(arg, message, now):
-    """Nút "ts:...": (thông báo nhỏ, việc tiếp theo) như sochitieu.on_button."""
+    """Nút "ts:...": (thông báo nhỏ, việc tiếp theo) như interface/chitieu/bot.on_button."""
     day = now.date()
     if arg == "xem":
         return "Đang cập nhật giá…", ("edit", lambda: overview(day, fresh=True))

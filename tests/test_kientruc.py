@@ -18,7 +18,7 @@ ALLOWED = {
 # Module cũ ở gốc mà file trong lớp mới còn tạm import, cho tới khi chức năng đó được chuyển. Phải khớp CHÍNH XÁC với
 # thực tế: thêm import cũ mới thì test đỏ, bỏ được import cũ mà không xóa khỏi danh sách cũng đỏ (ratchet: chỉ rút ngắn).
 LEGACY_IMPORTS = {}
-ROOT_PY_MAX = 1  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
+ROOT_PY_MAX = 0  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
 
 
 def py_files(folder):
