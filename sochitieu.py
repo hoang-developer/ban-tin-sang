@@ -1189,7 +1189,7 @@ def dautu():
 
 
 def tietkiem():
-    import tietkiem as module  # tiết kiệm từ khi dùng bot, chuỗi ngày ghi chép
+    from interface.tietkiem import progress as module  # tiết kiệm từ khi dùng bot, chuỗi ngày ghi chép
     return module
 
 

@@ -313,7 +313,7 @@ def expense_summary(now, job, kind, title):
                 print(f"[lỗi] {make.__name__}: {e!r}", file=sys.stderr)
     if count:
         try:
-            import tietkiem
+            from interface.tietkiem import progress as tietkiem
             saved = tietkiem.period_line(kind, now.date())  # đã bớt trong kỳ và từ khi dùng bot
             if saved:
                 text += "\n" + saved

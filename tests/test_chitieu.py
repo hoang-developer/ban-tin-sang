@@ -4,7 +4,7 @@ import unittest
 from tests import harness as h
 
 from infrastructure import kho
-import tietkiem
+from interface.tietkiem import progress as tietkiem
 
 
 class ChiTieu(unittest.TestCase):

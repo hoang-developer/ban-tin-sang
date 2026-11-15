@@ -1,0 +1,97 @@
+"""Tiết kiệm từ khi dùng bot: lệnh /tietkiem, nút tk:, tin nhắc 21h. Đọc lệnh, gọi service, nhờ presentation dựng tin."""
+from datetime import timedelta
+
+import sochitieu as ct  # module cũ ở gốc: đọc số tiền, ngày, hàng nút
+from infrastructure import kho
+from presentation.duphong import reserve as reserve_view
+from presentation.tietkiem import progress as pview
+from services.tietkiem import progress as service
+
+
+def view(day):
+    if not kho.ready():
+        return ct.NEED_STORE
+    p = service.summary(day)
+    return pview.view_text(p, day, service.invest_fund() if p.movable else None)
+
+
+def after_record(entries, day, brief=False):
+    """Dòng thêm dưới tin "Đã ghi" (chuỗi ngày, hôm nay so với mốc, đã bớt, chúc mừng mốc); [] nếu chưa cần."""
+    result = service.after_record(entries, day)
+    return pview.after_record_lines(result[0], result[1], brief) if result else []
+
+
+def home_line(day):
+    p = service.home(day)
+    return pview.home_line(p) if p else None
+
+
+def reminder(day):
+    """Tin nhắc 21h: (chữ, nút), hoặc None nếu không cần nhắc."""
+    p = service.reminder(day)
+    return pview.reminder_view(p, day) if p else None
+
+
+def period_line(kind, day):
+    info = service.period(kind, day)
+    return pview.period_text(info) if info else None
+
+
+def mark_no_spend(day_iso, today):
+    return pview.no_spend_text(service.mark_no_spend(day_iso, today))
+
+
+def tietkiem(args):
+    if not kho.ready():
+        return ct.NEED_STORE
+    day = ct.today()
+    word = ct.plain(args[0]) if args else ""
+    rest = " ".join(args[1:])
+    if not word:
+        return view(day)
+    if word in ("huongdan", "help", "?"):
+        return pview.USAGE
+    if word in ("khongtieu", "khong"):
+        target = day - timedelta(days=1) if "qua" in ct.plain(rest) else day
+        return mark_no_spend(target.isoformat(), day)
+    if word == "moc":
+        found = ct.parse_amount(rest)
+        if not found or not 10_000 <= found[0] <= 10_000_000:
+            return "Mốc chi lặt vặt mỗi ngày, ví dụ: /tietkiem moc 300k"
+        service.set_base(found[0])
+        return view(day)
+    if word == "batdau":
+        when, _ = ct.parse_date(rest, day)
+        if when > day:
+            return "Ngày bắt đầu phải là hôm nay hoặc trước đó, ví dụ: /tietkiem batdau 04/11"
+        service.set_start(when)
+        return view(day)
+    if word == "nhac":
+        on = service.set_reminder(ct.plain(rest) not in ("tat", "off", "khong"))
+        return "✅ Bật nhắc 21h khi hôm đó chưa ghi gì" if on else "Đã tắt nhắc 21h"
+    return pview.USAGE
+
+
+def on_button(arg, message, now):
+    """Nút "tk:...": (thông báo nhỏ, việc tiếp theo)."""
+    kind, _, value = arg.partition(":")
+    day = now.date()
+    if kind == "xem":
+        return None, ("edit", lambda: view(day))
+    if kind == "khong":
+        note = mark_no_spend(value, day)
+        if (message.get("text") or "").startswith("💚"):
+            return note[:190], ("edit", lambda: view(day))
+        rows = [[b for b in row if not b[1].startswith("tk:khong")] for row in ct.keyboard_rows(message)]
+        return note[:190], ("buttons", lambda: [r for r in rows if r])
+    if kind == "chuyen":
+        where, _, amount = value.partition(":")
+        if not amount.isdigit():
+            return None, None
+        amount = int(amount)
+        if where == "dt":
+            note = pview.invest_move_note(service.move_to_invest(amount), amount)
+        else:
+            note = reserve_view.change_note(service.move_to_reserve(amount, day)).split("\n")[0][2:]
+        return note[:190], ("edit", lambda: view(day))
+    return None, None
