@@ -51,3 +51,16 @@ def google_news_xml(query):
     """Kết quả tìm Google News (RSS, tiếng Việt) dạng bytes."""
     q = urllib.parse.quote(query)
     return get(f"https://news.google.com/rss/search?q={q}&hl=vi&gl=VN&ceid=VN:vi")
+
+
+FINFO = "https://api-finfo.vndirect.com.vn/v4"
+
+
+def industries():
+    """Phân ngành ICB cấp 3 của VNDirect: danh sách dòng gốc."""
+    return get_json(f"{FINFO}/industry_classification?q=industryLevel:3&size=100")["data"]
+
+
+def recommendations(since):
+    """Khuyến nghị của các CTCK từ ngày `since` (ISO), mới nhất trước: JSON gốc {"data": [...]}."""
+    return get_json(f"{FINFO}/recommendations?q=reportDate:gte:{since}&sort=reportDate:desc&size=500")

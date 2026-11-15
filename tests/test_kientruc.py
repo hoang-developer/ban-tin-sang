@@ -45,7 +45,7 @@ LEGACY_IMPORTS = {
     "presentation/kehoach/plan.py": {"sochitieu"},
     "interface/kehoach/plan.py": {"sochitieu"},
 }
-ROOT_PY_MAX = 5  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
+ROOT_PY_MAX = 4  # file .py còn ở gốc (không tính api/): chỉ được giảm qua từng bước, đích 0
 
 
 def py_files(folder):
