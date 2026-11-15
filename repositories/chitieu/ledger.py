@@ -4,6 +4,7 @@ tới cùng lúc không đè mất khoản của nhau. Mã khoản cấp từ m�
 Khoản thu/chi giữ dạng dict (id, ngay, gio, nhom, tien, ghichu…): kiểu dữ liệu riêng làm sau (plan.md).
 """
 import json
+from datetime import date, timedelta
 
 from repositories import keys, store
 
@@ -37,3 +38,12 @@ def next_id():
 def last_id():
     """Mã khoản đã cấp gần nhất (0 nếu chưa có): dùng làm mốc "các khoản ghi trước lúc này"."""
     return int(store.get(keys.COUNTER) or 0)
+
+
+def between(start, end):
+    """Các khoản từ ngày start tới end (tính cả hai đầu)."""
+    out, ym = [], date(start.year, start.month, 1)
+    while ym <= end:
+        out += [e for e in load(ym.strftime("%Y-%m")) if start.isoformat() <= e["ngay"] <= end.isoformat()]
+        ym = (ym + timedelta(days=32)).replace(day=1)
+    return out
