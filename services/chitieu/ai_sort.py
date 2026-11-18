@@ -41,7 +41,9 @@ def ai_request(notes, learned=None):
 
 def ask_ai(entries, learned=None):
     """Khoản rơi vào Khác thì hỏi AI (có nhớ câu trả lời cũ); đánh dấu khoản do AI xếp. Trả về số khoản AI xếp."""
-    unknown = [e for e in entries if learn_rules.pending(e) and e["ghichu"] and not e.get("_chon")]
+    # tiền trả nợ, đóng thẻ tín dụng: AI hay xếp nhầm vào nhà cửa, hóa đơn nên để ở Khác cho người dùng chọn
+    unknown = [e for e in entries if learn_rules.pending(e) and e["ghichu"] and not e.get("_chon")
+               and not classify.is_debt_payment(e["ghichu"])]
     if not unknown or not ai.key():
         return 0
     cache = groups_repo.ai_cache()

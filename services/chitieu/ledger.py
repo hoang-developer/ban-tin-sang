@@ -5,7 +5,7 @@ from datetime import timedelta
 from domain.chitieu import classify
 from domain.chitieu import learn as learn_rules
 from domain.chitieu import parse
-from domain.chitieu.kinds import OTHER
+from domain.chitieu.kinds import INCOME, OTHER
 from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
 from services.chitieu import ai_sort
@@ -52,7 +52,13 @@ def tidy(day):
     table = classify.rules(groups_repo.learned(), groups_repo.config())
     prev = (day.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
     moved = 0
+    debt = classify.find_group("trả nợ", groups_repo.config())
     for e in ledger_repo.load(prev) + ledger_repo.load(day.strftime("%Y-%m")):
+        # tiền trả nợ, đóng thẻ do AI lỡ xếp vào nhóm khác (nhà cửa...): đưa về nhóm Trả nợ, chưa có thì về Khác
+        if e.get("ai") and e["nhom"] not in (OTHER, INCOME, debt) and classify.is_debt_payment(e["ghichu"]):
+            e["nhom"] = debt or OTHER
+            e.pop("ai", None)
+            ledger_repo.save(e)
         if learn_rules.pending(e) and e["ghichu"]:
             code = classify.pick(e["ghichu"], table)
             if code != OTHER:

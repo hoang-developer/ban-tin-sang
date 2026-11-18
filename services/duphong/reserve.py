@@ -7,6 +7,7 @@ Số dư quỹ là các tài sản trong /taisan được gắn vào quỹ. Tr�
 """
 from datetime import date, timedelta
 
+from domain.chitieu import classify
 from domain.phantich import numbers as phantich_numbers
 from services.phantich import analysis as phantich_service
 from repositories.chitieu import ledger as ledger_repo
@@ -27,7 +28,8 @@ def essential(day):
     """(chi thiết yếu/tháng, {nhóm: chi/tháng}, số ngày dữ liệu). Nhóm hằng ngày bỏ khoản đột biến; tiền nhà, hóa
     đơn... tính đủ vì tháng nào cũng có. Tiền trả nợ không tính (đã có kế hoạch trả nợ riêng)."""
     codes = essential_groups()
-    items = [e for e in phantich_numbers.spending(ledger_repo.between(day - timedelta(days=89), day)) if e["nhom"] in codes]
+    items = [e for e in phantich_numbers.spending(ledger_repo.between(day - timedelta(days=89), day))
+             if e["nhom"] in codes and not classify.is_debt_payment(e["ghichu"])]  # trả nợ, đóng thẻ không phải chi thiết yếu
     if not items:
         return 0, {}, 0
     daily = [c for c in phantich_service.daily_groups() if c in codes] + [c for c in ("khoe", "giadinh") if c in codes]

@@ -107,3 +107,39 @@ class So(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TraNoDongThe(unittest.TestCase):
+    """Tiền trả nợ, đóng thẻ tín dụng không được AI xếp nhầm vào nhà cửa và không tính là chi thiết yếu."""
+
+    def setUp(self):
+        h.reset()
+        h.at(2026, 11, 18, 9)
+        self.real = ai_client.chat
+        self.addCleanup(lambda: setattr(ai_client, "chat", self.real))
+
+    def test_nhan_ra_ghi_chu_tra_no(self):
+        from domain.chitieu import classify
+        for note in ("thanh toán nợ vay", "đóng thẻ tín dụng lpbank", "Thanh toán thẻ VPBank", "trả góp tủ lạnh",
+                     "thanh toán shopeepay", "dong the tin dung", "trả nợ bác Vân"):
+            self.assertTrue(classify.is_debt_payment(note), note)
+        for note in ("tiền nhà tháng 11", "tiền điện", "phở bò", "mua thẻ cào", "trả tiền điện"):
+            self.assertFalse(classify.is_debt_payment(note), note)
+
+    def test_ai_khong_xep_tra_no_vao_nha_cua(self):
+        ai_client.chat = lambda *a, **k: ('{"1": "nha", "2": "nha"}', "m")
+        entries = ledger.add("đóng thẻ tín dụng lpbank 440k\nthanh toán nợ vay 4tr39", h.CLOCK["now"])
+        self.assertEqual([e["nhom"] for e in entries], ["khac", "khac"])
+        self.assertFalse(any(e.get("ai") for e in entries))
+
+    def test_tidy_dua_khoan_ai_xep_nham_ve_khac(self):
+        e = {"id": ledger_repo.next_id(), "ngay": "2026-11-05", "tien": 4_390_000, "ghichu": "thanh toán nợ vay", "nhom": "nha",
+             "ai": True}
+        ledger_repo.save(e)
+        mine = {"id": ledger_repo.next_id(), "ngay": "2026-11-06", "tien": 440_000, "ghichu": "đóng thẻ", "nhom": "nha"}  # người dùng tự chọn
+        ledger_repo.save(mine)
+        ledger.tidy(h.CLOCK["now"].date())
+        saved = {x["id"]: x for x in ledger_repo.load("2026-11")}
+        self.assertEqual(saved[e["id"]]["nhom"], "khac")
+        self.assertNotIn("ai", saved[e["id"]])
+        self.assertEqual(saved[mine["id"]]["nhom"], "nha")  # khoản người dùng tự chọn thì giữ nguyên

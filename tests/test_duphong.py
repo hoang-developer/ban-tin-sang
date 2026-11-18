@@ -126,6 +126,17 @@ class Service(unittest.TestCase):
         self.assertEqual(by_group["nha"], 5_000_000)
         self.assertAlmostEqual(total, 5_000_000 + 40_000 * 30.4 / 16)
 
+    def test_hoa_don_the_va_no_vay_khong_tinh_du_nam_o_nha_cua(self):
+        from repositories.chitieu import ledger as ledger_repo
+        h.at(2026, 11, 5, 10)
+        h.say("tiền nhà 5tr")
+        for ngay, tien, note in (("2026-11-05", 4_390_000, "thanh toán nợ vay"), ("2026-11-04", 440_000, "đóng thẻ tín dụng lpbank"),
+                                 ("2026-11-06", 386_310, "thanh toán shopeepay")):
+            ledger_repo.save({"id": ledger_repo.next_id(), "ngay": ngay, "tien": tien, "ghichu": note, "nhom": "nha", "ai": True})
+        h.at(2026, 11, 18, 9)
+        _, by_group, _ = service.essential(h.CLOCK["now"].date())
+        self.assertEqual(by_group["nha"], 5_000_000)  # chỉ còn tiền nhà thật
+
     def test_cai_dat(self):
         service.set_months(9)
         service.set_deadline(18, DAY)

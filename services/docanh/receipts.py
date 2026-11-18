@@ -95,9 +95,11 @@ def entry_from(tx, learned, cfg):
         return e
     active = classify.groups(cfg)
     e["nhom"] = classify.classify(note, learned, cfg)  # nhóm bạn đã dạy, từ khóa: đáng tin hơn AI đoán
-    if e["nhom"] == OTHER and tx["kieu"] == "tra_no":
+    debt = tx["kieu"] in ("tra_no", "tra_the") or classify.is_debt_payment(note)
+    if e["nhom"] == OTHER and debt:
         e["nhom"] = classify.find_group("trả nợ", cfg, False) or OTHER  # có nhóm Trả nợ (tự tạo) thì vào đó
-    if e["nhom"] == OTHER and tx["nhom"] in active and tx["nhom"] not in (OTHER, INCOME):
+    if e["nhom"] == OTHER and not debt and tx["nhom"] in active and tx["nhom"] not in (OTHER, INCOME):
+        # AI đoán nhóm cho khoản lạ; riêng tiền trả nợ, đóng thẻ thì không đoán (AI hay xếp nhầm vào nhà cửa, hóa đơn)
         e["nhom"], e["ai"] = tx["nhom"], True
     return e
 
