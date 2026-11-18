@@ -1,7 +1,7 @@
 """Quỹ dự phòng: các việc người dùng làm (xem tình trạng, nạp, rút, tính tài sản vào quỹ, đổi cấu hình).
 
 Chi thiết yếu mỗi tháng tính từ sổ chi tiêu 90 ngày qua: ăn uống, đi chợ, đi lại (bỏ khoản đột biến), nhà cửa và hóa đơn,
-sức khỏe, học tập, gia đình, trả nợ. Không tính mua sắm, giải trí, quà... Tự đặt được: /duphong chi 12tr.
+sức khỏe, học tập, gia đình, trả nợ. Nhà, hóa đơn, học, trả nợ tính theo tháng (không nhân theo ngày). Không tính mua sắm, giải trí, quà... Tự đặt được: /duphong chi 12tr.
 Số dư quỹ là các tài sản trong /taisan được gắn vào quỹ. Trả kết quả có cấu trúc (domain.duphong.reserve), không trả chữ.
 """
 from datetime import date, timedelta
@@ -38,8 +38,10 @@ def essential(day):
     by_group = {}
     for e in kept:
         by_group[e["nhom"]] = by_group.get(e["nhom"], 0) + e["tien"]
-    scale = 30.4 / days
-    by_group = {c: v * scale for c, v in sorted(by_group.items(), key=lambda x: -x[1])}
+    debt = chitieu_groups.find_group("trả nợ")
+    bills = set(rules.MONTHLY_BILLS) | ({debt} if debt else set())
+    monthly = rules.monthly_amounts(by_group, bills, days)
+    by_group = dict(sorted(monthly.items(), key=lambda x: -x[1]))
     return sum(by_group.values()), by_group, days
 
 

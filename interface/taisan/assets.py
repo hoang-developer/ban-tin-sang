@@ -200,7 +200,9 @@ def health(day):
                   "trọng nhất; 2–3 dòng bắt đầu bằng \"✅ \" là việc nên làm cụ thể có con số (ví dụ để dành thêm "
                   "3tr/tháng thì sau 8 tháng đủ quỹ dự phòng 6 tháng).")
         try:
-            answer, _ = ai_client.chat(system, facts)
+            # Vercel cắt hàm ở 60 giây mà lấy giá tài sản đã tốn một phần: nhận xét của AI chờ tối đa 15 giây, không kịp thì
+            # bỏ phần nhận xét, vẫn gửi bảng chấm điểm
+            answer, _ = ai_client.chat(system, facts, timeout=12, budget=15)
             for raw in answer.splitlines():
                 raw = raw.strip()
                 if raw.startswith(("•", "✅")) and len(advice) < 5:

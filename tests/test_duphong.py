@@ -5,7 +5,7 @@ from datetime import date
 from tests import harness as h
 
 from domain.common.dates import add_months
-from domain.duphong.reserve import MIN_DAYS, build_status, milestone, record_deposit
+from domain.duphong.reserve import MIN_DAYS, build_status, milestone, monthly_amounts, record_deposit
 from repositories.duphong import reserve as reserve_repo
 from services.duphong import reserve as service
 
@@ -40,6 +40,16 @@ class Domain(unittest.TestCase):
         self.assertIsNone(status(flows=(5, 9, 19)).surplus)
         self.assertEqual(status(flows=(5, 9, 20)).surplus, 4)
         self.assertIsNone(status(flows=(5, 0, 30)).surplus)  # không có thu: không tính
+
+    def test_chi_theo_ky_khong_nhan_theo_ngay(self):
+        totals = {"an": 150_000, "nha": 5_000_000, "tra_no": 5_000_000}
+        got = monthly_amounts(totals, {"nha", "tra_no"}, 15)  # 15 ngày dữ liệu: nhà, nợ đã trả đúng một lần
+        self.assertEqual((got["nha"], got["tra_no"]), (5_000_000, 5_000_000))
+        self.assertAlmostEqual(got["an"], 150_000 * 30.4 / 15)  # ăn uống thì quy theo ngày
+        got = monthly_amounts(totals, {"nha", "tra_no"}, 90)  # 90 ngày = 3 tháng: chia 3
+        self.assertAlmostEqual(got["nha"], 5_000_000 / 3)
+        self.assertEqual(monthly_amounts({"nha": 7_000_000}, {"nha"}, 45)["nha"], 7_000_000)  # 45 ngày vẫn là 1 tháng
+        self.assertEqual(monthly_amounts({"nha": 7_000_000}, {"nha"}, 60)["nha"], 3_500_000)
 
     def test_moc_vua_vuot(self):
         two = {"chi": 10, "thang": 6}
@@ -89,6 +99,17 @@ class Service(unittest.TestCase):
         self.assertEqual((miss.found, miss.available), (False, ["TCB"]))
         self.assertEqual(service.savings_books(), [("TCB", 5, False)])
 
+    def test_chi_thiet_yeu_it_ngay_khong_nhan_doi_tien_nha(self):
+        for day, text in ((3, "tiền nhà 5tr"), (3, "trả góp tủ lạnh 5tr"), (10, "phở 40k"), (10, "đi chợ 300k")):
+            h.at(2026, 11, day, 10)
+            h.say(text)
+        h.at(2026, 11, 18, 9)
+        total, by_group, days = service.essential(h.CLOCK["now"].date())
+        self.assertEqual(days, 16)
+        self.assertEqual(by_group["nha"], 10_000_000)  # tiền nhà và trả góp cùng nhóm: đúng 10tr, không phải 19tr
+        self.assertAlmostEqual(by_group["cho"], 300_000 * 30.4 / 16)
+        self.assertAlmostEqual(total, sum(by_group.values()))
+
     def test_cai_dat(self):
         service.set_months(9)
         service.set_deadline(18, DAY)
@@ -96,6 +117,26 @@ class Service(unittest.TestCase):
         self.assertEqual(reserve_repo.load(), {"thang": 9, "han": 18, "bat_dau": "2026-11-10", "chi": 8_000_000})
         service.clear_monthly()
         self.assertNotIn("chi", reserve_repo.load())
+
+
+class KhamSucKhoe(unittest.TestCase):
+    def test_nhan_xet_ai_chi_cho_toi_da_15_giay(self):
+        from tests.test_dongtien import setup_month
+        from infrastructure import ai as ai_client
+        from interface.taisan import assets
+        h.reset()
+        setup_month()
+        calls = []
+        real = ai_client.chat
+        self.addCleanup(lambda: setattr(ai_client, "chat", real))
+        ai_client.chat = lambda system, user, **kw: (calls.append(kw), ("• nhận xét một\n✅ việc nên làm", "m"))[1]
+        text = assets.health(h.CLOCK["now"].date())
+        self.assertEqual(calls[0]["budget"], 15)  # Vercel cắt hàm ở 60 giây: AI không được chiếm hết
+        self.assertLessEqual(calls[0]["timeout"], 12)
+        self.assertIn("🩺 <b>Sức khỏe tài chính", text)
+        self.assertIn("💡 <b>Việc nên làm</b>", text)
+        ai_client.chat = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("bận"))
+        self.assertIn("🩺 <b>Sức khỏe tài chính", assets.health(h.CLOCK["now"].date()))  # AI lỗi vẫn có bảng chấm điểm
 
 
 if __name__ == "__main__":
