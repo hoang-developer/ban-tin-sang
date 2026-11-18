@@ -5,8 +5,8 @@ from datetime import date
 from domain.common.dates import add_months
 
 FUND_NAME = "Quỹ dự phòng"
-ESSENTIAL = ["an", "cho", "xe", "nha", "khoe", "hoc", "giadinh"]  # cộng nhóm tự tạo tên "Trả nợ" nếu có
-MONTHLY_BILLS = ["nha", "hoc"]  # chi theo kỳ (tiền nhà, hóa đơn, học phí) và nhóm Trả nợ: mỗi tháng trả một lần, không nhân theo ngày
+ESSENTIAL = ["an", "cho", "xe", "nha", "khoe", "hoc", "giadinh"]  # không tính nhóm Trả nợ: nợ đã có kế hoạch trả riêng
+MONTHLY_BILLS = ["nha", "hoc"]  # chi theo kỳ (tiền nhà, hóa đơn, học phí): mỗi tháng trả một lần, không nhân theo ngày
 MONTHS_CHOICES, DEADLINE_CHOICES = (3, 6, 9, 12), (6, 12, 18, 24)
 MIN_DAYS = 14  # ít nhất 2 tuần ghi chép mới tự tính chi thiết yếu (ít hơn thì một khoản lớn làm sai lệch cả tháng)
 
@@ -36,7 +36,7 @@ class ReserveStatus:
 
 def monthly_amounts(totals, bills, days):
     """Chi thiết yếu mỗi tháng từ tổng chi trong `days` ngày có dữ liệu. Chi hằng ngày (ăn, chợ, đi lại...) quy theo số
-    ngày; chi theo kỳ (nhà, hóa đơn, học, trả nợ: tên nhóm trong `bills`) chia theo số tháng đã qua, tối thiểu một
+    ngày; chi theo kỳ (nhà, hóa đơn, học: nhóm trong `bills`) chia theo số tháng đã qua, tối thiểu một
     tháng, vì tháng nào cũng chỉ trả một lần (15 ngày dữ liệu có một lần trả nhà thì vẫn là một tháng, không nhân đôi)."""
     months = max(1, round(days / 30.4))
     return {c: v / months if c in bills else v * 30.4 / days for c, v in totals.items()}

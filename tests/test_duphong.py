@@ -100,15 +100,31 @@ class Service(unittest.TestCase):
         self.assertEqual(service.savings_books(), [("TCB", 5, False)])
 
     def test_chi_thiet_yeu_it_ngay_khong_nhan_doi_tien_nha(self):
-        for day, text in ((3, "tiền nhà 5tr"), (3, "trả góp tủ lạnh 5tr"), (10, "phở 40k"), (10, "đi chợ 300k")):
+        for day, text in ((3, "tiền nhà 5tr"), (3, "tiền điện 5tr"), (10, "phở 40k"), (10, "đi chợ 300k")):
             h.at(2026, 11, day, 10)
             h.say(text)
         h.at(2026, 11, 18, 9)
         total, by_group, days = service.essential(h.CLOCK["now"].date())
         self.assertEqual(days, 16)
-        self.assertEqual(by_group["nha"], 10_000_000)  # tiền nhà và trả góp cùng nhóm: đúng 10tr, không phải 19tr
+        self.assertEqual(by_group["nha"], 10_000_000)  # tiền nhà và tiền điện cùng nhóm: đúng 10tr, không nhân đôi
         self.assertAlmostEqual(by_group["cho"], 300_000 * 30.4 / 16)
         self.assertAlmostEqual(total, sum(by_group.values()))
+
+    def test_tien_tra_no_khong_tinh_vao_chi_thiet_yeu(self):
+        from services.chitieu import groups
+        h.at(2026, 11, 3, 10)
+        groups.nhom_them("Trả nợ: trả nợ, trả góp")
+        groups.reset()
+        debt = groups.find_group("trả nợ")
+        self.assertTrue(debt)
+        for text in ("trả góp tủ lạnh 5tr", "tiền nhà 5tr", "phở 40k"):
+            h.say(text)
+        h.at(2026, 11, 18, 9)
+        total, by_group, _ = service.essential(h.CLOCK["now"].date())
+        self.assertNotIn(debt, by_group)
+        self.assertNotIn(debt, service.essential_groups())
+        self.assertEqual(by_group["nha"], 5_000_000)
+        self.assertAlmostEqual(total, 5_000_000 + 40_000 * 30.4 / 16)
 
     def test_cai_dat(self):
         service.set_months(9)
