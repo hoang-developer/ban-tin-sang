@@ -33,7 +33,7 @@ def status_view(s):
     if not s.monthly:
         return ("🛟 <b>Quỹ dự phòng</b>\n"
                 f"📒 {s.days}/{MIN_DAYS} ngày ghi chép để tự tính chi thiết yếu mỗi tháng. "
-                "Tự đặt luôn: /duphong chi 12tr (ăn, đi lại, nhà, điện nước, trả nợ…)"), None
+                "Tự đặt luôn: /duphong chi 12tr (ăn, đi lại, nhà, điện nước…)"), None
     ratio = s.balance / s.target if s.target else 0
     lines = [f"🛟 <b>Quỹ dự phòng {money(s.balance)}/{money(s.target)}</b> · {s.months} tháng chi",
              f"{bar(ratio)} {ratio * 100:.0f}% · đủ {vn_num(s.covered, 1)} tháng"]

@@ -1,7 +1,8 @@
 """Quỹ dự phòng: các việc người dùng làm (xem tình trạng, nạp, rút, tính tài sản vào quỹ, đổi cấu hình).
 
 Chi thiết yếu mỗi tháng tính từ sổ chi tiêu 90 ngày qua: ăn uống, đi chợ, đi lại (bỏ khoản đột biến), nhà cửa và hóa đơn,
-sức khỏe, học tập, gia đình, trả nợ. Nhà, hóa đơn, học, trả nợ tính theo tháng (không nhân theo ngày). Không tính mua sắm, giải trí, quà... Tự đặt được: /duphong chi 12tr.
+sức khỏe, học tập, gia đình. Nhà, hóa đơn, học tính theo tháng (không nhân theo ngày). Không tính mua sắm, giải trí, quà,
+tiền trả nợ (nợ đã có kế hoạch trả riêng ở /no)... Tự đặt được: /duphong chi 12tr.
 Số dư quỹ là các tài sản trong /taisan được gắn vào quỹ. Trả kết quả có cấu trúc (domain.duphong.reserve), không trả chữ.
 """
 from datetime import date, timedelta
@@ -19,14 +20,12 @@ from repositories.duphong import reserve as reserve_repo
 
 
 def essential_groups():
-    codes = [c for c in rules.ESSENTIAL if c in chitieu_groups.groups()]
-    debt = chitieu_groups.find_group("trả nợ")
-    return codes + ([debt] if debt and debt not in codes else [])
+    return [c for c in rules.ESSENTIAL if c in chitieu_groups.groups()]
 
 
 def essential(day):
     """(chi thiết yếu/tháng, {nhóm: chi/tháng}, số ngày dữ liệu). Nhóm hằng ngày bỏ khoản đột biến; tiền nhà, hóa
-    đơn, trả nợ... tính đủ vì tháng nào cũng có."""
+    đơn... tính đủ vì tháng nào cũng có. Tiền trả nợ không tính (đã có kế hoạch trả nợ riêng)."""
     codes = essential_groups()
     items = [e for e in phantich_numbers.spending(ledger_repo.between(day - timedelta(days=89), day)) if e["nhom"] in codes]
     if not items:
@@ -38,9 +37,7 @@ def essential(day):
     by_group = {}
     for e in kept:
         by_group[e["nhom"]] = by_group.get(e["nhom"], 0) + e["tien"]
-    debt = chitieu_groups.find_group("trả nợ")
-    bills = set(rules.MONTHLY_BILLS) | ({debt} if debt else set())
-    monthly = rules.monthly_amounts(by_group, bills, days)
+    monthly = rules.monthly_amounts(by_group, set(rules.MONTHLY_BILLS), days)
     by_group = dict(sorted(monthly.items(), key=lambda x: -x[1]))
     return sum(by_group.values()), by_group, days
 
