@@ -6,6 +6,7 @@ from domain.common.dates import add_months
 
 FUND_NAME = "Quỹ dự phòng"
 ESSENTIAL = ["an", "cho", "xe", "nha", "khoe", "hoc", "giadinh"]  # cộng nhóm tự tạo tên "Trả nợ" nếu có
+MONTHLY_BILLS = ["nha", "hoc"]  # chi theo kỳ (tiền nhà, hóa đơn, học phí) và nhóm Trả nợ: mỗi tháng trả một lần, không nhân theo ngày
 MONTHS_CHOICES, DEADLINE_CHOICES = (3, 6, 9, 12), (6, 12, 18, 24)
 MIN_DAYS = 14  # ít nhất 2 tuần ghi chép mới tự tính chi thiết yếu (ít hơn thì một khoản lớn làm sai lệch cả tháng)
 
@@ -31,6 +32,14 @@ class ReserveStatus:
     per_month: float  # mỗi tháng cần để bao nhiêu để kịp hạn
     surplus: float | None  # thu − chi trung bình mỗi tháng; None nếu chưa đủ dữ liệu
     overdue: bool
+
+
+def monthly_amounts(totals, bills, days):
+    """Chi thiết yếu mỗi tháng từ tổng chi trong `days` ngày có dữ liệu. Chi hằng ngày (ăn, chợ, đi lại...) quy theo số
+    ngày; chi theo kỳ (nhà, hóa đơn, học, trả nợ: tên nhóm trong `bills`) chia theo số tháng đã qua, tối thiểu một
+    tháng, vì tháng nào cũng chỉ trả một lần (15 ngày dữ liệu có một lần trả nhà thì vẫn là một tháng, không nhân đôi)."""
+    months = max(1, round(days / 30.4))
+    return {c: v / months if c in bills else v * 30.4 / days for c, v in totals.items()}
 
 
 def build_status(cfg, day, essential, rows, flows, group_labels=None, has_other_funds=False):
