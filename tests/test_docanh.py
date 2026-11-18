@@ -104,6 +104,17 @@ class DichVu(unittest.TestCase):
         self.assertEqual((e["nhom"], e["ai"]), ("xe", True))
 
 
+    def test_tra_no_dong_the_khong_nhan_nhom_ai_doan(self):
+        cfg = receipts.groups_repo.config()
+        for note, kieu in (("đóng thẻ tín dụng lpbank", "chi_tieu"), ("thanh toán nợ vay", "tra_no"), ("thanh toán shopeepay", "chi_tieu")):
+            tx = {"tien": 440000, "chieu": "chi", "ngay": "2026-11-04", "noi_dung": note, "noi_ban": "", "nhom": "nha", "kieu": kieu}
+            e = receipts.entry_from(tx, {}, cfg)
+            self.assertEqual(e["nhom"], "khac", note)  # chưa có nhóm Trả nợ: để ở Khác, không nhận "nhà cửa" của AI
+            self.assertNotIn("ai", e)
+        tx = {"tien": 50000, "chieu": "chi", "ngay": "2026-11-04", "noi_dung": "zzz lạ", "noi_ban": "", "nhom": "xe", "kieu": "chi_tieu"}
+        self.assertTrue(receipts.entry_from(tx, {}, cfg)["ai"])  # khoản lạ khác vẫn nhận nhóm AI đoán
+
+
 class ManHinh(unittest.TestCase):
     def test_danh_sach(self):
         txs = [{"chieu": "chi", "noi_dung": "cà phê", "noi_ban": "", "ngay": "2026-11-13", "tien": 35000, "chon": True, "kieu": "chi_tieu"},

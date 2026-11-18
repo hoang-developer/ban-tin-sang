@@ -355,7 +355,7 @@ nào bằng 💰 Tiền của tôi → 🔄 Đối chiếu tháng hoặc `/doich
 Code ở [interface/duphong/reserve.py](interface/duphong/reserve.py). `/duphong` cho xem:
 
 - **Chi thiết yếu mỗi tháng**, tính từ sổ 90 ngày qua (cần ít nhất 14 ngày ghi chép): ăn uống, đi chợ, đi lại
-  (bỏ khoản đột biến), nhà cửa và hóa đơn, sức khỏe, học tập, gia đình. Không tính tiền trả nợ (nợ đã có kế hoạch trả riêng ở /no), mua
+  (bỏ khoản đột biến), nhà cửa và hóa đơn, sức khỏe, học tập, gia đình. Không tính tiền trả nợ, đóng thẻ tín dụng, trả góp (nợ đã có kế hoạch trả riêng ở /no) dù khoản đó nằm ở nhóm nào, mua
   sắm, giải trí, quà. Tự đặt: `/duphong chi 12tr` (về tự tính: `/duphong chi tu dong`).
 - **Mục tiêu**: đủ 3/6/9/12 tháng chi thiết yếu (mặc định 6, chọn bằng nút hoặc `/duphong muctieu 6`), mốc khởi đầu
   1 tháng, rồi 3 tháng. Thanh tiến độ, đủ mấy tháng chi.
