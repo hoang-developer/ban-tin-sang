@@ -250,6 +250,9 @@ Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câ
   so với, nhiều nhất, liệt kê, … không/chưa ở cuối) là câu hỏi, bot không ghi thành khoản. Dòng đầu câu
   trả lời cho biết bot hiểu thế nào (khoảng ngày, nhóm, chữ cần có trong ghi chú) để bạn kiểm tra. Có AI
   thì AI hiểu câu hỏi; AI bận/hết lượt thì bot tự hiểu theo cách đơn giản (thời gian, tên nhóm, từ khóa).
+  Câu hỏi **không nói về khoản chi đã ghi** (`bitcoin giá bao nhiêu`, `lãi suất ngân hàng bao nhiêu?`) không bao giờ được trả
+  bằng sổ chi tiêu: AI bận hoặc chưa bật thì bot nói thật là chưa trả lời được, kèm nút Tiền, Nợ, Chi tiêu
+  (`about_spending` ở [domain/phantich/query.py](domain/phantich/query.py): có chữ chi/tiêu/tốn, tên nhóm, món đã học hay hỏi thu nhập).
 - **Biểu đồ** (`/bieudo`, nút 📈): vẽ bằng [QuickChart](https://quickchart.io) (miễn phí), chỉ gửi tên
   nhóm và số tiền, không gửi ghi chú.
 - **Nhận xét** (`/nhanxet`, nút 💬, tự gửi ngày 1): tổng, so với kỳ trước và trung bình 3 tháng, nhóm

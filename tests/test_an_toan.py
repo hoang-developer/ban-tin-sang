@@ -72,5 +72,45 @@ class KhongGhiThang(unittest.TestCase):
         self.assertEqual(count(), 1)
 
 
+class CauHoiNgoaiSo(unittest.TestCase):
+    """Câu hỏi không nói về khoản chi đã ghi thì không được trả bằng sổ chi tiêu ("bitcoin giá bao nhiêu" từng ra tổng chi)."""
+
+    def setUp(self):
+        h.reset()
+        h.at(2026, 11, 20, 10)
+        h.say("phở 50k")
+
+    def test_ngoai_so_chi_tieu_noi_that_khi_ai_ban(self):
+        for text in ("bitcoin giá bao nhiêu", "bitcoin hôm nay giá bao nhiêu", "lãi suất ngân hàng bao nhiêu?",
+                     "mai có mưa không?", "tháng này thế nào?"):
+            reply, buttons = h.say(text)
+            self.assertIn("chưa trả lời được", reply, text)
+            self.assertNotIn("Tổng", reply, text)
+            self.assertNotIn("50.000đ", reply, text)
+            self.assertIn("m:tien", buttons)  # có đường tới màn hình có sẵn
+        self.assertEqual(count(), 1)  # không ghi gì thêm
+
+    def test_ngoai_so_chi_tieu_khi_chua_bat_ai(self):
+        from infrastructure import ai as ai_client
+        self.addCleanup(setattr, ai_client, "key", ai_client.key)
+        ai_client.key = lambda: ""
+        reply, _ = h.say("bitcoin giá bao nhiêu")
+        self.assertIn("chưa trả lời được", reply)
+        self.assertNotIn("Tổng", reply)
+
+    def test_ai_khong_hieu_thi_hoi_lai_khong_dem_so_chi_ra_dap(self):
+        h.AI.replies["bitcoin giá bao nhiêu"] = {"viec": "khac"}
+        reply, _ = h.say("bitcoin giá bao nhiêu")
+        self.assertIn("Mình chưa rõ câu này", reply)
+        self.assertNotIn("Tổng", reply)
+
+    def test_cau_hoi_ve_chi_tieu_van_tra_bang_so(self):
+        for text in ("tháng này ăn phở bao nhiêu", "tháng này tiêu bao nhiêu?", "phở hết bao nhiêu",
+                     "tuần này chi bao nhiêu", "tháng này ăn uống hết bao nhiêu tiền"):
+            reply, _ = h.say(text)
+            self.assertIn("50.000đ", reply, text)
+            self.assertNotIn("chưa trả lời được", reply, text)
+
+
 if __name__ == "__main__":
     unittest.main()

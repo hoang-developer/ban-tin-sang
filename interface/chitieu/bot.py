@@ -104,7 +104,10 @@ def respond(text, now, chat=None):
     if known is not None:
         return known
     question = features.phantich().is_question(text)
-    if question and not (ai_client.key() and helper.beyond_spending(text)):
+    # Chỉ câu hỏi nói về khoản chi/thu đã ghi mới vào sổ chi tiêu; câu hỏi khác ("bitcoin giá bao nhiêu") để AI hiểu,
+    # AI bận thì nói thật là chưa trả lời được, không đem tổng chi ra đáp
+    if question and features.phantich().about_spending(text, now.date()) and not (
+            ai_client.key() and helper.beyond_spending(text)):
         return features.phantich().hoi(text, now.date())  # câu hỏi về chi tiêu đã ghi
     if question or helper.wants(text):  # không phải khoản chi thường: nhờ AI hiểu câu
         reply = helper.understand(text, now, chat, question)

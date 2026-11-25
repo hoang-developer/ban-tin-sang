@@ -33,7 +33,7 @@ flowchart TD
         R6 -- không --> R7{hôm nay không tiêu…?}
         R7 -- có --> NS[Đánh dấu không tiêu]
         R7 -- không --> R8{Câu hỏi?}
-        R8 -- hỏi về chi tiêu đã ghi --> Q[phantich.hoi]
+        R8 -- hỏi về chi tiêu đã ghi<br/>(about_spending: chi, tiêu, tốn,<br/>tên nhóm, món đã học) --> Q[phantich.hoi]
         R8 -- hỏi việc khác,<br/>hoặc có chữ báo hiệu<br/>quỹ, nợ, vàng, chuyển… --> L2
         R8 -- khoản chi thường --> GD{domain/chitieu/guard:<br/>dự định, câu hỏi giả định,<br/>tin bot bị dán lại?}
         GD -- có --> GA[Hỏi lại bằng thẻ 💸/❌,<br/>tin bot dán lại thì không ghi]
@@ -47,6 +47,7 @@ flowchart TD
 
     L2[🤖 LLM hiểu câu thành việc<br/>troly.ask_ai → JSON] --> CK[Code soát lại:<br/>bỏ trường lạ, đối chiếu số tiền]
     L2 -. lỗi .-> UN[Hỏi lại bằng nút<br/>hoặc ghi như khoản chi]
+    L2 -. lỗi, câu hỏi ngoài sổ chi tiêu .-> NA[Nói thật: chưa trả lời được,<br/>kèm nút Tiền, Nợ, Chi tiêu]
     CK --> J{Loại việc}
     J -- chi thường --> GD
     J -- thiếu thông tin --> ASK[Hỏi từng trường<br/>có nút chọn nhanh]

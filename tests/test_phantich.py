@@ -130,6 +130,22 @@ class CauHoi(unittest.TestCase):
         self.assertFalse(query.matches({"nhom": "thu", "ghichu": "cafe"}, spec))  # chi mà khoản là thu
 
 
+class NoiVeChiTieu(unittest.TestCase):
+    """Câu hỏi nói về khoản chi đã ghi (vào /hoi) hay về việc khác (để AI hiểu, AI bận thì nói thật)."""
+    DAY = date(2026, 11, 20)
+
+    def test_cau_hoi_ve_chi_tieu(self):
+        for q in ("tháng này ăn phở bao nhiêu", "tháng này tiêu bao nhiêu?", "cà phê hết bao nhiêu", "tuần trước chi bao nhiêu",
+                  "tháng này ăn uống hết bao nhiêu tiền", "đi chợ tốn bao nhiêu", "tháng này thu nhập bao nhiêu",
+                  "thang nay an pho bao nhieu"):
+            self.assertTrue(query.about_spending(q, self.DAY, {}, {}), q)
+
+    def test_cau_hoi_viec_khac(self):
+        for q in ("bitcoin giá bao nhiêu", "bitcoin hôm nay giá bao nhiêu", "lãi suất ngân hàng bao nhiêu?",
+                  "thời tiết hôm nay thế nào", "tháng này thế nào?", "mai có mưa không"):
+            self.assertFalse(query.about_spending(q, self.DAY, {}, {}), q)  # khoảng ngày một mình chưa đủ
+
+
 class DichVu(unittest.TestCase):
     def setUp(self):
         h.reset()
