@@ -15,6 +15,28 @@ def accrued(it, day):
     return it["tien"] * it["lai"] / 100 * max((end - start).days, 0) / 365, maturity
 
 
+DEMAND_RATE = 0.5  # %/năm: lãi không kỳ hạn mặc định khi tất toán sổ có kỳ hạn trước hạn (sổ có `lai_kkh` thì dùng số đó)
+
+
+def payout(it, day):
+    """(tiền nhận về nếu tất toán hôm nay, phần lãi, rút trước hạn?, ngày đáo hạn hoặc None) của sổ tiết kiệm. Sổ có kỳ hạn
+    mà chưa tới hạn thì chỉ được lãi không kỳ hạn (lỗi cũ: bot cộng đủ lãi có kỳ hạn, vài triệu không có thật vào thu nhập
+    và tài khoản chính). Tới hạn hoặc sổ không kỳ hạn thì lãi như `accrued`."""
+    start = date.fromisoformat(it["ngay"])
+    maturity = add_months(start, it["ky"]) if it.get("ky") else None
+    if maturity and day < maturity:
+        interest = it["tien"] * it.get("lai_kkh", DEMAND_RATE) / 100 * max((day - start).days, 0) / 365
+        return it["tien"] + interest, interest, True, maturity
+    interest, _ = accrued(it, day)
+    return it["tien"] + interest, interest, False, maturity
+
+
+def renewed(it, day):
+    """Sổ sau khi tái tục từ ngày đáo hạn: gốc mới = gốc + lãi tới hạn, cùng kỳ hạn và lãi suất, tính từ ngày đáo hạn."""
+    interest, maturity = accrued(it, day)
+    return {**it, "tien": round(it["tien"] + interest), "ngay": maturity.isoformat()}
+
+
 def can_be_main(it):
     """Tài khoản tiền thường (không phải quỹ dự phòng, quỹ chờ đầu tư, tài khoản chứng khoán)."""
     return it["loai"] == "tien" and not it.get("duphong") and not it.get("dautu") and "dnse" not in plain(it["ten"])

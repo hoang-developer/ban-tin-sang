@@ -715,7 +715,10 @@ def describe(a):
         kind = (" miếng SJC" if a.get("loai") == "sjc" else " nhẫn") if a.get("loai") else ""
         return f"🥇 Bán {num(a['chi']) + ' chỉ' if a.get('chi') else 'hết'} vàng{kind}, nhận <b>{money}</b>"
     if job == "tat_toan":
-        return f"🐷 Tất toán sổ <b>{esc(a['ten'])}</b>" + (f", nhận <b>{money}</b>" if money else " (gốc + lãi tới hôm nay)")
+        early = None if money else features.taisan().early_close_date(a["ten"], chitieu_ctx.today())
+        return f"🐷 Tất toán sổ <b>{esc(a['ten'])}</b>" + (
+            f", nhận <b>{money}</b>" if money else
+            f" (gốc + lãi không kỳ hạn: sổ chưa tới hạn {early:%d/%m/%Y})" if early else " (gốc + lãi tới hôm nay)")
     if job == "ban_quy":
         return (f"💹 Bán {num(a['ccq']) + ' ccq ' if a.get('ccq') else ''}<b>{esc(a['ma'].upper())}</b>, nhận "
                 f"<b>{money}</b>")
