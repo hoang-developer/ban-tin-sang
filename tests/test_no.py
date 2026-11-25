@@ -212,5 +212,56 @@ class Presentation(unittest.TestCase):
         self.assertEqual(line, "Nợ: trả 2tr/tháng = 10% thu (nên < 30%) · nợ không lãi 10tr · ⬜ tháng này: a&lt;b")
 
 
+class VayMoiCoTien(unittest.TestCase):
+    """Lỗi cũ: vay mới 10tr chỉ ghi sổ nợ, tiền vay không vào tài khoản nên tài sản ròng giảm 10tr."""
+
+    def setUp(self):
+        h.reset()
+        h.at(2026, 11, 20, 10)
+
+    def test_the_vay_moi_hoi_tien_vao_tai_khoan_chinh(self):
+        from tests.test_dongtien import main_balance, net, set_main
+        set_main(50_000_000)
+        h.AI.replies["vay anh Nam 10tr"] = {"viec": "no_moi", "ten": "anh Nam", "tien": 10_000_000, "lai": 0}
+        _, buttons = h.say("vay anh Nam 10tr")
+        _, _, buttons = h.press(h.button(buttons, "y:bo:moi_thang"))
+        _, done, buttons = h.press(h.button(buttons, "y:ok:"))
+        self.assertIn("tiền đã về VCB, bấm nút dưới để cộng 10tr", done)
+        self.assertEqual((net(), main_balance()), (40_000_000, 50_000_000))  # khai báo nợ một mình: tài sản ròng giảm
+        button = h.button(buttons, "no:vao:")
+        toast, _, _ = h.press(button)
+        self.assertEqual(toast, "🏦 VCB +10tr → ~60tr")
+        self.assertEqual((net(), main_balance()), (50_000_000, 60_000_000))  # tiền vay vào: tài sản ròng như cũ
+        self.assertEqual(h.press(button)[0], "Đã cộng tiền vay vào tài khoản rồi")  # chỉ một lần
+        self.assertEqual(main_balance(), 60_000_000)
+
+    def test_lenh_no_cung_hoi_va_khai_bao_no_cu_thi_khong_bam(self):
+        from tests.test_dongtien import main_balance, net, set_main
+        set_main(50_000_000)
+        text, buttons = h.say("/no chú Tư 5tr, trả 1tr/tháng, không lãi")
+        self.assertIn("bấm nút dưới để cộng 5tr", text)
+        self.assertTrue(any(b.startswith("no:vao:") for b in buttons))
+        self.assertEqual(net(), 45_000_000)
+        text, buttons = h.say("/no chú Tư trả 2tr/tháng")  # cập nhật khoản đã có: không hỏi tiền vay nữa
+        self.assertNotIn("bấm nút dưới", text)
+        self.assertFalse(any(b.startswith("no:vao:") for b in buttons))
+        self.assertEqual(main_balance(), 50_000_000)  # không bấm thì không cộng gì
+
+    def test_chua_co_tai_khoan_chinh_thi_khong_hoi(self):
+        text, buttons = h.say("/no chú Tư 5tr, trả 1tr/tháng, không lãi")
+        self.assertNotIn("bấm nút dưới", text)
+        self.assertFalse(any(b.startswith("no:vao:") for b in buttons))
+
+    def test_khoan_no_da_xoa_thi_nut_het_tac_dung(self):
+        from tests.test_dongtien import main_balance, set_main
+        set_main(50_000_000)
+        _, buttons = h.say("/no chú Tư 5tr, trả 1tr/tháng, không lãi")
+        button = h.button(buttons, "no:vao:")
+        debt_id = button.split(":")[2]
+        h.press(f"no:x:{debt_id}")
+        self.assertEqual(h.press(button)[0], "Khoản nợ này đã xóa")
+        self.assertEqual(main_balance(), 50_000_000)
+
+
 if __name__ == "__main__":
     unittest.main()

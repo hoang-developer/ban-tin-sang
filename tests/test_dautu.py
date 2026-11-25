@@ -239,5 +239,61 @@ class LichKhopLenh(unittest.TestCase):
         self.assertIn("bán VFF phiên <b>27/10</b>", dautu.record_switch(50))
 
 
+class QuyChoKhongTuSinhTien(unittest.TestCase):
+    """Lỗi cũ: /dautu batdau 4tr rồi không góp đồng nào, tới tháng 11 bot hiện "Quỹ chờ 8tr" (không tài khoản nào bị trừ)
+    và khuyên mua ~12tr."""
+
+    def setUp(self):
+        from tests.test_dongtien import set_main
+        h.reset()
+        h.at(2026, 9, 9, 15)
+        set_main(30_000_000)
+        h.say("/dautu batdau 4tr VMEEF")
+        h.at(2026, 11, 13, 10)
+
+    def wait_money(self):
+        return next((it["tien"] for it in ts.load()["items"] if "chờ" in (it.get("ten") or "")), 0)
+
+    def test_ky_da_qua_chua_gop_thi_hoi_khong_tu_cong_tien(self):
+        from tests.test_dongtien import main_balance
+        text, buttons = h.say("/dautu")
+        self.assertIn("Chưa ghi phần góp vào quỹ chờ: 9/2026 4tr, 10/2026 4tr", text)
+        self.assertIn("Quỹ chờ 0đ + chưa để 4tr", text)
+        self.assertIn("cuối tháng mua ~4tr", text)  # không còn ~12tr
+        self.assertEqual((self.wait_money(), main_balance()), (0, 30_000_000))
+        self.assertIn("dt:ndat", buttons)
+        self.assertIn("dt:nchua", buttons)
+
+    def test_bam_da_de_thi_tru_tai_khoan_chinh_va_cong_quy_cho(self):
+        from tests.test_dongtien import main_balance
+        h.say("/dautu")
+        toast, text, buttons = h.press("dt:ndat")
+        self.assertEqual(toast, "Đã ghi 8tr vào quỹ chờ. 🏦 VCB −4tr → ~22tr")
+        self.assertEqual((self.wait_money(), main_balance()), (8_000_000, 22_000_000))
+        self.assertIn("Quỹ chờ 8tr + chưa để 4tr", text)
+        self.assertNotIn("dt:ndat", buttons)
+        self.assertEqual(h.press("dt:ndat")[0], "Đã trả lời rồi")  # không cộng lần hai
+        self.assertEqual(self.wait_money(), 8_000_000)
+
+    def test_bam_chua_de_thi_bo_qua_khong_cong_gi(self):
+        from tests.test_dongtien import main_balance
+        h.say("/dautu")
+        toast, text, _ = h.press("dt:nchua")
+        self.assertEqual(toast, "Đã bỏ qua, không cộng tiền")
+        self.assertEqual((self.wait_money(), main_balance()), (0, 30_000_000))
+        self.assertNotIn("Chưa ghi phần góp", text)
+        self.assertNotIn("Chưa ghi phần góp", h.say("/dautu")[0])  # hết hỏi
+
+    def test_thang_da_gop_that_thi_khong_hoi_chi_hoi_thang_chua_gop(self):
+        h.reset()
+        h.at(2026, 9, 9, 15)
+        h.say("/dautu batdau 4tr VMEEF")
+        h.say("/dautu nap 4tr")  # tháng 9 góp thật (lệnh, không cần AI)
+        h.at(2026, 11, 13, 10)
+        text, _ = h.say("/dautu")
+        self.assertIn("Chưa ghi phần góp vào quỹ chờ: 10/2026 4tr", text)  # chỉ còn tháng 10
+        self.assertNotIn("9/2026", text.split("Bạn đã để")[0])
+
+
 if __name__ == "__main__":
     unittest.main()

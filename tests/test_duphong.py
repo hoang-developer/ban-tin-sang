@@ -49,6 +49,10 @@ class Domain(unittest.TestCase):
         got = monthly_amounts(totals, {"nha", "tra_no"}, 90)  # 90 ngày = 3 tháng: chia 3
         self.assertAlmostEqual(got["nha"], 5_000_000 / 3)
         self.assertEqual(monthly_amounts({"nha": 7_000_000}, {"nha"}, 45)["nha"], 7_000_000)  # 45 ngày vẫn là 1 tháng
+        # hai lần trả ở hai tháng lịch khác nhau thì là hai tháng dù 45 ngày chỉ làm tròn thành 1
+        self.assertEqual(monthly_amounts({"nha": 10_000_000}, {"nha"}, 45, {"nha": 2})["nha"], 5_000_000)
+        self.assertEqual(monthly_amounts({"nha": 15_000_000}, {"nha"}, 90, {"nha": 1})["nha"], 5_000_000)  # trả theo quý
+        self.assertEqual(monthly_amounts({"nha": 5_000_000}, {"nha"}, 26, {"nha": 1})["nha"], 5_000_000)  # cửa sổ 20/10 tới 14/11
         self.assertEqual(monthly_amounts({"nha": 7_000_000}, {"nha"}, 60)["nha"], 3_500_000)
 
     def test_moc_vua_vuot(self):
@@ -65,7 +69,10 @@ class Domain(unittest.TestCase):
         self.assertEqual(cfg, {"bat_dau": "2026-11-10", "nap": {"2026-11": 2_000_000}})
         cfg = record_deposit(cfg, date(2026, 11, 20), 1_000_000)
         self.assertEqual(cfg["nap"], {"2026-11": 3_000_000})
-        self.assertEqual(record_deposit(cfg, DAY, -500_000)["nap"], {"2026-11": 3_000_000})  # rút không đổi số đã nạp
+        # rút thì số đã nạp của tháng giảm theo (lỗi cũ: nạp 2,6tr rồi rút 2tr vẫn ghi "đã nạp 2,6tr")
+        self.assertEqual(record_deposit(cfg, DAY, -500_000)["nap"], {"2026-11": 2_500_000})
+        self.assertEqual(record_deposit(cfg, DAY, -9_000_000)["nap"], {"2026-11": 0})  # không xuống dưới 0
+        self.assertEqual(record_deposit({"nap": {}}, DAY, -1_000_000)["nap"], {"2026-11": 0})  # tháng chưa nạp gì
         many = {"nap": {f"2025-{m:02d}": 1 for m in range(1, 13)}, "bat_dau": "2025-01-01"}
         kept = record_deposit(many, DAY, 5)["nap"]
         self.assertEqual((len(kept), "2025-01" in kept, kept["2026-11"]), (12, False, 5))  # chỉ giữ 12 tháng gần nhất
@@ -88,7 +95,26 @@ class Service(unittest.TestCase):
         self.assertEqual(reserve_repo.deposited_in("2026-11"), 12_000_000)
         r = service.change(-11_000_000, DAY, from_main=False)
         self.assertEqual((r.after.balance, r.milestone), (1_000_000, None))
-        self.assertEqual(reserve_repo.deposited_in("2026-11"), 12_000_000)
+        self.assertEqual(reserve_repo.deposited_in("2026-11"), 1_000_000)  # rút 11tr thì đã nạp trong tháng còn 1tr
+
+    def test_rut_qua_so_du_chi_tru_phan_that_da_rut(self):
+        service.change(2_000_000, DAY, from_main=False)
+        service.change(-5_000_000, DAY, from_main=False)  # quỹ chỉ có 2tr: chỉ rút được 2tr
+        self.assertEqual((service.status(DAY).balance, reserve_repo.deposited_in("2026-11")), (0, 0))
+
+    def test_tien_nha_hai_thang_khong_nhan_doi(self):
+        """Lỗi cũ: 45 ngày dữ liệu có hai lần trả nhà 5tr (01/10, 01/11) thì tiền nhà thành 10tr/tháng, mục tiêu quỹ +62%."""
+        h.at(2026, 10, 1, 9)
+        h.say("tiền nhà 5tr")
+        for d in range(1, 15):
+            h.at(2026, 11, d, 9)
+            if d == 1:
+                h.say("tiền nhà 5tr")
+            h.say("ăn trưa 100k")
+        h.at(2026, 11, 14, 10)
+        _, by_group, days = service.essential(date(2026, 11, 14))
+        self.assertEqual(days, 45)
+        self.assertEqual(round(by_group["nha"]), 5_000_000)  # đúng 5tr/tháng
 
     def test_tinh_tai_san_vao_quy(self):
         h.say("/taisan tietkiem TCB 50tr 5% 6 thang 01/11/2026")

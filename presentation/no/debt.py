@@ -89,6 +89,12 @@ def declare_text(r, day):
     return "\n".join(lines)
 
 
+def money_prompt_text(main, amount):
+    """Dòng hỏi dưới tin khai báo khoản nợ mới: tiền vay đã về tài khoản chính chưa."""
+    return (f"💰 Nếu đây là khoản vay mới và tiền đã về {html.escape(main)}, bấm nút dưới để cộng {short(amount)} vào tài "
+            "khoản (tài sản ròng mới đúng). Chỉ khai báo nợ đang có thì không bấm.")
+
+
 def pay_lines(r):
     """Các dòng báo sau khi bấm ✅ Trả (r: PayResult)."""
     if r.status == "het_hoac_xoa":

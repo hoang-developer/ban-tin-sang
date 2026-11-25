@@ -1039,7 +1039,9 @@ def run(a, now, chat, option=None):
         due = int(a["ngay_tra"]) if a.get("ngay_tra") and 1 <= a["ngay_tra"] <= 31 else None
         info = {"ten": a["ten"][:30], "con": a["tien"], "thang": a.get("moi_thang"),
                 "lai": float(a["lai"]) if a.get("lai") is not None else None, "ngay_tra": due}
-        return features.sono().declare_info(info, day), [[("💳 Sổ nợ", "no:xem"), chitieu_ctx.BACK]]
+        reply = features.sono().declare_info_with_prompt(info, day)
+        text, rows = reply if isinstance(reply, tuple) else (reply, [])
+        return text, rows + [[("💳 Sổ nợ", "no:xem"), chitieu_ctx.BACK]]
     if job == "ngan_sach":
         return chitieu_commands.ngansach([*str(a["nhom"]).split(), str(a["tien"])])
     if job == "ngay_luong":

@@ -21,7 +21,9 @@ def wait_item(data, cfg):
 
 
 def close_periods(cfg, now=None):
-    """Chốt các kỳ đã qua hạn: góp của tháng (phần chưa để) được tính vào quỹ chờ, trừ tháng tạm dừng.
+    """Chốt các kỳ đã qua hạn. Phần góp của tháng mà người dùng chưa ghi là đã để vào quỹ chờ KHÔNG tự cộng vào quỹ chờ
+    (lỗi cũ: tạo ra tiền không có thật, không tài khoản nào bị trừ, bot khuyên mua bằng tiền đó): ghi lại ở k["thieu"]
+    để hỏi người dùng "đã để chưa?" (owed, orders.settle_owed). Tháng tạm dừng thì không có phần góp.
     Trả True nếu có thay đổi (đã lưu)."""
     current = current_period(cfg, now)
     changed = False
@@ -37,16 +39,18 @@ def close_periods(cfg, now=None):
             value = (hold["sl"] * navs[-1][1] if hold and navs else 0) + sum(
                 o["tien"] for o in cfg.get("lenh", []) if pending_main(cfg, o))
         unpaid = max(0, total_of(cfg, ym) - cfg.get("nap", {}).get(ym, 0))
-        if unpaid:
-            wait_item(data, cfg)["tien"] += unpaid
-            cfg.setdefault("nap", {})[ym] = cfg.get("nap", {}).get(ym, 0) + unpaid
         k.update({"chot": True, "muc": round(target(cfg, ym)), "gt": round(value)})  # gt: giá trị lúc chốt (biểu đồ)
+        if unpaid:
+            k["thieu"] = unpaid  # chưa ghi góp: hỏi người dùng, không tự cộng tiền
         changed = True
     if changed:
-        if data:
-            assets_repo.save(data)
         fund_repo.save(cfg)
     return changed
+
+
+def owed(cfg):
+    """[(kỳ, số tiền)] các kỳ đã chốt mà phần góp chưa được ghi là đã để vào quỹ chờ và người dùng chưa trả lời."""
+    return [(ym, k["thieu"]) for ym, k in sorted(cfg.get("ky", {}).items()) if k.get("thieu") and not k.get("thieu_xong")]
 
 
 def status(cfg, now=None, fresh=False):
@@ -103,7 +107,7 @@ def status(cfg, now=None, fresh=False):
     except Exception as e:
         print(f"[lỗi] quỹ dự phòng trong /dautu: {e!r}", file=sys.stderr)
     return {"ym": ym, "plan": plan, "value": value, "units": units, "nav": nav, "nav_day": nav_day, "pending": pending,
-            "cash": cash, "unpaid": unpaid, "available": available, "need": need, "buy": buy, "skip": k.get("bo"),
+            "cash": cash, "unpaid": unpaid, "owed": owed(cfg), "available": available, "need": need, "buy": buy, "skip": k.get("bo"),
             "direct": direct, "switch": switch, "switch_units": switch_units, "side_buy": side_buy, "side": sd,
             "side_value": side_value, "side_nav": side_nav, "side_day": side_day, "money_now": money_now,
             "short": need > available + STEP, "ordered": ordered, "invested": invested, "cost": cost,

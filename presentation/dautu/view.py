@@ -158,7 +158,14 @@ def view_text(cfg, s, final, sess, info, today, side_phien):
     if left:
         lines.append(f"🔁 Đang rải vào {cfg['ma']}: còn {money(sum(left.values()))}, tới {ym_text(max(left))}"
                      " (bỏ: /dautu taicocau xoa)")
-    return "\n".join(lines), buttons(cfg, s, sess, final, side_phien)
+    rows = buttons(cfg, s, sess, final, side_phien)
+    if s.get("owed"):  # bot không tự cộng tiền vào quỹ chờ khi người dùng chưa báo: hỏi
+        months = ", ".join(f"{ym_text(ym)} {money(a)}" for ym, a in s["owed"])
+        lines.insert(1, f"❓ Chưa ghi phần góp vào quỹ chờ: {months}. Bạn đã để số tiền này vào quỹ chờ chưa? Bot không tự "
+                        "cộng tiền khi bạn chưa báo.")
+        rows.insert(0, [(f"✅ Đã để {money(sum(a for _, a in s['owed']))}, trừ tài khoản chính", "dt:ndat"),
+                        ("Chưa để", "dt:nchua")])
+    return "\n".join(lines), rows
 
 
 def reminder_view(cfg, s, sess, second, side_when, side_phien):

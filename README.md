@@ -384,7 +384,8 @@ Code ở [interface/duphong/reserve.py](interface/duphong/reserve.py). `/duphong
   dùng) cộng các sổ tiết kiệm, quỹ có sẵn bạn gắn vào (`/duphong tinh ACB`). Để tiền vào quỹ là chuyển tiền,
   không tính là khoản chi. Chạm mốc thì bot chúc mừng.
 - **Ngày nhận lương**: ghi `+ lương …` (hoặc ảnh lịch sử có lương) thì bot gợi ý chia lương (trả nợ → chi tiêu →
-  quỹ dự phòng, xem mục Kế hoạch) kèm nút để luôn vào quỹ. Mỗi lần nạp được cộng vào số đã nạp của tháng.
+  quỹ dự phòng, xem mục Kế hoạch) kèm nút để luôn vào quỹ. Mỗi lần nạp được cộng vào số đã nạp của tháng, mỗi lần rút
+  thì trừ đi (nạp 2,6tr rồi rút 2tr: tháng đó mới nạp 0,6tr).
 - **🏦 Để quỹ ở đâu**: tiết kiệm không kỳ hạn hoặc tiết kiệm online kỳ hạn 1–3 tháng (chia vài sổ nhỏ), 1 tháng chi
   có thể để ở tài khoản thanh toán; lãi suất các sổ bạn đã khai báo; không để ở cổ phiếu, ETF, vàng.
 - `/suckhoe` dùng đúng số liệu quỹ; tổng kết đầu tháng kèm tiến độ quỹ.
@@ -398,6 +399,8 @@ Code ở [interface/no/debt.py](interface/no/debt.py). Khoản nợ lưu chung v
   `/no thẻ tín dụng trả góp 8,2tr, trả 4,39tr/tháng, ngày 5` · có lãi thì ghi `lãi 12%` (hoặc `lãi 1%/tháng`).
   Gõ lại cùng tên để sửa (`/no chú Tư trả 6tr/tháng`). Khoản mới tính kỳ trả từ tháng sau (số dư khai báo đã gồm lần
   trả tháng này); chưa trả tháng này thì thêm `tháng này chưa trả`. Lần đầu bot tạo nhóm chi 🏦 Trả nợ.
+  Khoản nợ **mới thêm** (và đã có tài khoản chính) thì bot hỏi thêm «tiền vay đã về VCB chưa?» với nút «💰 Tiền vay đã vào
+  VCB»: bấm thì cộng tiền vào tài khoản (một lần), tài sản ròng mới đúng; chỉ khai báo nợ đang có thì không bấm.
 - **`/no`**: mỗi khoản còn bao nhiêu / tổng ban đầu, thanh tiến độ, có lãi hay không, mỗi tháng trả bao nhiêu, còn
   mấy tháng và tháng nào xong, tháng này đã trả chưa (nút ✅ Trả). Khoản sắp xong thì báo trước mỗi tháng dư ra bao
   nhiêu.
@@ -448,8 +451,10 @@ Code ở [interface/dautu/fund.py](interface/dautu/fund.py). Bật: `/dautu batd
   thì `/dautu ccq 66,43`. Mua ngoài lịch: vừa đặt xong thì `/dautu dadat 3tr` hoặc nhắn `mua VMEEF 3tr`; lệnh đặt
   hôm khác thì thêm **ngày đặt lệnh** (`/dautu dadat 1tr 9/11`, đặt sau 14:40 thì thêm `sau 14h40`), bot tự tính phiên
   khớp (đặt trước 14:40 khớp phiên giao dịch kế tiếp, cuối tuần và ngày lễ theo lịch NAV thật).
-- **Góp tiền**: ghi `+ lương …` thì gợi ý chia lương có nút 📈 để tiền vào quỹ chờ; qua hạn cuối tháng mà chưa để thì
-  bot tự tính phần góp tháng đó vào quỹ chờ (sửa số dư thật: `/dautu quycho 12tr`). Quỹ dự phòng chưa tới mốc 1 tháng
+- **Góp tiền**: ghi `+ lương …` thì gợi ý chia lương có nút 📈 để tiền vào quỹ chờ. Qua hạn cuối tháng mà bạn chưa báo đã
+  để thì bot **không tự cộng tiền** vào quỹ chờ (trước đây tự cộng thành tiền không có thật): `/dautu` hỏi «Đã để 8tr vào quỹ
+  chờ chưa?» với nút «✅ Đã để, trừ tài khoản chính» (cộng quỹ chờ, trừ tài khoản chính, tính là góp của đúng tháng đó) và
+  «Chưa để» (bỏ qua, không cộng gì). Sửa số dư thật: `/dautu quycho 12tr`. Quỹ dự phòng chưa tới mốc 1 tháng
   chi thiết yếu thì bot khuyên tạm dừng góp (không chặn): nút ⏸ hoặc `/dautu bo`.
 - **Quỹ chờ là quỹ trái phiếu** (`/dautu quycho VFF`): hoán đổi VFF ↔ VMEEF miễn phí (bán VFF ra tiền mặt trong
   12 tháng đầu mới mất 2%), nên VFF vừa là phần trái phiếu của danh mục, vừa là tiền chờ cho VA. Góp thêm mỗi tháng vào

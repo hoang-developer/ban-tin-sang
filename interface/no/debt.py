@@ -55,6 +55,31 @@ def declare_info(info, day):
     return pview.declare_text(service.declare_info(info, day), day)
 
 
+def with_money_prompt(result, day):
+    """Câu báo khai báo nợ; khoản nợ mới thêm và đã có tài khoản chính thì kèm câu hỏi và nút "💰 Tiền vay đã vào…":
+    (chữ, hàng nút) hoặc chỉ chữ."""
+    text = pview.declare_text(result, day)
+    if result.status != "ok" or not result.created or not result.debt.get("tien"):
+        return text
+    main = service.main_account_name()
+    if not main:
+        return text
+    debt = result.debt
+    return (text + "\n" + pview.money_prompt_text(main, debt["tien"]),
+            [[(f"💰 Tiền vay đã vào {main}", f"no:vao:{debt['id']}:{int(debt['tien'])}")]])
+
+
+def declare_with_prompt(text, day):
+    """/no <khoản nợ>: như declare, kèm nút hỏi tiền vay đã vào tài khoản chính chưa khi là khoản nợ mới."""
+    result = service.declare(text, day)
+    return pview.USAGE if result is None else with_money_prompt(result, day)
+
+
+def declare_info_with_prompt(info, day):
+    """Khai báo nợ từ câu nói thường (thẻ ✅): như declare_info, kèm nút hỏi tiền vay khi là khoản nợ mới."""
+    return with_money_prompt(service.declare_info(info, day), day)
+
+
 def pay(debt_id, amount, now):
     """Bấm ✅ Trả: ghi khoản chi nhóm Trả nợ và trừ dư nợ. Trả (khoản đã ghi hoặc None, các dòng báo)."""
     result = service.pay(debt_id, amount, now)
@@ -84,7 +109,7 @@ def no_cmd(args):
             return "Trả nợ: /no tra <tên khoản nợ> <số tiền>, ví dụ /no tra chú Tư 5tr"
         _, lines = pay(d["id"], found[0], service.now())
         return "\n".join(lines)
-    return declare(" ".join(args), day)
+    return declare_with_prompt(" ".join(args), day)
 
 
 def on_button(arg, message, now):
@@ -97,6 +122,16 @@ def on_button(arg, message, now):
         return None, ("send", lambda: pview.USAGE)
     if kind == "ds":
         return None, ("edit", _edit_list)
+    if kind == "vao":  # tiền vay mới đã vào tài khoản chính
+        debt_id, _, amount = rest.partition(":")
+        if not amount.isdigit():
+            return None, None
+        status, note = service.receive_loan(debt_id, int(amount), day)
+        if status != "ok":
+            return {"het": "Khoản nợ này đã xóa", "da_cong": "Đã cộng tiền vay vào tài khoản rồi",
+                    "chua_co_tk": "Chưa chọn tài khoản chính"}[status], None
+        rows = [row for row in common.keyboard_rows(message) if not any(d == f"no:{arg}" for _, d in row)]
+        return common.clip(common.strip_tags(note)), ("buttons", lambda: rows)
     if kind == "x":
         if service.remove(rest):
             return "Đã xóa khoản nợ", ("edit", _edit_list)

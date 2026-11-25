@@ -39,7 +39,8 @@ def essential(day):
     by_group = {}
     for e in kept:
         by_group[e["nhom"]] = by_group.get(e["nhom"], 0) + e["tien"]
-    monthly = rules.monthly_amounts(by_group, set(rules.MONTHLY_BILLS), days)
+    bill_months = {c: len({e["ngay"][:7] for e in kept if e["nhom"] == c}) for c in rules.MONTHLY_BILLS}
+    monthly = rules.monthly_amounts(by_group, set(rules.MONTHLY_BILLS), days, bill_months)
     by_group = dict(sorted(monthly.items(), key=lambda x: -x[1]))
     return sum(by_group.values()), by_group, days
 
@@ -83,7 +84,7 @@ def change(amount, day, from_main=True):
     item["ngay"] = day.isoformat()
     moved = accounts.move_main(data, old - item["tien"], "quỹ dự phòng", day) if from_main else None
     assets_repo.save(data)
-    reserve_repo.save(rules.record_deposit(reserve_repo.load(), day, amount))
+    reserve_repo.save(rules.record_deposit(reserve_repo.load(), day, item["tien"] - old))  # số thật đã đổi (rút quá số dư thì bị chặn ở 0)
     after = status(day)
     return Change(amount, before, after, moved, rules.milestone(before, after) if amount >= 0 else None)
 
