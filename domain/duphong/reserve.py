@@ -34,12 +34,15 @@ class ReserveStatus:
     overdue: bool
 
 
-def monthly_amounts(totals, bills, days):
+def monthly_amounts(totals, bills, days, bill_months=None):
     """Chi thiết yếu mỗi tháng từ tổng chi trong `days` ngày có dữ liệu. Chi hằng ngày (ăn, chợ, đi lại...) quy theo số
-    ngày; chi theo kỳ (nhà, hóa đơn, học: nhóm trong `bills`) chia theo số tháng đã qua, tối thiểu một
-    tháng, vì tháng nào cũng chỉ trả một lần (15 ngày dữ liệu có một lần trả nhà thì vẫn là một tháng, không nhân đôi)."""
+    ngày; chi theo kỳ (nhà, hóa đơn, học: nhóm trong `bills`) chia theo số tháng đã qua, tối thiểu một tháng, vì tháng
+    nào cũng chỉ trả một lần (15 ngày dữ liệu có một lần trả nhà thì vẫn là một tháng, không nhân đôi).
+    bill_months: {nhóm: số tháng lịch có khoản chi của nhóm}. 45 ngày dữ liệu (01/10 tới 14/11) có hai lần trả nhà 5tr ở
+    hai tháng khác nhau: số tháng theo ngày là 1 nhưng đã có 2 tháng trả, nên tiền nhà là 5tr/tháng chứ không phải 10tr."""
     months = max(1, round(days / 30.4))
-    return {c: v / months if c in bills else v * 30.4 / days for c, v in totals.items()}
+    bill_months = bill_months or {}
+    return {c: v / max(months, bill_months.get(c, 0)) if c in bills else v * 30.4 / days for c, v in totals.items()}
 
 
 def build_status(cfg, day, essential, rows, flows, group_labels=None, has_other_funds=False):
@@ -75,14 +78,15 @@ def milestone(before, after):
 
 
 def record_deposit(cfg, day, amount):
-    """Cấu hình sau khi nạp/rút: có ngày bắt đầu; nạp (amount > 0) thì cộng vào số đã nạp của tháng (12 tháng gần nhất)."""
+    """Cấu hình sau khi nạp/rút: có ngày bắt đầu; số đã nạp của tháng (12 tháng gần nhất) tăng khi nạp (amount > 0) và
+    giảm khi rút (amount < 0, không xuống dưới 0): nạp 2,6tr rồi rút 2tr thì tháng đó mới nạp 0,6tr."""
     cfg = dict(cfg)
     if not cfg.get("bat_dau"):
         cfg["bat_dau"] = day.isoformat()
-    if amount > 0:
+    if amount:
         ym = day.strftime("%Y-%m")
         added = dict(cfg.get("nap", {}))
-        added[ym] = added.get(ym, 0) + amount
+        added[ym] = max(0, added.get(ym, 0) + amount)
         cfg["nap"] = dict(sorted(added.items())[-12:])
     return cfg
 

@@ -39,7 +39,7 @@ from services.dautu import market
 from services.dautu.market import (current_period, find_fund, fund_info, is_deadline, nav_history,  # noqa: F401
                                    next_trading, session)
 from services.dautu.orders import (add_money, fix_units, match_details, match_orders, order_spec,  # noqa: F401
-                                   record_order, record_plan, record_switch, skip, take_money)
+                                   record_order, record_plan, record_switch, settle_owed, skip, take_money)
 from services.taisan.prices import prices as asset_prices
 from services.dautu.reports import daily_report, evening_line, holdings_alert, salary_part  # noqa: F401
 from services.dautu.status import close_periods, status, wait_item  # noqa: F401
@@ -400,6 +400,13 @@ def on_button(arg, message, now):
         return "Đang vẽ biểu đồ…", ("send", chart_reply)
     if kind == "ls":
         return None, ("edit", history_text)
+    if kind in ("ndat", "nchua"):  # đã để phần góp các tháng trước vào quỹ chờ chưa?
+        count, total, notes = settle_owed(config(), kind == "ndat")
+        if not count:
+            return "Đã trả lời rồi", ("edit", view)
+        toast = (f"Đã ghi {money(total)} vào quỹ chờ" + (f". {common.strip_tags(notes[-1])}" if notes else "") if kind == "ndat"
+                 else "Đã bỏ qua, không cộng tiền")
+        return common.clip(toast), ("edit", view)
     return None, None
 
 

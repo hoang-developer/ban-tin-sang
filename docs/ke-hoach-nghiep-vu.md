@@ -4,6 +4,12 @@ Trạng thái: **đã duyệt các mặc định ở mục 2** (25/11/2026). Ngu
 đầu tư – thị trường, và xuyên suốt. Điểm trung bình: đúng nghiệp vụ 5,5 · đầy đủ 6,5 · **nhất quán 4,8** · hữu ích 7,0.
 26 lỗi trong báo cáo đã được chạy lại bằng `tests/harness.py` (AI giả) và cả 26 tái hiện được.
 
+## Tiến độ (cập nhật 25/11/2026)
+
+- **Xong và đã deploy:** PR 0.1 (#89), PR 0.2 (#90), giai đoạn 1 của kế hoạch trợ lý (#91: chống xử lý trùng, không ghi thẳng dự định/giả định/tin bot dán lại, hạn AI 50 giây, câu hỏi ngoài sổ chi tiêu, bộ ca hồi quy `tests/test_an_toan.py`).
+- **PR 0.3 (tiền phải có nguồn):** làm xong, khác kế hoạch ở một điểm: khoản nợ mới chỉ có nút «💰 Tiền vay đã vào <tài khoản chính>» (không nút "tài khoản khác"; không bấm nghĩa là khai báo nợ đang có). Tiền vào ví khác thì khai báo ví đó ở `/taisan`.
+- **Việc kế tiếp:** PR 0.4 (sổ tiết kiệm đáo hạn và tất toán sớm), PR 0.5 (nợ có lãi giảm dần), rồi dừng báo bạn đổi sang Opus cho PR 0.6.
+
 Giai đoạn này đứng **trước** các giai đoạn của `docs/ke-hoach-tro-ly.md` vì trợ lý hội thoại (giai đoạn 3) đưa chính các con số này
 cho AI viết thành lời; số sai thì lời càng thuyết phục càng nguy hiểm.
 

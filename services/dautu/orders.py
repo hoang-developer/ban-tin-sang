@@ -14,7 +14,7 @@ from repositories.taisan import assets as assets_repo
 from services.dautu import market
 from services.taisan import accounts
 from services.dautu.market import current_period, nav_history, next_trading, session
-from services.dautu.status import close_periods, wait_item
+from services.dautu.status import close_periods, owed, wait_item
 
 
 def add_money(cfg, amount, ym, data=None, from_main=True, notes=None):
@@ -32,6 +32,22 @@ def add_money(cfg, amount, ym, data=None, from_main=True, notes=None):
     if own:
         assets_repo.save(data)
     return item["tien"]
+
+
+def settle_owed(cfg, deposited):
+    """Trả lời "đã để phần góp các tháng trước vào quỹ chờ chưa?". deposited=True: ghi là đã để (tiền đi từ tài khoản chính,
+    cộng vào quỹ chờ, tính là góp của đúng tháng đó); False: chưa để, bỏ qua (không cộng gì). Trả (số tháng, tổng tiền, dòng báo)."""
+    pending = owed(cfg)
+    data, notes = assets_repo.load(), []
+    for ym, amount in pending:
+        if deposited:
+            add_money(cfg, amount, ym, data, from_main=True, notes=notes)
+        cfg["ky"][ym]["thieu_xong"] = True
+    if pending:
+        if deposited:
+            assets_repo.save(data)
+        fund_repo.save(cfg)
+    return len(pending), sum(a for _, a in pending), notes
 
 
 def take_money(cfg, amount, to_main=True, notes=None):

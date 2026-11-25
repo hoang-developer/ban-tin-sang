@@ -106,6 +106,29 @@ def declare_info(info, day):
     return DeclareResult("ok", d["ten"], d, created, group_note)
 
 
+def main_account_name():
+    """Tên tài khoản chính (để hỏi tiền vay đã vào đâu); None nếu chưa chọn."""
+    it = accounts.main_account(debt_repo.load())
+    return it["ten"] if it else None
+
+
+def receive_loan(debt_id, amount, day):
+    """Tiền vay mới đã vào tài khoản chính: cộng vào số dư, một lần cho mỗi khoản nợ (khai báo nợ một mình làm tài sản ròng
+    giảm vì thêm nợ mà không có tiền vào). Trả (trạng thái, dòng báo): "het" (khoản nợ đã xóa) | "da_cong" | "chua_co_tk" | "ok"."""
+    data = debt_repo.load()
+    d = by_id(data, debt_id)
+    if not d:
+        return "het", None
+    if d.get("tien_vao"):
+        return "da_cong", None
+    note = accounts.move_main(data, amount, f"tiền vay {d['ten']}", day)
+    if not note:
+        return "chua_co_tk", None
+    d["tien_vao"] = int(amount)
+    debt_repo.save(data)
+    return "ok", note
+
+
 def remove(debt_id):
     """Xóa khoản nợ; False nếu đã xóa rồi."""
     data = debt_repo.load()
