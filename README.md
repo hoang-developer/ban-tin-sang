@@ -138,7 +138,9 @@ và chỉ ghi sau khi bạn bấm ✅ trên thẻ "Mình hiểu là…" (có nú
 Cách chạy: khoản chi thường ("cà phê 35k") vẫn ghi ngay, không qua AI. Tin có chữ dễ là việc khác (chuyển, nạp, vàng,
 vay, quỹ, tiết kiệm…) hoặc không có số tiền thì AI phân loại thành "việc" kèm các trường; code kiểm tra lại từng trường
 (số tiền đối chiếu với số đọc được trong câu), tính toán và ghi bằng các hàm sẵn có. AI bảo là khoản chi thì bot nhớ, lần
-sau ghi ngay. AI bận: bot hỏi lại bằng nút ("Ghi là khoản chi" / "Không ghi"), không tự đoán. AI nhận thêm tên các khoản
+sau ghi ngay. AI bận: bot hỏi lại bằng nút ("Ghi là khoản chi" / "Không ghi"), không tự đoán. Tổng thời gian chờ AI của một tin
+có hạn **50 giây** ([infrastructure/ai.py](infrastructure/ai.py), `ai.deadline`): hàm Vercel bị cắt ở 60 giây, quá hạn thì coi
+như AI bận thay vì để người dùng không nhận được câu trả lời nào. AI nhận thêm tên các khoản
 nợ, tài khoản, mã quỹ của bạn (không kèm số tiền) để gọi đúng tên. Thử một câu mà không ghi gì: mở
 `https://ban-tin-sang.vercel.app/api/chitieu?hieu=mua 2 chỉ vàng nhẫn hết 27tr` (tối đa 40 câu mỗi ngày, không gửi tên
 riêng cho AI).

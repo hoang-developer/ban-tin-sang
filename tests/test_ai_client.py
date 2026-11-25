@@ -103,6 +103,50 @@ class May(unittest.TestCase):
         self.assertIn("hết thời gian chờ", str(err.exception))
         self.assertEqual(self.log, [])
 
+    def test_han_chung_cua_ca_luot_xu_ly(self):
+        """Nhiều lần chat nối tiếp (hiểu câu, xếp nhóm, số liệu...) cộng quá 50 giây thì lần sau không gọi nữa, để hàm
+        Vercel (cắt ở 60 giây) còn kịp trả lời "AI đang bận" thay vì im lặng."""
+        os.environ["GEMINI_API_KEY"] = "g"
+        clock = {"t": 1000.0}
+
+        class FakeTime:
+            @staticmethod
+            def monotonic():
+                return clock["t"]
+
+        self.addCleanup(setattr, ai, "time", ai.time)
+        ai.time = FakeTime
+        timeouts, normal = [], self.fake
+
+        def slow(req, timeout=None):  # mỗi lượt gọi mất 20 giây
+            timeouts.append(timeout)
+            clock["t"] += 20
+            return normal(req, timeout)
+
+        urllib.request.urlopen = slow
+        self.assertIsNone(ai.time_left())  # chưa đặt hạn: không giới hạn
+        with ai.deadline(50):
+            self.assertEqual(ai.time_left(), 46)  # chừa 4 giây để gửi câu trả lời
+            chat("s", "u")
+            chat("s", "u")
+            chat("s", "u")  # còn 6 giây: vẫn gọi, nhưng chỉ chờ tối đa 6 giây
+            self.assertEqual(timeouts, [25, 25, 6])
+            with self.assertRaises(RuntimeError) as err:
+                chat("s", "u")  # quá hạn: không gọi nữa
+            self.assertIn("hết thời gian chờ", str(err.exception))
+            self.assertEqual(len(timeouts), 3)
+        self.assertIsNone(ai.time_left())  # ra khỏi khối là hết hạn chung
+        chat("s", "u")  # ngoài khối: gọi bình thường
+        self.assertEqual(len(timeouts), 4)
+
+    def test_han_long_nhau_lay_han_som_hon(self):
+        with ai.deadline(50):
+            with ai.deadline(100):
+                self.assertLessEqual(ai.time_left(), 46)  # hạn ngoài (50 giây) vẫn thắng
+            with ai.deadline(10):
+                self.assertLessEqual(ai.time_left(), 6)
+            self.assertGreater(ai.time_left(), 40)  # ra khỏi khối trong thì về hạn ngoài
+
     def test_luot_dung_openrouter(self):
         self.assertIsNone(ai.quota())
         os.environ["AI_API_KEY"] = "o"

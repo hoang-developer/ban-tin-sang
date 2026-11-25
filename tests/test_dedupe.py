@@ -6,6 +6,7 @@ import unittest
 from tests import harness as h
 
 from api import chitieu as api_chitieu
+from infrastructure import ai
 from infrastructure import telegram as tg
 from interface.chitieu import context as chitieu_ctx
 from interface.chitieu import dedupe
@@ -99,6 +100,16 @@ class DauVao(unittest.TestCase):
         self.post(press(602, data="bc:tuan"))  # nút khác vẫn chạy
         self.post(press(603, message_id=78))  # cùng nút trên tin khác vẫn chạy
         self.assertEqual(self.pressed, ["bc:ngay", "bc:tuan", "bc:ngay"])
+
+    def test_moi_tin_co_han_cho_ai_50_giay(self):
+        """Hàm Vercel bị cắt ở 60 giây: tổng thời gian chờ AI của một tin phải có hạn."""
+        seen, real = [], api_chitieu.chitieu_bot.answer
+        self.addCleanup(setattr, api_chitieu.chitieu_bot, "answer", real)
+        api_chitieu.chitieu_bot.answer = lambda *args, **kwargs: (seen.append(ai.time_left()), "ok")[1]
+        self.post(self.text(700, "cà phê 35k"))
+        self.assertEqual(len(seen), 1)
+        self.assertTrue(40 < seen[0] <= 46, seen)  # 50 giây trừ 4 giây chừa để gửi câu trả lời
+        self.assertIsNone(ai.time_left())  # xong tin là hết hạn
 
     def test_sai_secret_van_bi_chan(self):
         body = b"{}"
