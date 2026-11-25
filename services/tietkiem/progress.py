@@ -49,8 +49,8 @@ def real_saved(cfg, entries):
         out["dautu"] = sum(v for k, v in dautu_fund.load().get("nap", {}).items() if k >= ym)
     except Exception as e:
         print(f"[lỗi] đầu tư trong /tietkiem: {e!r}", file=sys.stderr)
-    group = debt_group()
-    out["tra_no"] = sum(e["tien"] for e in entries if e["nhom"] != INCOME and rules.is_debt(e, group))
+    # trả gốc nợ (trả thẻ, trả góp) chỉ trả lại tiền đã tiêu, không phải để dành: không tính (lỗi cũ: trả thẻ 10tr thành
+    # "để dành thật 10tr")
     return out
 
 

@@ -5,7 +5,7 @@ import re
 import sys
 from datetime import timedelta
 
-from domain.chitieu import classify
+from domain.chitieu import classify, flow
 from domain.chitieu.kinds import INCOME, OTHER
 from domain.common.dates import WEEKDAYS
 from domain.phantich import numbers, query
@@ -16,7 +16,12 @@ from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
 from services.kehoach import plan as kehoach_service
 
-spending, total, spike_limits, allowance = numbers.spending, numbers.total, numbers.spike_limits, numbers.allowance
+total, spike_limits, allowance = numbers.total, numbers.spike_limits, numbers.allowance
+
+
+def spending(items):
+    """Khoản chi thật (không thu, không trả gốc nợ), theo nhóm Trả nợ của người dùng."""
+    return numbers.spending(items, flow.debt_group_of(groups_repo.config()))
 
 
 def forecast(day):
@@ -138,10 +143,14 @@ def about_spending(question, day):
 
 def query_items(spec):
     """(các khoản khớp bộ lọc trong kỳ, các khoản khớp trong kỳ đem so hoặc None nếu không phải câu so sánh)."""
-    items = [e for e in ledger_repo.between(spec["tu"], spec["den"]) if query.matches(e, spec)]
+    debt = flow.debt_group_of(groups_repo.config())
+
+    def keep(e):  # hỏi chung về chi tiêu thì trả gốc nợ không tính là chi; hỏi đúng nhóm Trả nợ thì vẫn có
+        return query.matches(e, spec) and (spec["thu"] or spec["nhom"] or flow.kind(e, debt) != flow.TRA_GOC)
+    items = [e for e in ledger_repo.between(spec["tu"], spec["den"]) if keep(e)]
     other = None
     if spec["kieu"] == "so_sanh":
-        other = [e for e in ledger_repo.between(spec["tu2"], spec["den2"]) if query.matches(e, spec)]
+        other = [e for e in ledger_repo.between(spec["tu2"], spec["den2"]) if keep(e)]
     return items, other
 
 

@@ -12,6 +12,7 @@ import sys
 
 from infrastructure import kho
 from repositories import keys
+from domain.chitieu import flow
 from domain.chitieu.kinds import INCOME
 from domain.chitieu.learn import pending as pending_count
 from interface.chitieu import bot as chitieu_bot
@@ -110,7 +111,7 @@ def home(day, now=None):
     now = now or ts.now_vn()
     month = ledger_repo.load(day.strftime("%Y-%m"))
     group = part("nhóm trả nợ", lambda: sono.debt_group()[0])
-    spend = [e for e in month if e["nhom"] not in (INCOME, group) and not e.get("no")]
+    spend = flow.spending(month, group)
     today = [e for e in spend if e["ngay"] == day.isoformat()]
     lines = [f"🏠 <b>Hôm nay, {WEEKDAYS[day.weekday()].lower()} {day:%d/%m}</b>"]
     if today:
@@ -123,7 +124,7 @@ def home(day, now=None):
     s = part("mỗi ngày được tiêu", lambda: kehoach.spendable(day, n)) if n else None
     if s:
         lines.append(kehoach.spend_text(s, bold=True))
-    income = sum(e["tien"] for e in month if e["nhom"] == INCOME)
+    income = flow.income(month)
     lines.append(f"📅 Tháng {day.month}: đã chi {short(sum(e['tien'] for e in spend))}"
                  + (f" · đã thu {short(income)}" if income else ""))
     main = part("tài khoản chính", lambda: ts.main_line(day))

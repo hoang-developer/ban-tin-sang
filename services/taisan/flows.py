@@ -1,7 +1,8 @@
 """Dòng tiền trung bình theo sổ thu chi."""
 from datetime import date, timedelta
 
-from domain.chitieu.kinds import INCOME
+from domain.chitieu import flow
+from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
 
 
@@ -11,6 +12,6 @@ def monthly_flows(day):
     if not items:
         return 0, 0, 0
     days = (day - date.fromisoformat(min(e["ngay"] for e in items))).days + 1
-    spend = sum(e["tien"] for e in items if e["nhom"] != INCOME)
-    income = sum(e["tien"] for e in items if e["nhom"] == INCOME)
+    spend = flow.spent(items, flow.debt_group_of(groups_repo.config()))  # trả gốc nợ không phải chi
+    income = flow.income(items)
     return spend / days * 30.4, income / days * 30.4, days

@@ -1,5 +1,6 @@
 """Tiến độ ngân sách tháng: số đã chi so với hạn mức từng nhóm, ngân sách tổng và ngân sách chi hằng ngày."""
-from domain.chitieu.kinds import INCOME
+from domain.chitieu import flow
+from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import budget as budget_repo
 from repositories.chitieu import ledger as ledger_repo
 
@@ -10,7 +11,7 @@ def progress(codes, day):
     if not budgets:
         return []
     from services.phantich import analysis as phantich  # nạp muộn: phantich cũng dùng sổ chi tiêu
-    items = [e for e in ledger_repo.load(day.strftime("%Y-%m")) if e["nhom"] != INCOME]
+    items = flow.spending(ledger_repo.load(day.strftime("%Y-%m")), flow.debt_group_of(groups_repo.config()))
     out = []
     daily = phantich.daily_groups() if "hangngay" in budgets else []
     extra = (["hangngay"] if daily and set(codes) & set(daily + ["hangngay"]) else []) + (["tong"] if "tong" in budgets else [])

@@ -10,7 +10,7 @@ from domain.common.text import norm, plain
 
 # Ghi chú là tiền trả nợ, đóng thẻ tín dụng, trả góp, ví trả sau: không phải chi tiêu thiết yếu và không thuộc nhóm
 # nhà cửa, ăn uống... dù AI hay từ khóa lạc sang đó (so sau khi bỏ dấu)
-DEBT_PAYMENT = re.compile(r"(?<!\w)(?:the tin dung|dong the|thanh toan the|sao ke the|no vay|tra no|tra gop|"
+DEBT_PAYMENT = re.compile(r"(?<!\w)(?:the tin dung|dong the|tra the|thanh toan the|sao ke the|no vay|tra no|tra gop|"
                           r"tra tien vay|vay tieu dung|spaylater|shopeepay)(?!\w)")
 
 

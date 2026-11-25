@@ -18,6 +18,7 @@ from datetime import date, timedelta
 from infrastructure import kho
 from repositories import keys
 from domain.chitieu import parse as parse_rules
+from domain.chitieu import flow
 from domain.chitieu.kinds import INCOME
 from domain.chitieu.learn import learn_key
 from domain.common.format import vnd
@@ -455,8 +456,8 @@ def finance_facts(day):
     n = kehoach.numbers(day)
 
     def month():
-        today = sum(e["tien"] for e in ledger_repo.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()
-                    and e["nhom"] != INCOME and not e.get("no"))
+        today = flow.spent([e for e in ledger_repo.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()],
+                           n["group"])
         return (f"Tháng {day.month}: đã thu {short(n['income'])}" + (f" ({n['income_basis']})" if n["income_basis"] else "")
                 + f" · đã chi {short(n['spent'])} (không tính trả nợ) · hôm nay đã chi {short(today)}")
 

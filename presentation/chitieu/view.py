@@ -3,7 +3,7 @@ cfg là cấu hình nhóm tự chỉnh của người dùng."""
 import html
 from datetime import timedelta
 
-from domain.chitieu import classify
+from domain.chitieu import classify, flow
 from domain.chitieu.income import income_kinds
 from domain.chitieu.kinds import INCOME
 from domain.chitieu.learn import pending
@@ -29,7 +29,8 @@ def entry_text(e, day, cfg):
         else f" · {e['ngay'][8:]}/{e['ngay'][5:7]}{year}")
     note = html.escape(e["ghichu"]) if e["ghichu"] else "<i>không ghi chú</i>"
     robot = " ✨" if e.get("ai") else ""  # ✨ nhóm do AI đoán
-    return f"<b>{vnd(e['tien'])}</b> · {classify.name(e['nhom'], cfg)}{robot} — {note}{when}"
+    money = f"↩️ hoàn {vnd(-e['tien'])}" if e.get("hoan") else vnd(e["tien"])  # hoàn tiền: trừ vào chi của nhóm này
+    return f"<b>{money}</b> · {classify.name(e['nhom'], cfg)}{robot} — {note}{when}"
 
 def budget_label(code, cfg):
     return {"tong": "Tổng chi", "hangngay": "Chi hằng ngày"}.get(code) or classify.name(code, cfg)
@@ -71,7 +72,7 @@ def entries_message(entries, day, cfg, budget_notes, sorting=False, focus=None, 
         lines = [f"✅ Đã ghi {entry_text(e, day, cfg)}"]
         rows = [[("✏️ Đổi nhóm", f"doi:{ref(e)}"), ("❌ Xóa", f"xoa:{ref(e)}")]]
     else:
-        total = sum(e["tien"] for e in entries if e["nhom"] != INCOME)
+        total = flow.spent(entries, flow.debt_group_of(cfg))
         lines = [f"✅ Đã ghi {len(entries)} khoản" + (f", chi <b>{vnd(total)}</b>" if total else "")]
         lines += [f"{i}. {entry_text(e, day, cfg)}" for i, e in enumerate(entries, 1)]
         rows = [[(f"✏️ {i}. {e['ghichu'][:12] or vnd(e['tien'])}", f"doi:{ref(e)}"), (f"❌ {i}", f"xoa:{ref(e)}")]
@@ -102,8 +103,10 @@ def report_text(data, cfg):
     """(nội dung báo cáo, số khoản chi) của một kỳ từ số liệu của services.chitieu.report."""
     start, end, label, prev_start, prev_end, prev_label = data["period"]
     items = data["items"]
-    spend = [e for e in items if e["nhom"] != INCOME]
-    income = sum(e["tien"] for e in items if e["nhom"] == INCOME)
+    debt = flow.debt_group_of(cfg)
+    spend = flow.spending(items, debt)
+    income = flow.income(items)
+    repaid = flow.repaid(items, debt)
     total = sum(e["tien"] for e in spend)
     span = f"{start:%d/%m}" + (f" – {end:%d/%m}" if end != start else "")
     lines = [f"📊 <b>Chi tiêu {label}</b> ({span})"]
@@ -116,8 +119,10 @@ def report_text(data, cfg):
         by_cat[e["nhom"]] = by_cat.get(e["nhom"], 0) + e["tien"]
     top = max(by_cat.values(), default=0)
     for code, amount in sorted(by_cat.items(), key=lambda x: -x[1]):
-        lines.append(f"{classify.name(code, cfg)} <b>{short(amount)}</b> · {amount / total * 100:.0f}%\n"
-                     + "▇" * max(1, round(amount / top * 10)))
+        lines.append(f"{classify.name(code, cfg)} <b>{short(amount)}</b> · {amount / total * 100 if total else 0:.0f}%\n"
+                     + "▇" * max(1, round(amount / top * 10) if top > 0 else 1))
+    if repaid:
+        lines.append(f"🏦 Trả gốc nợ {short(repaid)} (không tính là chi)")
     prev_total = data["prev_total"]
     if prev_total:
         change = (total - prev_total) / prev_total * 100
@@ -125,7 +130,7 @@ def report_text(data, cfg):
     if income:
         kinds = income_kinds([e for e in items if e["nhom"] == INCOME])
         detail = f" ({' · '.join(f'{k} {short(v)}' for k, v in kinds)})" if len(kinds) > 1 else ""
-        left = income - total
+        left = income - total - repaid
         lines.append(f"💰 Thu {short(income)}{detail} → {'🟢' if left >= 0 else '🔴'} còn <b>{short(left)}</b>")
     biggest = sorted(spend, key=lambda e: -e["tien"])[:3]
     if biggest and len(spend) > 3:

@@ -5,6 +5,7 @@ Số liệu trả dạng dict theo khóa (xem domain/kehoach/plan.py); kết qu�
 import sys
 from datetime import timedelta
 
+from domain.chitieu import flow
 from domain.chitieu.kinds import INCOME
 from domain.chitieu.learn import pending as pending_count
 from repositories.chitieu import ledger as ledger_repo
@@ -30,8 +31,7 @@ def spending_estimate(day, group, debt_need):
     budget_total = budget_repo.load().get("tong")
     if budget_total:
         return rules.estimate_spend(budget_total, debt_need, [], day, None)
-    items = [e for e in ledger_repo.between(day - timedelta(days=89), day)
-             if e["nhom"] not in (INCOME, group) and not e.get("no")]
+    items = flow.spending(ledger_repo.between(day - timedelta(days=89), day), group)
     return rules.estimate_spend(None, debt_need, items, day, reserve_repo.load().get("chi"))
 
 
@@ -50,7 +50,7 @@ def numbers(day):
     data = assets_repo.load()
     group = debt_service.debt_group()[0]
     month = ledger_repo.load(ym)
-    income = sum(e["tien"] for e in month if e["nhom"] == INCOME)
+    income = flow.income(month)
     basis = ""
     if not income:
         salary = salary_repo.load()
@@ -63,7 +63,7 @@ def numbers(day):
     debts = rules.month_debts(debt_service.debts(data), ym)  # (khoản nợ, phải trả kỳ này, đã trả kỳ này)
     debt_need = sum(need for _, need, _ in debts)
     debt_left = sum(debt_rules.month_left(d, ym) for d, _, _ in debts)
-    spending = [e for e in month if e["nhom"] not in (INCOME, group) and not e.get("no")]
+    spending = flow.spending(month, group)
     spent = sum(e["tien"] for e in spending)
     spent_today = sum(e["tien"] for e in spending if e["ngay"] == day.isoformat())
     spend, spend_basis = spending_estimate(day, group, debt_need)
@@ -96,7 +96,7 @@ def spendable(day, n=None):
     if not n["income"]:
         return None
     invest = n["invest"]["gop"] if n["invest"] else 0
-    upcoming = sum(e["tien"] for e in f["upcoming"] if e["nhom"] != n["group"] and not e.get("no"))
+    upcoming = sum(e["tien"] for e in flow.spending(f["upcoming"], n["group"]))
     return rules.plan_spendable(n["income"], n["debt_need"], n["fund_target"], invest, n["spent"], n["spent_today"],
                                 upcoming, f["left"])
 
