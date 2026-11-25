@@ -965,7 +965,8 @@ def run(a, now, chat, option=None):
     if job in ("tai_khoan", "cho_vay"):
         data = ts.load()
         name = a["ten"] if job == "tai_khoan" else f"Cho {a['ten']} vay"
-        note = ts.add_simple(data, "tien" if job == "tai_khoan" else "khac", [name, f"{a['tien']}đ"])
+        note = (ts.add_simple(data, "tien", [name, f"{a['tien']}đ"]) if job == "tai_khoan"
+                else ts.add_loan(data, a["ten"], a["tien"]))  # cho vay thêm thì cộng dồn, không ghi đè
         if not note:
             return "⚠️ Chưa ghi được, thử lại với tên ngắn hơn nhé"
         if job == "cho_vay" and paid:

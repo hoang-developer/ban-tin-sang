@@ -97,6 +97,27 @@ class Service(unittest.TestCase):
         self.assertEqual(service.book_gap(12345, self.now()), GapBooked("da_xu_ly"))
         self.assertTrue(reconcile_repo.load_month("2026-11")["muc"][str(vcb)]["ghi"])
 
+    def test_doi_chieu_so_tiet_kiem_khong_dat_lai_ngay_gui(self):
+        """Lỗi cũ: nhập đúng số gốc khi đối chiếu thì ngày gửi thành ngày đối chiếu, lãi dồn về 0, đáo hạn lùi một năm."""
+        h.say("/taisan tietkiem ACB 100tr 6% 12 thang 01/01/2026")
+        acb = item("ACB")
+        self.assertEqual(service.set_value(acb["id"], 100_000_000, self.now()).status, "khop")
+        after = item("ACB")
+        self.assertEqual((after["ngay"], after["ky"], after["lai"]), ("2026-01-01", 12, 6.0))
+        self.assertEqual(after["doichieu"], "2026-11-15")
+        self.assertIn("đáo hạn 01/01/2027", h.say("/taisan")[0])
+        self.assertNotIn("lãi tới nay 0k", h.say("/taisan")[0])  # lãi tới nay vẫn còn
+
+    def test_doi_chieu_so_tiet_kiem_lech_chi_sua_goc(self):
+        tcb = item("TCB")["id"]
+        self.assertEqual(service.set_value(tcb, 49_000_000, self.now()).status, "lech")
+        after = item("TCB")
+        self.assertEqual((after["tien"], after["ngay"]), (49_000_000, "2026-11-01"))  # gốc đổi, ngày gửi giữ nguyên
+
+    def test_doi_chieu_ngan_khac_van_ghi_ngay_cap_nhat(self):
+        service.set_value(item("MoMo")["id"], 2_500_000, self.now())
+        self.assertEqual(item("MoMo")["ngay"], "2026-11-15")
+
     def test_nhac_va_viec_can_lam(self):
         self.assertIsNone(service.todo_count(date(2026, 11, 14)))
         self.assertEqual(service.todo_count(date(2026, 11, 15)), 4)
@@ -126,6 +147,19 @@ class Presentation(unittest.TestCase):
         text, rows = view.set_value_view(SetResult("khop", vcb, 30_000_000, 30_000_000, "đ"))
         self.assertTrue(text.endswith("· khớp"))
         self.assertEqual(rows, [[("🔄 Tiếp tục đối chiếu", "dc:xem")]])
+
+    def test_lech_duong_hoi_chi_tien_mat_truoc_khi_ghi_thu(self):
+        """Số thật cao hơn bot tính thường do chi tiền mặt/thẻ (bot đã trừ vào tài khoản): không mặc định ghi một khoản thu."""
+        vcb = {"id": 7, "loai": "tien", "ten": "VCB", "chinh": True}
+        text, rows = view.set_value_view(SetResult("lech", vcb, 24_950_000, 25_000_000, "đ", 50_000))
+        self.assertIn("🟢 VCB (chính): bot 24,95tr → thật 25tr · lệch +50k", text)
+        self.assertIn("Có khoản chi bạn trả bằng tiền mặt hoặc thẻ không?", text)
+        self.assertEqual(rows[0], [("✅ Chỉ sửa số dư (có chi tiền mặt/thẻ)", "dc:xem")])  # lựa chọn an toàn đứng đầu
+        self.assertEqual(rows[1], [("💰 Ghi 50k là thu chưa ghi", "dc:ghi:7")])
+        self.assertNotIn("Có khoản chi", view.set_value_view(SetResult("lech", vcb, 30_000_000, 29_500_000, "đ", -500_000))[0])
+        other = {"id": 8, "loai": "tien", "ten": "MoMo"}  # ngăn không phải tài khoản chính: không hỏi
+        self.assertEqual(view.set_value_view(SetResult("lech", other, 1_000_000, 1_500_000, "đ", 500_000))[1],
+                         [[("🔄 Tiếp tục đối chiếu", "dc:xem")]])
 
     def test_dong_khoan_lech_va_nhac(self):
         self.assertEqual(view.gap_booked_text(GapBooked("da_xu_ly")), "Khoản lệch này đã xử lý rồi")

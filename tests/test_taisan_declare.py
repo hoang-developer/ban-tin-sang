@@ -49,6 +49,16 @@ class DichVu(unittest.TestCase):
         self.assertEqual([(it["ten"], it["tien"]) for it in data["items"]], [("VCB", 30_000_000)])
         self.assertIsNone(declare.add_simple(data, "tien", ["VCB"]))
 
+    def test_cho_vay_them_thi_cong_don_khong_ghi_de(self):
+        """Lỗi cũ: "cho Hùng vay 2tr" rồi "thêm 1tr" ghi đè thành 1tr dù tài khoản đã bị trừ đủ 3tr."""
+        data = assets_repo.load()
+        self.assertIn("Đã thêm 🏠 Tài sản khác: Cho Hùng vay 2.000.000đ", declare.add_loan(data, "Hùng", 2_000_000))
+        text = declare.add_loan(data, "hùng", 1_000_000)  # cùng người, gõ khác hoa thường
+        self.assertIn("Đã cộng thêm vào 🏠 Tài sản khác: Cho Hùng vay +1.000.000đ → tổng 3.000.000đ", text)
+        declare.add_loan(data, "Tư", 500_000)  # người khác: khoản riêng
+        self.assertEqual([(it["ten"], it["tien"]) for it in data["items"]],
+                         [("Cho Hùng vay", 3_000_000), ("Cho Tư vay", 500_000)])
+
     def test_so_tiet_kiem(self):
         data = assets_repo.load()
         text = declare.add_saving(data, "BIDV 50tr 5,5% 6 thang 01/08/2026".split())

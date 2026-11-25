@@ -318,7 +318,8 @@ vàng, cổ phiếu, khoản nợ. Bot nối các ngăn thành một dòng tiề
   không tính (đã nằm trong số dư). Lệch với app ngân hàng thì bấm ✏️ Cập nhật số dư thật (hoặc nhắn lại câu trên).
 - **Chuyển giữa các ngăn trừ nơi đi, cộng nơi đến** (tài sản ròng không đổi): nạp/rút quỹ dự phòng, để/rút tiền quỹ
   chờ đầu tư (`để 4tr vào quỹ chờ`, `/dautu nap`, `/dautu rut`), phần tiền mua quỹ không lấy từ quỹ chờ, gửi tiết
-  kiệm, mua vàng, cho vay, mua bán cổ phiếu (không khai báo tài khoản DNSE thì tiền đi/về tài khoản chính), chuyển
+  kiệm, mua vàng, cho vay (cho cùng một người vay thêm thì **cộng dồn** vào khoản «Cho X vay», không ghi đè), mua bán
+  cổ phiếu (không khai báo tài khoản DNSE thì tiền đi/về tài khoản chính), chuyển
   giữa hai tài khoản của mình (`chuyển 5tr từ VCB sang MoMo`, `rút 2tr tiền mặt`; tài khoản đến chưa có thì tạo).
   Trả nợ là khoản chi nhóm Trả nợ nên tự trừ tài khoản chính và dư nợ. Thẻ xác nhận ghi rõ "Tiền từ VCB: còn ~…";
   tiền có sẵn ở chỗ khác thì bấm 🔁 Tiền có sẵn, không trừ. Lệnh mua quỹ đã đặt chưa khớp vẫn tính vào tài sản (theo
@@ -344,8 +345,12 @@ nào bằng 💰 Tiền của tôi → 🔄 Đối chiếu tháng hoặc `/doich
   số, ngoại tệ (số lượng), khoản nợ. Khớp bấm ✅ (hoặc ✅ Khớp hết phần còn lại), lệch bấm ✏️ rồi nhắn số thật.
 - Bot ghi đè số thật và lưu khoản lệch: `🔴 −465k VCB (chính): 29,5tr`, `🟢 +200k TCB: 50,2tr`, cuối màn hình Σ lệch
   tiền (không tính nợ). Nợ thì ngược màu: nợ thật nhiều hơn là 🔴.
-- **Tài khoản chính lệch**: chốt lại số dư, rồi hỏi «🧾 Ghi 465k là chi chưa ghi» (hoặc «💰 thu chưa ghi») hay «Chỉ sửa số
-  dư». Ghi thì vào báo cáo chi tiêu (nhóm Khác / Thu nhập) nhưng không trừ số dư lần nữa.
+- **Tài khoản chính lệch**: chốt lại số dư. Thật thấp hơn bot tính thì hỏi «🧾 Ghi 465k là chi chưa ghi» hay «Chỉ sửa số
+  dư». Thật cao hơn thì hỏi trước «có khoản chi trả bằng tiền mặt hoặc thẻ không» (bot đã trừ nó vào tài khoản nên số thật
+  cao hơn là bình thường), nút đầu là «✅ Chỉ sửa số dư», nút «💰 Ghi là thu chưa ghi» chỉ dùng khi đúng là tiền mới về. Ghi thì vào
+  báo cáo chi tiêu (nhóm Khác / Thu nhập) nhưng không trừ số dư lần nữa.
+- **Sổ tiết kiệm**: đối chiếu chỉ ghi lại số gốc thật, **không đổi ngày gửi, kỳ hạn, lãi suất** (ngày đối chiếu lưu riêng),
+  nên lãi dồn và ngày đáo hạn giữ nguyên.
 - **Quỹ mở còn lệnh chờ khớp hoặc hoán đổi đang chuyển**: chưa cho đối chiếu (⏳), vì khớp xong bot tự cộng ccq.
 - Vàng không có trong danh sách (mỗi lần mua có giá riêng, ít khi đổi): sửa ở 💼 Tài sản. Khai báo lại sổ tiết kiệm cùng
   tên thì cập nhật, không tạo sổ trùng.

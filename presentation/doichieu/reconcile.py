@@ -73,9 +73,16 @@ def set_value_view(r):
         return f"✅ {head} · khớp", screen_rows()
     note = (f"{color(r.gap, r.item['loai'] == 'no')} {head} · lệch "
             f"{'+' if r.gap > 0 else '−'}{amount_text(abs(r.gap), r.unit)}")
-    if r.item.get("chinh"):  # tài khoản chính lệch: thường là khoản chi (thu) quên ghi
-        label = f"🧾 Ghi {short(-r.gap)} là chi chưa ghi" if r.gap < 0 else f"💰 Ghi {short(r.gap)} là thu chưa ghi"
-        return note, [[(label, f"dc:ghi:{r.item['id']}"), ("Chỉ sửa số dư", "dc:xem")]]
+    if r.item.get("chinh"):
+        if r.gap < 0:  # số thật thấp hơn: thường là khoản chi quên ghi
+            label = f"🧾 Ghi {short(-r.gap)} là chi chưa ghi"
+            return note, [[(label, f"dc:ghi:{r.item['id']}"), ("Chỉ sửa số dư", "dc:xem")]]
+        # Số thật cao hơn: bot đã trừ mọi khoản chi vào tài khoản này, nên khoản chi trả bằng tiền mặt hay thẻ cũng
+        # làm số thật cao hơn. Hỏi trước, không mặc định ghi một khoản thu không có thật.
+        ask = ("\nCó khoản chi bạn trả bằng tiền mặt hoặc thẻ không? Bot đã trừ nó vào tài khoản này nên số thật mới "
+               "cao hơn. Nếu vậy chỉ cần sửa số dư; chỉ ghi là thu khi đúng là tiền mới về.")
+        return note + ask, [[("✅ Chỉ sửa số dư (có chi tiền mặt/thẻ)", "dc:xem")],
+                            [(f"💰 Ghi {short(r.gap)} là thu chưa ghi", f"dc:ghi:{r.item['id']}")]]
     return note, screen_rows()
 
 

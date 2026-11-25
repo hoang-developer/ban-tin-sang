@@ -91,7 +91,10 @@ def set_value(item_id, real, now):
             accounts.pin_balance(it, real)
         else:
             it["tien"] = real
-        it["ngay"] = day.isoformat()
+        if it["loai"] == "tietkiem":
+            it["doichieu"] = day.isoformat()  # it["ngay"] là ngày gửi, gốc tính lãi: đối chiếu không được đặt lại
+        else:
+            it["ngay"] = day.isoformat()
         if it["loai"] == "no" and real <= 0:
             it["xong"] = day.isoformat()
     else:
