@@ -44,7 +44,7 @@ class MoiManHinhCungMotSo(unittest.TestCase):
         if with_group:
             h.say("/nhom them 🏦 Trả nợ: trả nợ, thẻ tín dụng, trả thẻ")
         for text in ("+ lương 20tr", "quẹt thẻ mua tivi 10tr", "trả thẻ tín dụng 10tr", "ăn trưa 50k"):
-            h.say(text)
+            h.record(text)
 
     def check(self):
         report = h.say("/thang")[0]

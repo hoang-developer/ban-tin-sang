@@ -105,11 +105,11 @@ class Service(unittest.TestCase):
     def test_tien_nha_hai_thang_khong_nhan_doi(self):
         """Lỗi cũ: 45 ngày dữ liệu có hai lần trả nhà 5tr (01/10, 01/11) thì tiền nhà thành 10tr/tháng, mục tiêu quỹ +62%."""
         h.at(2026, 10, 1, 9)
-        h.say("tiền nhà 5tr")
+        h.record("tiền nhà 5tr")
         for d in range(1, 15):
             h.at(2026, 11, d, 9)
             if d == 1:
-                h.say("tiền nhà 5tr")
+                h.record("tiền nhà 5tr")
             h.say("ăn trưa 100k")
         h.at(2026, 11, 14, 10)
         _, by_group, days = service.essential(date(2026, 11, 14))
@@ -128,7 +128,7 @@ class Service(unittest.TestCase):
     def test_chi_thiet_yeu_it_ngay_khong_nhan_doi_tien_nha(self):
         for day, text in ((3, "tiền nhà 5tr"), (3, "tiền điện 5tr"), (10, "phở 40k"), (10, "đi chợ 300k")):
             h.at(2026, 11, day, 10)
-            h.say(text)
+            h.record(text)
         h.at(2026, 11, 18, 9)
         total, by_group, days = service.essential(h.CLOCK["now"].date())
         self.assertEqual(days, 16)
@@ -144,7 +144,7 @@ class Service(unittest.TestCase):
         debt = groups.find_group("trả nợ")
         self.assertTrue(debt)
         for text in ("trả góp tủ lạnh 5tr", "tiền nhà 5tr", "phở 40k"):
-            h.say(text)
+            h.record(text)
         h.at(2026, 11, 18, 9)
         total, by_group, _ = service.essential(h.CLOCK["now"].date())
         self.assertNotIn(debt, by_group)
@@ -155,7 +155,7 @@ class Service(unittest.TestCase):
     def test_hoa_don_the_va_no_vay_khong_tinh_du_nam_o_nha_cua(self):
         from repositories.chitieu import ledger as ledger_repo
         h.at(2026, 11, 5, 10)
-        h.say("tiền nhà 5tr")
+        h.record("tiền nhà 5tr")
         for ngay, tien, note in (("2026-11-05", 4_390_000, "thanh toán nợ vay"), ("2026-11-04", 440_000, "đóng thẻ tín dụng lpbank"),
                                  ("2026-11-06", 386_310, "thanh toán shopeepay")):
             ledger_repo.save({"id": ledger_repo.next_id(), "ngay": ngay, "tien": tien, "ghichu": note, "nhom": "nha", "ai": True})

@@ -319,7 +319,7 @@ class TrenBotNoCoLai(unittest.TestCase):
         text, _ = h.say("/no vay ngân hàng 100tr, trả 10tr/tháng, lãi 12%")
         self.assertIn("10tr/tháng · xong ~10/2027 (11 tháng)", text)  # trước đây: xong ~09/2027 (10 tháng)
         h.at(2026, 12, 25, 10)
-        text, _ = h.say("trả nợ vay ngân hàng 10tr")
+        text, _ = h.record("trả nợ vay ngân hàng 10tr")
         self.assertIn("còn 90,99tr · lần này gồm lãi 986k, gốc 9,01tr · còn 10 tháng, xong khoảng 10/2027", text)
         self.assertIn("còn 90,99tr · lãi 12%/năm", h.say("/no")[0])
 
@@ -338,7 +338,7 @@ class TrenBotNoCoLai(unittest.TestCase):
 
     def test_tra_du_co_canh_bao(self):
         h.say("/no Hùng 5tr, trả 5tr/tháng, lãi 12%")
-        text, _ = h.say("trả nợ Hùng 6tr")
+        text, _ = h.record("trả nợ Hùng 6tr")
         self.assertIn("Đã trả xong nợ Hùng", text)
         self.assertIn("Bạn trả dư", text)
 
@@ -346,7 +346,7 @@ class TrenBotNoCoLai(unittest.TestCase):
         text, _ = h.say("/no chú Tư 100tr, trả 10tr/tháng, không lãi")
         self.assertIn("10tr/tháng · xong ~09/2027 (10 tháng)", text)
         h.at(2026, 12, 25, 10)
-        text, _ = h.say("trả nợ chú Tư 10tr")
+        text, _ = h.record("trả nợ chú Tư 10tr")
         self.assertIn("còn 90tr · còn 9 tháng", text)
         self.assertNotIn("lần này gồm lãi", text)
 

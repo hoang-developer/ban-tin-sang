@@ -44,7 +44,7 @@ cũ/mới chỉ được khác đúng những ca đó.
 
 | # | Quyết định | Mặc định trong plan này | Cần chốt trước |
 |---|---|---|---|
-| A | Chính sách ghi | Chi nhỏ, rõ ràng (một số, có đơn vị, câu không phải hỏi/tương lai) thì **ghi ngay + ↩️ Hoàn tác**; còn lại qua thẻ "Mình hiểu là…". Ngưỡng ghi ngay đề xuất ≤ 2.000.000đ, chỉnh ở PR 2.1 | PR 2.1 |
+| A | Chính sách ghi | Chi nhỏ, rõ ràng (một số, có đơn vị, câu không phải hỏi/tương lai) thì **ghi ngay + ↩️ Hoàn tác**; còn lại qua thẻ "Mình hiểu là…". **Đã làm ở PR 2.1** với mặc định: ghi ngay tới 2.000.000đ, khoản thu do luật nhận ra ghi ngay, từ 50.000.000đ bấm hai lần (`domain/chitieu/risk.py`: `QUICK_LIMIT`, `DOUBLE_LIMIT`) | Đổi số khi cần |
 | B | Riêng tư với Gemini gói miễn phí | Giữ mức gửi hiện tại; GĐ3 chỉ gửi **số tổng hợp**, không gửi ghi chú tự do và tên riêng | PR 3.0 |
 | C | Bắt đầu từ đâu | Giai đoạn 1 | Ngay |
 

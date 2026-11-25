@@ -50,7 +50,7 @@ class KhongGhiThang(unittest.TestCase):
         self.assertEqual(count(), 1)
 
     def test_khoan_chi_thuong_van_ghi_ngay(self):
-        for text, added in (("cà phê 35k", 1), ("hôm qua mua laptop 20tr", 1), ("mua laptop 20tr", 1),
+        for text, added in (("cà phê 35k", 1), ("hôm qua mua áo 500k", 1), ("mua áo 500k", 1), ("+ lương 20tr", 1),
                             ("tiền điện định kỳ 500k", 1), ("trả Mai 500k", 1), ("sắp xếp tủ 50k", 1),
                             ("cà phê 35k\nphở 50k", 2), ("tối qua ăn lẩu 300k", 1)):
             before = count()

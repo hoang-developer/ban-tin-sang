@@ -4,6 +4,7 @@ import html
 import sys
 
 from domain.chitieu import guard
+from domain.chitieu import risk
 from domain.chitieu import parse as parse_rules
 from domain.chitieu.kinds import INCOME, OTHER
 from domain.chitieu.learn import pending
@@ -13,6 +14,7 @@ from domain.common.text import plain
 from infrastructure import ai as ai_client
 from interface import common
 from interface.chitieu import commands, features
+from interface.chitieu import context as chitieu_ctx
 from interface.chitieu.context import (CHI_BUTTONS, REPORT_BUTTONS, SORT_TITLE, entries_message, groups, name,
                                        report, reset, today)
 from presentation.chitieu.view import BOT_ECHO, NEED_STORE
@@ -118,6 +120,11 @@ def respond(text, now, chat=None):
         return BOT_ECHO
     if reason:
         return helper.ask_record(text, reason)
+    # khoản lớn, nhiều số tiền, ngày chưa tới: hỏi trước khi ghi. Ngày "dd/mm" chưa rõ thì record_text hỏi ngày trước
+    # (thẻ đó đã hiện nguyên tin, bấm chọn là ghi): mỗi lần chỉ một câu hỏi
+    if not parse_rules.first_vague_date(text, now.date()) and risk.text_level(
+            text, now.date(), lambda line: chitieu_ctx.parse_line(line, now.date())) != risk.GHI_NGAY:
+        return helper.ask_record(text, None, now.date())
     return record_text(text, now)
 
 def record_text(text, now):
