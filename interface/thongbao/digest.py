@@ -8,6 +8,7 @@ Tin theo sự kiện vẫn gửi riêng vì cần làm ngay: nhắc hạn đặt
 """
 import sys
 
+from domain.chitieu import flow
 from domain.chitieu.kinds import INCOME
 from interface.chitieu import features
 from repositories.chitieu import ledger as ledger_repo
@@ -68,8 +69,7 @@ def today_line(day):
     """'💸 Hôm nay chi 85k · trong mức (dư 246k)' theo con số mỗi ngày được tiêu."""
     from interface.kehoach import plan as kehoach
     group = features.sono().debt_group()[0]
-    spent = sum(e["tien"] for e in ledger_repo.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()
-                and e["nhom"] not in (INCOME, group) and not e.get("no"))
+    spent = flow.spent([e for e in ledger_repo.load(day.strftime("%Y-%m")) if e["ngay"] == day.isoformat()], group)
     s = kehoach.spendable_safe(day)
     if not s or s["per_day"] <= 0:
         return f"💸 Hôm nay chi {kehoach.short(spent)}"

@@ -57,7 +57,7 @@ CATEGORIES = {
     "khac": ("📦 Khác", []),
     "thu": ("💰 Thu nhập", [
         "lương", "nhận lương", "thưởng", "tiền thưởng", "hoa hồng", "lãi tiết kiệm", "cổ tức", "bán",
-        "thu nhập", "được cho", "được tặng", "hoàn tiền", "cashback", "freelance", "làm thêm"]),
+        "thu nhập", "được cho", "được tặng", "freelance", "làm thêm"]),
 }
 GENERIC = {"mua", "ăn", "quán", "học", "bánh", "nước", "xe"}  # từ chung chung: chỉ dùng khi không có từ nào rõ hơn
 MAX_LEARNED = 500  # số cụm từ học được tối đa

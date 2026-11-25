@@ -4,6 +4,7 @@ import statistics
 from calendar import monthrange
 from datetime import date, timedelta
 
+from domain.chitieu import flow
 from domain.chitieu import classify
 from domain.chitieu.kinds import INCOME
 from domain.chitieu.learn import learn_key
@@ -15,8 +16,9 @@ DAILY_DEFAULT = ["an", "cho", "xe"]  # ăn uống, đi chợ/siêu thị, đi l�
 SPIKE_MIN, SPIKE_RATIO = 300_000, 3  # khoản đột biến: từ 300k và gấp 3 lần mức thường (trung vị) của nhóm
 
 
-def spending(items):
-    return [e for e in items if e["nhom"] != INCOME]
+def spending(items, debt_group=None):
+    """Khoản chi thật: không thu, không trả gốc nợ (domain/chitieu/flow.py)."""
+    return flow.spending(items, debt_group)
 
 
 def total(items):

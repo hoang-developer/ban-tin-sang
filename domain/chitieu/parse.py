@@ -96,6 +96,10 @@ def read_tag(line, cfg):
     return None, " ".join(words[:n]).strip(" .,;:"), " ".join([before, *words[n:], after])
 
 
+# Hoàn tiền: giảm chi của nhóm gốc (khoản số âm), không phải thu nhập (so trên chữ đã bỏ dấu)
+REFUND = re.compile(r"(?<!\w)(?:hoan tien|hoan lai tien|duoc hoan|tien hoan|cashback|refund)(?!\w)")
+
+
 def parse_line(line, day, learned, cfg):
     """Một dòng tin nhắn -> khoản chi/thu (chưa có id), None nếu không có số tiền."""
     line = line.strip()
@@ -107,8 +111,11 @@ def parse_line(line, day, learned, cfg):
         return None
     amount, start, end = found
     note = " ".join((text[:start] + " " + text[end:]).split()).strip(" ,.:;-–")
-    e = {"ngay": when.isoformat(), "tien": amount, "ghichu": note,
-         "nhom": INCOME if income else chosen or classify(note, learned, cfg)}
+    refund = not income and REFUND.search(plain(note))
+    group = INCOME if income else chosen or classify(REFUND.sub(" ", plain(note)) if refund else note, learned, cfg)
+    e = {"ngay": when.isoformat(), "tien": amount, "ghichu": note, "nhom": group}
+    if refund and group != INCOME:  # "hoàn tiền áo 50k": Mua sắm −50k
+        e.update(tien=-amount, hoan=True)
     if missing:
         e["_tag"] = missing  # chưa có nhóm tên này: nhắc tạo nhóm
     if chosen and not income:

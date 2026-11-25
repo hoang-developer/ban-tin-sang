@@ -115,6 +115,10 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
 - `đóng họ 1tr #tiết kiệm`: tự chọn nhóm bằng dấu `#` (tên nhóm, gõ tắt hay không dấu đều được); bot nhớ
   cho lần sau
 - Nhiều khoản một lúc: mỗi khoản một dòng.
+- **Một định nghĩa "đã chi"** cho mọi màn hình ([domain/chitieu/flow.py](domain/chitieu/flow.py)): `/thang`, 🏠 Hôm nay,
+  ngân sách, dự báo, kế hoạch, tin tối, `/hoi` và số liệu gửi AI cùng một số. Thẻ tín dụng tính là chi **lúc quẹt**; trả thẻ,
+  trả góp, trả nợ là **trả gốc nợ**, không tính là chi lần nữa (và không tính là "để dành"). **Hoàn tiền**
+  (`hoàn tiền áo khoác 50k`, `cashback 20k`) trừ vào chi của nhóm gốc, không thành thu nhập; muốn ghi là thu thì thêm `+`.
 - **Không ghi trùng**: Telegram gửi lại một tin khi bot trả lời chậm (cùng `update_id`), hay bạn bấm đúp một nút, thì bot
   chỉ làm một lần ([interface/chitieu/dedupe.py](interface/chitieu/dedupe.py)). Hai tin nhắn khác nhau giống hệt nhau vẫn ghi hai khoản.
 - **Không ghi nhầm dự định hay tin bot gửi**: tin có số tiền nhưng nghe như dự định (`mai tôi định mua laptop 20tr`, `sẽ…`,
@@ -197,7 +201,7 @@ Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm
 | Lệnh | Làm gì |
 |---|---|
 | `/baocao` | Báo cáo kèm nút chọn kỳ: hôm nay, tuần này, tháng này, tháng trước |
-| `/homnay`, `/tuan`, `/thang` | Báo cáo nhanh; `/thang 10` cho tháng 10. Có tổng chi, từng nhóm, so với kỳ trước, thu, khoản lớn nhất |
+| `/homnay`, `/tuan`, `/thang` | Báo cáo nhanh; `/thang 10` cho tháng 10. Có tổng chi, từng nhóm, so với kỳ trước, thu, khoản lớn nhất. **Trả gốc nợ** (trả thẻ, trả góp, khoản gắn sổ nợ, nhóm Trả nợ) hiện dòng riêng, không tính là chi |
 | `/ngansach` | Ngân sách tháng: `/ngansach ăn uống 3tr`, `/ngansach tổng 15tr`, bỏ: `/ngansach ăn uống 0`. Ghi khoản mới thì bot báo ⚠️ khi quá 80%, 🚨 khi vượt |
 | `/lichsu` | 10 khoản gần nhất, bấm ❌ để xóa |
 | `/xoa` | Xóa khoản vừa ghi |

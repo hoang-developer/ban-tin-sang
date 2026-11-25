@@ -10,7 +10,8 @@ Trạng thái: **đã duyệt các mặc định ở mục 2** (25/11/2026). Ngu
 - **PR 0.3 (tiền phải có nguồn):** làm xong, khác kế hoạch ở một điểm: khoản nợ mới chỉ có nút «💰 Tiền vay đã vào <tài khoản chính>» (không nút "tài khoản khác"; không bấm nghĩa là khai báo nợ đang có). Tiền vào ví khác thì khai báo ví đó ở `/taisan`.
 - **PR 0.4 (sổ tiết kiệm đáo hạn và tất toán sớm):** làm xong. Lãi không kỳ hạn mặc định 0,5%/năm, chỉnh theo sổ bằng trường `lai_kkh` (chưa có lệnh riêng; người dùng nhập số thật nhận về khi tất toán).
 - **PR 0.5 (nợ có lãi giảm dần):** làm xong: lãi dồn theo ngày, trả lãi trước gốc, số kỳ theo công thức trả góp, cảnh báo mức trả không đủ lãi và trả dư. Dư nợ trong tài sản ròng vẫn là gốc đã ghi (chưa cộng lãi dồn chưa trả); phần lãi trong khoản trả chưa được tách ra khỏi "chi" (làm ở PR 0.6).
-- **Việc kế tiếp:** dừng báo bạn đổi sang Opus cho PR 0.6 (một định nghĩa dòng tiền) và 0.7 (kỳ lương).
+- **PR 0.6 (một định nghĩa dòng tiền):** làm xong (`domain/chitieu/flow.py`). Hoàn tiền lưu là khoản số âm ở nhóm gốc (cờ `hoan`), nên mọi tổng cộng thẳng là đúng mà không cần sửa từng chỗ. "Để dành thật" không còn tính trả nợ.
+- **Việc kế tiếp:** PR 0.7 (kế hoạch theo kỳ lương), PR 2.1 (chính sách rủi ro), vẫn Opus.
 
 Giai đoạn này đứng **trước** các giai đoạn của `docs/ke-hoach-tro-ly.md` vì trợ lý hội thoại (giai đoạn 3) đưa chính các con số này
 cho AI viết thành lời; số sai thì lời càng thuyết phục càng nguy hiểm.
