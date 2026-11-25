@@ -36,10 +36,12 @@ def morning(day):
     ts, sono = features.taisan(), features.sono()
     salary = part("nhắc lương", lambda: ts.salary_due(day))
     notes = part("đáo hạn", lambda: ts.maturity_notes(day)) or []
+    matured = part("sổ đã đáo hạn", lambda: ts.matured_prompts(day)) or []
     debts = part("nhắc nợ", lambda: sono.reminders(day))
     switches = part("hoán đổi quỹ", lambda: features.dautu().switch_prompts(day)) or []
     check = part("đối chiếu", lambda: __import__("interface.doichieu.reconcile", fromlist=["morning_part"]).morning_part(day))
-    parts = [salary, ("\n".join(notes), [[("💰 Tiền của tôi", "m:tien")]]) if notes else None, debts, *switches, check]
+    parts = [salary, ("\n".join(notes), [[("💰 Tiền của tôi", "m:tien")]]) if notes else None, *matured, debts, *switches,
+             check]
     return join(f"☀️ <b>Sáng {day:%d/%m}</b>", parts)
 
 

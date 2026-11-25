@@ -77,8 +77,10 @@ class Ban(unittest.TestCase):
     def test_tat_toan_so(self):
         before = self.main_balance()
         text = sales.close_saving("bidv", None, self.now)
-        self.assertIn("Tất toán sổ BIDV: gốc 50.000.000đ → nhận <b>50.037.671đ</b> (lãi 37.671đ)", text)
-        self.assertEqual(self.main_balance(), before + 50_037_671)
+        # sổ 6 tháng đáo hạn 20/04/2027, tất toán trước hạn: chỉ được lãi không kỳ hạn 0,5%/năm (lỗi cũ: đủ lãi 5,5% có kỳ hạn)
+        self.assertIn("Tất toán sổ BIDV: gốc 50.000.000đ → nhận <b>50.003.425đ</b> (lãi 3.425đ)", text)
+        self.assertIn("Rút trước hạn (20/04/2027) nên bot chỉ tính lãi không kỳ hạn", text)
+        self.assertEqual(self.main_balance(), before + 50_003_425)
         self.assertNotIn("BIDV", [it["ten"] for it in assets_repo.load()["items"] if "ten" in it])
         self.assertEqual(assets_repo.load().get("lailo", []), [])  # lãi tiết kiệm là thu nhập, không là lãi/lỗ mua bán
         self.assertIn("Không thấy sổ «zzz». Đang có: Sổ B", sales.close_saving("zzz", None, self.now))

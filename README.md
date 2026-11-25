@@ -301,7 +301,7 @@ Code ở [interface/taisan/assets.py](interface/taisan/assets.py) (lệnh, nút)
   | Loại | Khai báo | Giá |
   |---|---|---|
   | Tiền, tài khoản | `/taisan tien VCB 25tr` (cùng tên là cập nhật số dư) | Bạn tự cập nhật |
-  | Tiết kiệm | `/taisan tietkiem VCB 100tr 4,7% 6 thang 01/08/2026` | Bot tính lãi theo ngày, nhắc trước đáo hạn 3 ngày |
+  | Tiết kiệm | `/taisan tietkiem VCB 100tr 4,7% 6 thang 01/08/2026` | Bot tính lãi theo ngày, nhắc trước đáo hạn 3 ngày. **Tất toán trước hạn** chỉ được lãi không kỳ hạn (mặc định 0,5%/năm; ngân hàng trả khác thì nhắn «tất toán sổ VCB nhận về 100tr4»). **Đã đáo hạn**: lãi dừng ở ngày đáo hạn, tin sáng hỏi «🔁 Tái tục» (gốc + lãi, cùng kỳ hạn, tính từ ngày đáo hạn) hay «💸 Rút về tài khoản chính», nhắc lại sau 10 ngày nếu chưa trả lời |
   | Cổ phiếu | `/taisan cp FPT 1000 95` (số lượng, giá vốn) | Giá khớp gần nhất (Vietcap) |
   | ETF | `/taisan etf E1VFVN30 1000 30` (ETF VN30 của Dragon Capital; mã E1VF…, FUE… tự vào nhóm ETF) | Giá khớp gần nhất (Vietcap) |
   | Quỹ mở | `/taisan quy VCBF-FIF 1200 15000` | Giá chứng chỉ quỹ trên Fmarket |

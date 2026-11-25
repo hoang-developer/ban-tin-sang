@@ -43,8 +43,8 @@ from services.taisan.declare import (add_fx, add_gold, add_holding, add_loan, ad
 from services.taisan.flows import monthly_flows  # noqa: F401
 from services.taisan.prices import (SOURCES, coin_prices, fund_navs, fx_rates, gold_table, prices,  # noqa: F401
                                     stock_prices)
-from services.taisan.reminders import maturity_notes, salary_due  # noqa: F401
-from services.taisan.sales import (remove_by_id, close_saving, collect_loan, realize, remove_named, sell_fund,  # noqa: F401
+from services.taisan.reminders import maturity_notes, matured_prompts, salary_due  # noqa: F401
+from services.taisan.sales import (remove_by_id, renew_saving, early_close_date, close_saving, collect_loan, realize, remove_named, sell_fund,  # noqa: F401
                                    sell_gold)
 from services.taisan.trade import broker_cash, trade  # noqa: F401
 from services.taisan.valuation import compare_line, history, pending_orders, snapshot, valuation  # noqa: F401
@@ -250,4 +250,11 @@ def on_button(arg, message, now):
         return "Đã ghi lương", ("edit", lambda: (done + "\n" + hint[0], [hint[1]]) if hint else done)
     if arg == "chua":
         return "Mai bot hỏi lại", ("edit", lambda: "Chưa nhận lương: mai bot hỏi lại (tối đa 3 ngày)")
+    if arg.startswith(("taituc:", "rutso:")):  # sổ tiết kiệm đã đáo hạn: tái tục hay rút về tài khoản chính
+        kind, _, book = arg.partition(":")
+        it = next((x for x in assets_repo.load()["items"] if x["loai"] == "tietkiem" and str(x["id"]) == book), None)
+        if not it:
+            return "Sổ này không còn trong tài sản", ("edit", lambda: "Sổ này đã xử lý rồi hoặc không còn trong tài sản.")
+        note = renew_saving(book, day) if kind == "taituc" else close_saving(it["ten"], None, now)
+        return common.clip(common.strip_tags(note.splitlines()[0])), ("edit", lambda: (note, [[("💼 Tài sản", "m:ts")]]))
     return None, None

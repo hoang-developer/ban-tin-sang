@@ -3,6 +3,7 @@
 import html
 
 from domain.chitieu.kinds import INCOME
+from domain.common.dates import add_months
 from domain.common.format import vnd
 from domain.common.text import plain
 from domain.taisan import rules
@@ -54,8 +55,9 @@ def close_saving(name, received, now, to_main=True):
         books = [x["ten"] for x in data["items"] if x["loai"] == "tietkiem"]
         return (f"Không thấy sổ «{html.escape(name or '')}»" + (f". Đang có: {html.escape(', '.join(books))}" if books
                                                                   else ". Chưa có sổ tiết kiệm nào"))
-    interest, _ = rules.accrued(it, now.date())
-    received = round(received if received else it["tien"] + interest)
+    total, _, early, maturity = rules.payout(it, now.date())
+    guessed = not received  # số nhận về do bot tính (người dùng không nói)
+    received = round(received if received else total)
     gain = received - it["tien"]
     data["items"] = [x for x in data["items"] if x is not it]
     if gain > 0:
@@ -64,7 +66,37 @@ def close_saving(name, received, now, to_main=True):
     moved = accounts.move_main(data, received, f"tất toán sổ {it['ten']}", now.date()) if to_main else None
     assets_repo.save(data)
     return "\n".join([f"🐷 Tất toán sổ {html.escape(it['ten'])}: gốc {vnd(it['tien'])} → nhận <b>{vnd(received)}</b>"
-                      + (f" (lãi {vnd(gain)})" if gain else "")] + ([moved] if moved else []))
+                      + (f" (lãi {vnd(gain)})" if gain else "")]
+                     + ([f"⚠️ Rút trước hạn ({maturity:%d/%m/%Y}) nên bot chỉ tính lãi không kỳ hạn. Ngân hàng trả khác thì nhắn "
+                         f"«tất toán sổ {html.escape(it['ten'])} nhận về <số tiền>»"] if early and guessed else [])
+                     + ([moved] if moved else []))
+
+def early_close_date(name, day):
+    """Ngày đáo hạn nếu sổ tên `name` chưa tới hạn (tất toán lúc này là rút trước hạn, chỉ được lãi không kỳ hạn); None nếu không."""
+    it = rules.find_item(assets_repo.load(), name, ("tietkiem",))
+    if not it:
+        return None
+    _, _, early, maturity = rules.payout(it, day)
+    return maturity if early else None
+
+
+def renew_saving(item_id, day):
+    """Tái tục sổ đã tới hạn: gốc mới = gốc + lãi tới hạn, cùng kỳ hạn và lãi suất, tính từ ngày đáo hạn (như ngân hàng tự tái
+    tục). Trả câu báo."""
+    data = assets_repo.load()
+    it = next((x for x in data["items"] if x["loai"] == "tietkiem" and str(x["id"]) == str(item_id)), None)
+    if not it:
+        return "Sổ này không còn trong tài sản"
+    _, maturity = rules.accrued(it, day)
+    if not maturity or maturity > day:
+        return "Sổ này chưa tới hạn"
+    it.update(tien=round(it["tien"] + rules.accrued(it, day)[0]), ngay=maturity.isoformat())
+    assets_repo.save(data)
+    new_maturity = add_months(maturity, it["ky"])
+    return (f"🔁 Đã tái tục sổ {html.escape(it['ten'])}: gốc mới <b>{vnd(it['tien'])}</b> (gốc + lãi tới hạn), {it['ky']} tháng, lãi "
+            f"{qty_text(it['lai'])}%/năm tính từ {maturity:%d/%m/%Y}, đáo hạn {new_maturity:%d/%m/%Y}. Ngân hàng đổi lãi suất "
+            "thì khai báo lại: /taisan tietkiem …")
+
 
 def sell_fund(code, received, units, now, to_main=True):
     """Bán chứng chỉ quỹ: số ccq (None: tính theo NAV gần nhất), tiền nhận về. Trả câu báo."""
