@@ -212,6 +212,145 @@ class Presentation(unittest.TestCase):
         self.assertEqual(line, "Nợ: trả 2tr/tháng = 10% thu (nên < 30%) · nợ không lãi 10tr · ⬜ tháng này: a&lt;b")
 
 
+def loan(**kw):
+    """Vay 100tr lãi 12%/năm, khai báo 25/11/2026, trả 10tr/tháng từ tháng 12."""
+    d = {"id": 1, "loai": "no", "ten": "vay ngân hàng", "tien": 100_000_000, "goc": 100_000_000, "thang": 10_000_000,
+         "lai": 12.0, "ngay": "2026-11-25", "ngay_lai": "2026-11-25", "tu": "2026-12"}
+    d.update(kw)
+    return d
+
+
+class LaiGiamDan(unittest.TestCase):
+    """Lỗi cũ: nợ có lãi bị trừ như nợ không lãi (100tr, 12%, trả 10tr: còn 90tr, 10 kỳ; đúng ≈ 91tr, 11 kỳ)."""
+
+    def test_lai_don_theo_ngay_tren_du_no_giam_dan(self):
+        d = loan()
+        self.assertEqual(round(rules.accrued_interest(d, D(2026, 12, 25))), 986_301)  # 100tr × 12% × 30/365
+        self.assertEqual(rules.accrued_interest(d, D(2026, 11, 25)), 0)  # cùng ngày khai báo
+        self.assertEqual(rules.accrued_interest(d, D(2026, 11, 1)), 0)  # trước mốc: không âm
+        self.assertEqual(rules.accrued_interest(loan(lai=0), D(2026, 12, 25)), 0)  # không lãi
+        self.assertEqual(rules.accrued_interest(loan(lai=None), D(2026, 12, 25)), 0)  # chưa rõ lãi: không tự đoán
+
+    def test_so_ky_con_lai_theo_cong_thuc_tra_gop(self):
+        n, last = rules.schedule(loan(), D(2026, 11, 25))
+        self.assertEqual((n, last), (11, "2027-10"))  # trước đây bot báo 10 kỳ, xong 09/2027
+        self.assertEqual(rules.schedule(loan(lai=0), D(2026, 11, 25)), (10, "2027-09"))  # nợ không lãi giữ nguyên
+        self.assertEqual(rules.schedule(loan(lai=None), D(2026, 11, 25)), (10, "2027-09"))  # chưa rõ lãi: như không lãi
+
+    def test_muc_tra_khong_du_lai_thi_no_khong_bao_gio_het(self):
+        d = loan(thang=900_000)  # lãi một tháng 1tr > 900k
+        self.assertTrue(rules.interest_only(d))
+        self.assertIsNone(rules.schedule(d, D(2026, 11, 25)))
+        self.assertFalse(rules.interest_only(loan()))
+        self.assertTrue(rules.interest_only(loan(thang=1_000_000)))  # trả đúng bằng lãi tháng: dư nợ đứng yên, không bao giờ hết
+        self.assertFalse(rules.interest_only(loan(thang=1_100_000)))
+        self.assertFalse(rules.interest_only(loan(lai=0, thang=1)))
+
+    def test_tra_truoc_lai_roi_toi_goc(self):
+        d = loan()
+        pay = rules.apply_payment(d, {"ngay": "2026-12-25", "tien": 10_000_000}, "r1", D(2026, 12, 25))
+        self.assertEqual((d["tien"], pay.interest, pay.principal, pay.left), (90_986_301, 986_301 // 1, 9_013_699, 90_986_301))
+        self.assertEqual(pay.schedule, (10, "2027-10"))
+        self.assertEqual(d["ngay_lai"], "2026-12-25")  # lần sau dồn lãi từ đây
+        self.assertEqual((d["tra"][-1]["lai"], d["tra"][-1]["goc"]), (986_301, 9_013_699))
+
+    def test_tra_khong_du_lai_thi_lai_chua_tra_cong_vao_du_no(self):
+        d = loan(thang=500_000)
+        pay = rules.apply_payment(d, {"ngay": "2026-12-25", "tien": 500_000}, "r1", D(2026, 12, 25))
+        self.assertEqual((pay.interest, pay.principal), (500_000, 0))
+        self.assertEqual(d["tien"], 100_486_301)  # 986k lãi - 500k đã trả = 486k nợ thêm
+        self.assertTrue(pay.interest_only)
+
+    def test_tra_het_va_tra_du(self):
+        d = loan(tien=5_000_000)
+        pay = rules.apply_payment(d, {"ngay": "2026-12-25", "tien": 6_000_000}, "r1", D(2026, 12, 25))
+        self.assertEqual((d["tien"], pay.finished, pay.extra), (0, True, 6_000_000 - 5_000_000 - 49_315))  # lãi 30 ngày 49.315
+        self.assertEqual(d["xong"], "2026-12-25")
+
+    def test_hoan_tac_khoan_tra_tra_lai_dung_du_no_va_moc_lai(self):
+        d = loan()
+        e = {"ngay": "2026-12-25", "tien": 10_000_000}
+        rules.apply_payment(d, e, "r1", D(2026, 12, 25))
+        rules.undo_payment(d, e, "r1")
+        self.assertEqual((d["tien"], d["ngay_lai"], d["tra"]), (100_000_000, "2026-11-25", []))
+        small = loan(thang=500_000)
+        e = {"ngay": "2026-12-25", "tien": 500_000}
+        rules.apply_payment(small, e, "r2", D(2026, 12, 25))  # trả không đủ lãi: dư nợ tăng
+        rules.undo_payment(small, e, "r2")
+        self.assertEqual(small["tien"], 100_000_000)
+
+    def test_khoan_no_cu_chua_co_moc_lai_lay_ngay_tra_gan_nhat(self):
+        d = loan(ngay_lai=None, tra=[{"ngay": "2026-12-10", "tien": 1, "ref": "x"}])
+        d.pop("ngay_lai")
+        self.assertEqual(rules.accrual_start(d), D(2026, 12, 10))
+        d["tra"] = []
+        self.assertEqual(rules.accrual_start(d), D(2026, 11, 25))  # chưa trả lần nào: ngày khai báo dư nợ
+        self.assertIsNone(rules.accrual_start({"tien": 1}))
+
+    def test_no_khong_lai_khong_doi(self):
+        d = loan(lai=0)
+        pay = rules.apply_payment(d, {"ngay": "2026-12-25", "tien": 10_000_000}, "r1", D(2026, 12, 25))
+        self.assertEqual((d["tien"], pay.interest, pay.principal), (90_000_000, 0, None))
+        self.assertEqual(d["tra"][-1], {"ngay": "2026-12-25", "tien": 10_000_000, "ref": "r1"})  # không thêm trường lạ
+        self.assertEqual(d["ngay_lai"], "2026-11-25")  # nợ không lãi không dồn lãi, không đổi mốc
+
+    def test_khai_bao_dat_moc_dan_lai(self):
+        d = {"id": 1, "loai": "no", "ten": "x", "tien": 0}
+        info = {"con": 50_000_000, "goc": None, "thang": 5_000_000, "lai": 12.0, "ngay_tra": None, "nay": False}
+        rules.apply_info(d, info, D(2026, 11, 25), True)
+        self.assertEqual((d["ngay"], d["ngay_lai"]), ("2026-11-25", "2026-11-25"))
+        free = {"id": 2, "loai": "no", "ten": "y", "tien": 0}
+        rules.apply_info(free, {**info, "lai": 0}, D(2026, 11, 25), True)
+        self.assertNotIn("ngay_lai", free)  # nợ không lãi: dữ liệu như cũ
+        rules.apply_info(free, {"con": None, "goc": None, "thang": None, "lai": 12.0, "ngay_tra": None, "nay": False},
+                         D(2026, 12, 1), False)
+        self.assertEqual(free["ngay_lai"], "2026-12-01")  # chuyển sang nợ có lãi: dồn lãi từ ngày đó
+        rules.apply_info(free, {"con": None, "goc": None, "thang": 6_000_000, "lai": None, "ngay_tra": None, "nay": False},
+                         D(2026, 12, 20), False)
+        self.assertEqual(free["ngay_lai"], "2026-12-01")  # chỉ đổi mức trả: không dời mốc
+
+
+class TrenBotNoCoLai(unittest.TestCase):
+    def setUp(self):
+        h.reset()
+        h.at(2026, 11, 25, 10)
+
+    def test_kich_ban_100tr_lai_12_tra_10tr(self):
+        text, _ = h.say("/no vay ngân hàng 100tr, trả 10tr/tháng, lãi 12%")
+        self.assertIn("10tr/tháng · xong ~10/2027 (11 tháng)", text)  # trước đây: xong ~09/2027 (10 tháng)
+        h.at(2026, 12, 25, 10)
+        text, _ = h.say("trả nợ vay ngân hàng 10tr")
+        self.assertIn("còn 90,99tr · lần này gồm lãi 986k, gốc 9,01tr · còn 10 tháng, xong khoảng 10/2027", text)
+        self.assertIn("còn 90,99tr · lãi 12%/năm", h.say("/no")[0])
+
+    def test_xoa_khoan_tra_hoan_lai_du_no(self):
+        h.say("/no vay ngân hàng 100tr, trả 10tr/tháng, lãi 12%")
+        h.at(2026, 12, 25, 10)
+        h.say("trả nợ vay ngân hàng 10tr")
+        text, _ = h.say("/xoa")
+        self.assertIn("còn 100tr", h.say("/no")[0])
+
+    def test_muc_tra_khong_du_lai_co_canh_bao(self):
+        text, _ = h.say("/no vay ngân hàng 100tr, trả 500k/tháng, lãi 12%")
+        self.assertIn("chưa đủ trả lãi", text)
+        self.assertIn("nợ sẽ không giảm", text)
+        self.assertNotIn("xong ~", text)
+
+    def test_tra_du_co_canh_bao(self):
+        h.say("/no Hùng 5tr, trả 5tr/tháng, lãi 12%")
+        text, _ = h.say("trả nợ Hùng 6tr")
+        self.assertIn("Đã trả xong nợ Hùng", text)
+        self.assertIn("Bạn trả dư", text)
+
+    def test_no_khong_lai_nhu_cu(self):
+        text, _ = h.say("/no chú Tư 100tr, trả 10tr/tháng, không lãi")
+        self.assertIn("10tr/tháng · xong ~09/2027 (10 tháng)", text)
+        h.at(2026, 12, 25, 10)
+        text, _ = h.say("trả nợ chú Tư 10tr")
+        self.assertIn("còn 90tr · còn 9 tháng", text)
+        self.assertNotIn("lần này gồm lãi", text)
+
+
 class VayMoiCoTien(unittest.TestCase):
     """Lỗi cũ: vay mới 10tr chỉ ghi sổ nợ, tiền vay không vào tài khoản nên tài sản ròng giảm 10tr."""
 

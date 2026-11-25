@@ -4,7 +4,7 @@ import html
 from domain.common.format import short as format_short
 from presentation.chitieu.view import BACK
 from domain.taisan import text as taisan_text
-from domain.no.debt import Ask, month_left, month_of, paid_in, schedule, ym_text
+from domain.no.debt import Ask, interest_only, month_left, month_of, monthly_rate, paid_in, schedule, ym_text
 
 USAGE = ("💳 <b>Sổ nợ</b>\n"
          "• Thêm: /no chú Tư 300tr đã trả 32tr, trả 5tr/tháng, không lãi\n"
@@ -37,9 +37,19 @@ def interest_text(d):
 def plan_line(d, day):
     s = schedule(d, day)
     if not s:
+        if interest_only(d):
+            return interest_warning(d)
         return f"Chưa đặt mỗi tháng trả bao nhiêu: /no {html.escape(d['ten'])} trả 5tr/tháng"
     n, last = s
     return f"{short(d['thang'])}/tháng · xong ~{ym_text(last)} ({n} tháng)"
+
+
+def interest_warning(d):
+    """Nợ có lãi mà mức trả mỗi tháng không đủ trả lãi: dòng cảnh báo; chuỗi rỗng nếu không."""
+    if not interest_only(d):
+        return ""
+    return (f"⚠️ {short(d['thang'])}/tháng chưa đủ trả lãi (~{short(monthly_rate(d) * d['tien'])}/tháng): nợ sẽ không giảm, "
+            "cần trả nhiều hơn")
 
 
 def month_status(d, day):
@@ -59,13 +69,17 @@ def month_status(d, day):
 def payment_lines(p):
     """Các dòng báo sau khi trừ một khoản trả vào dư nợ (p: Payment)."""
     name = html.escape(p.name)
+    split = (f" · lần này gồm lãi {short(p.interest)}, gốc {short(p.principal or 0)}"
+             if p.interest and p.principal is not None else "")
+    extra = (f"\n⚠️ Bạn trả dư {short(p.extra)} so với số còn nợ (đã gồm lãi): kiểm tra lại số tiền nhé" if p.extra else "")
     if p.finished:
-        lines = [f"🎉 Đã trả xong nợ {name}!"]
+        lines = [f"🎉 Đã trả xong nợ {name}!{split}{extra}"]
         if p.monthly:
             lines.append(f"🔁 Từ tháng sau mỗi tháng dư ra {short(p.monthly)}: nên chuyển vào quỹ dự phòng (/kehoach)")
         return lines
-    return [f"💳 Đã trừ vào nợ {name}: còn {short(p.left)}"
-            + (f" · còn {p.schedule[0]} tháng, xong khoảng {ym_text(p.schedule[1])}" if p.schedule else "")]
+    return [f"💳 Đã trừ vào nợ {name}: còn {short(p.left)}{split}"
+            + (f" · còn {p.schedule[0]} tháng, xong khoảng {ym_text(p.schedule[1])}" if p.schedule else "")
+            + ("\n⚠️ Mức trả mỗi tháng chưa đủ trả lãi: nợ sẽ không giảm" if p.interest_only else "")]
 
 
 def declare_text(r, day):
