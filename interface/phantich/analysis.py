@@ -26,8 +26,8 @@ from presentation.phantich.view import (HOI_HELP, PALETTE, approx, budget_line, 
                                         times, trend, weekday_lines)
 from repositories.chitieu import budget as budget_repo
 from services.phantich import analysis as service
-from services.phantich.analysis import (allowance, clean_spec, daily_forecast, daily_groups, daily_spent,  # noqa: F401
-                                        forecast, habits, rule_spec, spendable, spike_limits, spec_for)
+from services.phantich.analysis import (about_spending, allowance, clean_spec, daily_forecast, daily_groups,  # noqa: F401
+                                        daily_spent, forecast, habits, rule_spec, spendable, spike_limits, spec_for)
 from services.phantich.analysis import ai_spec  # noqa: F401
 
 

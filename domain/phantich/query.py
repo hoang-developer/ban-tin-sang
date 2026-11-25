@@ -111,6 +111,20 @@ def rule_spec(question, day, cfg, learned):
     return spec
 
 
+# Chữ cho thấy câu hỏi nói về khoản chi đã ghi (đã bỏ dấu); chỉ có khoảng ngày ("hôm nay") thì chưa đủ
+SPENDING_WORDS = re.compile(r"(?<!\w)(?:chi tieu|chi phi|khoan chi|da chi|da tieu|tieu het|tieu bao|tieu nhieu|chi bao|chi nhieu|"
+                            r"chi gi|tieu gi|het bao|ton bao|ton het|ton nhieu|mua gi)(?!\w)")
+
+
+def about_spending(question, day, cfg, learned):
+    """Câu hỏi này nói về khoản chi/thu đã ghi trong sổ (có chữ chi/tiêu/tốn, tên nhóm, món đã học, hoặc hỏi thu nhập)?
+    Câu hỏi khác ("bitcoin giá bao nhiêu hôm nay") không: trả bằng sổ chi tiêu là trả lời sai."""
+    if SPENDING_WORDS.search(" ".join(plain(question).replace("?", " ").split())):
+        return True
+    spec = rule_spec(question, day, cfg, learned)
+    return bool(spec["nhom"] or spec["tu_khoa"] or spec["thu"])
+
+
 def clean_spec(raw, day, cfg):
     """Kiểm tra bộ lọc AI đưa: ngày hợp lệ, không quá hôm nay, nhóm có thật, từ khóa ngắn."""
     def when(key, default):

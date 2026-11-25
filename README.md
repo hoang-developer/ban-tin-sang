@@ -115,6 +115,12 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
 - `đóng họ 1tr #tiết kiệm`: tự chọn nhóm bằng dấu `#` (tên nhóm, gõ tắt hay không dấu đều được); bot nhớ
   cho lần sau
 - Nhiều khoản một lúc: mỗi khoản một dòng.
+- **Không ghi trùng**: Telegram gửi lại một tin khi bot trả lời chậm (cùng `update_id`), hay bạn bấm đúp một nút, thì bot
+  chỉ làm một lần ([interface/chitieu/dedupe.py](interface/chitieu/dedupe.py)). Hai tin nhắn khác nhau giống hệt nhau vẫn ghi hai khoản.
+- **Không ghi nhầm dự định hay tin bot gửi**: tin có số tiền nhưng nghe như dự định (`mai tôi định mua laptop 20tr`, `sẽ…`,
+  `tháng sau…`) hay câu hỏi giả định (`nếu mua xe 30tr thì sao`) thì bot **chưa ghi**, hỏi lại bằng thẻ «💸 Ghi là khoản chi /
+  ❌ Không ghi». Dán lại tin bot vừa gửi (hoặc cả báo cáo) cũng không bị ghi thành khoản mới. Luật ở
+  [domain/chitieu/guard.py](domain/chitieu/guard.py); `định kỳ`, `cố định`, `sắp xếp` không bị nhầm là dự định.
 - 📷 **Gửi ảnh** hóa đơn hoặc màn hình chuyển khoản: bot đọc rồi ghi (xem mục Ghi bằng ảnh).
 
 **Nhắn câu thường, không cần nhớ lệnh** ([interface/troly/assistant.py](interface/troly/assistant.py), cần bật AI): ngoài khoản chi, bot hiểu cả các việc khác
@@ -132,7 +138,9 @@ và chỉ ghi sau khi bạn bấm ✅ trên thẻ "Mình hiểu là…" (có nú
 Cách chạy: khoản chi thường ("cà phê 35k") vẫn ghi ngay, không qua AI. Tin có chữ dễ là việc khác (chuyển, nạp, vàng,
 vay, quỹ, tiết kiệm…) hoặc không có số tiền thì AI phân loại thành "việc" kèm các trường; code kiểm tra lại từng trường
 (số tiền đối chiếu với số đọc được trong câu), tính toán và ghi bằng các hàm sẵn có. AI bảo là khoản chi thì bot nhớ, lần
-sau ghi ngay. AI bận: bot hỏi lại bằng nút ("Ghi là khoản chi" / "Không ghi"), không tự đoán. AI nhận thêm tên các khoản
+sau ghi ngay. AI bận: bot hỏi lại bằng nút ("Ghi là khoản chi" / "Không ghi"), không tự đoán. Tổng thời gian chờ AI của một tin
+có hạn **50 giây** ([infrastructure/ai.py](infrastructure/ai.py), `ai.deadline`): hàm Vercel bị cắt ở 60 giây, quá hạn thì coi
+như AI bận thay vì để người dùng không nhận được câu trả lời nào. AI nhận thêm tên các khoản
 nợ, tài khoản, mã quỹ của bạn (không kèm số tiền) để gọi đúng tên. Thử một câu mà không ghi gì: mở
 `https://ban-tin-sang.vercel.app/api/chitieu?hieu=mua 2 chỉ vàng nhẫn hết 27tr` (tối đa 40 câu mỗi ngày, không gửi tên
 riêng cho AI).
@@ -242,6 +250,9 @@ Số liệu luôn do bot tự tính từ sổ; AI (nếu bật) chỉ hiểu câ
   so với, nhiều nhất, liệt kê, … không/chưa ở cuối) là câu hỏi, bot không ghi thành khoản. Dòng đầu câu
   trả lời cho biết bot hiểu thế nào (khoảng ngày, nhóm, chữ cần có trong ghi chú) để bạn kiểm tra. Có AI
   thì AI hiểu câu hỏi; AI bận/hết lượt thì bot tự hiểu theo cách đơn giản (thời gian, tên nhóm, từ khóa).
+  Câu hỏi **không nói về khoản chi đã ghi** (`bitcoin giá bao nhiêu`, `lãi suất ngân hàng bao nhiêu?`) không bao giờ được trả
+  bằng sổ chi tiêu: AI bận hoặc chưa bật thì bot nói thật là chưa trả lời được, kèm nút Tiền, Nợ, Chi tiêu
+  (`about_spending` ở [domain/phantich/query.py](domain/phantich/query.py): có chữ chi/tiêu/tốn, tên nhóm, món đã học hay hỏi thu nhập).
 - **Biểu đồ** (`/bieudo`, nút 📈): vẽ bằng [QuickChart](https://quickchart.io) (miễn phí), chỉ gửi tên
   nhóm và số tiền, không gửi ghi chú.
 - **Nhận xét** (`/nhanxet`, nút 💬, tự gửi ngày 1): tổng, so với kỳ trước và trung bình 3 tháng, nhóm

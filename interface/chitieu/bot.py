@@ -3,6 +3,7 @@ dòng phụ, và lượt bấm nút của mọi chức năng. Chỗ duy nhất b
 import html
 import sys
 
+from domain.chitieu import guard
 from domain.chitieu import parse as parse_rules
 from domain.chitieu.kinds import INCOME, OTHER
 from domain.chitieu.learn import pending
@@ -14,7 +15,7 @@ from interface import common
 from interface.chitieu import commands, features
 from interface.chitieu.context import (CHI_BUTTONS, REPORT_BUTTONS, SORT_TITLE, entries_message, groups, name,
                                        report, reset, today)
-from presentation.chitieu.view import NEED_STORE
+from presentation.chitieu.view import BOT_ECHO, NEED_STORE
 from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
 from services.chitieu import ledger
@@ -103,12 +104,20 @@ def respond(text, now, chat=None):
     if known is not None:
         return known
     question = features.phantich().is_question(text)
-    if question and not (ai_client.key() and helper.beyond_spending(text)):
+    # Chỉ câu hỏi nói về khoản chi/thu đã ghi mới vào sổ chi tiêu; câu hỏi khác ("bitcoin giá bao nhiêu") để AI hiểu,
+    # AI bận thì nói thật là chưa trả lời được, không đem tổng chi ra đáp
+    if question and features.phantich().about_spending(text, now.date()) and not (
+            ai_client.key() and helper.beyond_spending(text)):
         return features.phantich().hoi(text, now.date())  # câu hỏi về chi tiêu đã ghi
     if question or helper.wants(text):  # không phải khoản chi thường: nhờ AI hiểu câu
         reply = helper.understand(text, now, chat, question)
         if reply is not None:
             return reply
+    reason = guard.skip_reason(text)  # dự định, câu hỏi giả định, tin bot bị dán lại: không bao giờ ghi thẳng vào sổ
+    if reason == "dan_lai":
+        return BOT_ECHO
+    if reason:
+        return helper.ask_record(text, reason)
     return record_text(text, now)
 
 def record_text(text, now):

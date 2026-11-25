@@ -1184,6 +1184,21 @@ def ask_date(text, vague, today):
              [("📌 Hôm nay", f"y:chi:{cid}:nay"), ("❌ Không ghi", f"y:huy:{cid}")]])
 
 
+SKIP_WHY = {"tuong_lai": "nghe như một dự định, chưa phải khoản đã chi",
+            "gia_su": "nghe như một câu hỏi giả định, chưa phải khoản đã chi",
+            "hoi": "nghe như một câu hỏi, không phải khoản đã chi"}
+
+
+def ask_record(text, reason):
+    """Tin có số tiền nhưng nghe như dự định, câu hỏi giả định hay câu hỏi (domain/chitieu/guard.py): chưa ghi, hỏi
+    bằng thẻ. Đã chi thật thì bấm 💸 để ghi nguyên tin."""
+    cid = kho.command("INCR", keys.CARD_COUNTER)
+    kho.put(keys.card(cid), {"viec": "_chi", "cau": text.strip()[:300]}, CARD_SECONDS)
+    quoted = html.escape(text.strip()[:80])
+    return (f"🤔 «{quoted}» {SKIP_WHY.get(reason, SKIP_WHY['hoi'])}, nên mình chưa ghi. Nếu đã chi thật thì bấm nút dưới.",
+            [[("💸 Ghi là khoản chi", f"y:chi:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")], [chitieu_ctx.BACK]])
+
+
 def handle(a, text, now, chat):
     """Xử lý một việc AI vừa hiểu. Trả câu trả lời; None nếu là khoản chi thường (ghi như cũ)."""
     job = a["viec"]
@@ -1226,6 +1241,14 @@ def quick(text, now):
     return None
 
 
+def cannot_answer(text):
+    """Câu hỏi ngoài sổ chi tiêu mà AI không trả lời được (bận, hết lượt, chưa bật): nói thật và đưa các màn hình có sẵn."""
+    quoted = html.escape(text.strip()[:80])
+    return (f"🤔 Mình chưa trả lời được «{quoted}»: câu này ngoài sổ chi tiêu, mà AI đang bận hoặc chưa bật. Bạn thử lại "
+            "sau ít phút, hoặc xem số liệu có sẵn:",
+            [[("💰 Tiền của tôi", "m:tien"), ("💳 Sổ nợ", "no:xem")], [("📊 Chi tiêu tháng", "bc:thang"), chitieu_ctx.BACK]])
+
+
 def understand(text, now, chat, question=False):
     """Hiểu một tin tự do. Trả câu trả lời; None nếu là khoản chi thường (để ghi như cũ). question: tin là câu hỏi,
     AI bận thì trả lời bằng sổ chi tiêu như trước."""
@@ -1240,7 +1263,9 @@ def understand(text, now, chat, question=False):
     except Exception as e:
         print(f"[lỗi] AI hiểu câu: {e!r}", file=sys.stderr)
         if question:
-            return features.phantich().hoi(text, now.date())
+            if features.phantich().about_spending(text, now.date()):
+                return features.phantich().hoi(text, now.date())  # câu hỏi về chi tiêu đã ghi: sổ trả lời được
+            return cannot_answer(text)  # ngoài sổ chi tiêu: nói thật, không đem tổng chi ra đáp
         if parse_amount(text) and re.match(r"tra (?:no|gop|tien)(?!\w)", plain(text.strip())):
             return None  # "trả nợ chú Tư 5tr": ghi như trước, sổ nợ tự trừ
         return unsure(text, down=True)

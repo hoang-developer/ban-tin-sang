@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -25,6 +26,7 @@ AI_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Không thêm openrouter/free: nó chọn ngẫu nhiên model miễn phí, có lần chỉ đúng 7/13.
 AI_MODELS = "nvidia/nemotron-3-ultra-550b-a55b:free,dots-studio/dots-3-note-preview:free"
 AI_TIMEOUT = 25  # giây; model miễn phí có "suy nghĩ" trước khi trả lời nên chậm, quá thì thôi
+REPLY_RESERVE = 4  # giây chừa lại sau lượt gọi AI cuối để còn gửi câu trả lời (hạn của hàm Vercel là 60 giây)
 # Đọc ảnh: model Gemini ở trên đều xem được ảnh; trên OpenRouter phải dùng model riêng (thử 04/11/2026:
 # Nemotron 3.5 Super VL đọc đúng số tiền 6/6 ảnh mẫu)
 AI_VISION_MODELS = "nvidia/nemotron-3.5-super-vl:free"
@@ -80,6 +82,34 @@ def post(payload, url=None, key_=None, timeout=AI_TIMEOUT):
         raise RuntimeError(f"AI báo lỗi {e.code}: {message}") from None
 
 
+_deadline = None  # thời điểm (time.monotonic) mọi lượt gọi AI của lượt xử lý hiện tại phải xong; None: không giới hạn
+
+
+class deadline:
+    """with ai.deadline(50): ... — mọi lượt gọi AI trong khối (cộng dồn, kể cả nhiều lần chat nối tiếp) phải xong trước
+    `seconds` giây kể từ lúc vào khối, chừa REPLY_RESERVE giây để gửi câu trả lời. Mỗi chat có budget riêng nhưng nhiều chat
+    nối tiếp (hiểu câu, rồi xếp nhóm, rồi số liệu...) từng có thể cộng quá 60 giây của Vercel: hàm bị cắt, người dùng không
+    nhận được câu trả lời."""
+
+    def __init__(self, seconds):
+        self.seconds = seconds
+
+    def __enter__(self):
+        global _deadline
+        self.previous = _deadline
+        end = time.monotonic() + self.seconds
+        _deadline = end if self.previous is None else min(end, self.previous)
+
+    def __exit__(self, *exc):
+        global _deadline
+        _deadline = self.previous
+
+
+def time_left():
+    """Số giây còn lại cho AI trong khối ai.deadline; None nếu không đặt hạn."""
+    return None if _deadline is None else _deadline - time.monotonic() - REPLY_RESERVE
+
+
 def chat(system, user, max_tokens=2000, image=None, timeout=AI_TIMEOUT, budget=45):
     """Hỏi AI một lượt: (câu trả lời đã bỏ phần "suy nghĩ", model đã trả lời). Thử lần lượt từng nhà cung cấp,
     từng model; tất cả đều lỗi (mạng, bận, hết lượt...) thì báo lỗi. image=(bytes, kiểu ảnh) để gửi kèm ảnh.
@@ -96,6 +126,9 @@ def chat(system, user, max_tokens=2000, image=None, timeout=AI_TIMEOUT, budget=4
             [(m, {}) for m in models]
         for model, extra in tries:
             left = budget - (datetime.now() - started).total_seconds()
+            overall = time_left()
+            if overall is not None:
+                left = min(left, overall)  # hạn chung của cả lượt xử lý (ai.deadline)
             if left < 5:
                 errors.append(f"{provider} {model}: hết thời gian chờ")
                 continue

@@ -132,6 +132,10 @@ def clean_spec(raw, day):
     return query.clean_spec(raw, day, groups_repo.config())
 
 
+def about_spending(question, day):
+    return query.about_spending(question, day, groups_repo.config(), groups_repo.learned())
+
+
 def query_items(spec):
     """(các khoản khớp bộ lọc trong kỳ, các khoản khớp trong kỳ đem so hoặc None nếu không phải câu so sánh)."""
     items = [e for e in ledger_repo.between(spec["tu"], spec["den"]) if query.matches(e, spec)]
