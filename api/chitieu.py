@@ -17,6 +17,7 @@ from interface.docanh import photo as docanh  # noqa: E402
 from infrastructure import kho  # noqa: E402
 from interface.chitieu import bot as chitieu_bot  # noqa: E402
 from interface.chitieu import context as chitieu_ctx  # noqa: E402
+from interface.chitieu import dedupe  # noqa: E402
 from repositories.chitieu import groups as groups_repo  # noqa: E402
 from services.chitieu import ai_sort  # noqa: E402
 from infrastructure import telegram as tg  # noqa: E402
@@ -53,6 +54,9 @@ def handle_message(message, tok):
 def handle_button(query, tok):
     chat_id = ((query.get("message") or {}).get("chat") or {}).get("id")
     if str(chat_id) not in chitieu_ctx.owner_chats():
+        tg.call("answerCallbackQuery", tok, callback_query_id=query["id"])
+        return
+    if dedupe.repeated_press(query):  # bấm đúp: lượt đầu đang làm, lượt này chỉ cho nút thôi quay
         tg.call("answerCallbackQuery", tok, callback_query_id=query["id"])
         return
     tg.handle_button(query, chitieu_bot.on_button, datetime.now(VN_TZ), tok)
@@ -119,10 +123,14 @@ def app(environ, start_response):
         length = int(environ.get("CONTENT_LENGTH") or 0)
         update = json.loads(environ["wsgi.input"].read(length))
         with kho.memo():  # đọc trùng trong một tin thì dùng lại, đỡ hàng chục lần gọi Redis
-            if "callback_query" in update:
-                handle_button(update["callback_query"], tok)
+            if not dedupe.start(update):  # Telegram gửi lại tin đã/đang xử lý: bỏ qua, không ghi lần hai
+                print(f"[bỏ] tin {update.get('update_id')} đã nhận trước đó", file=sys.stderr)
             else:
-                handle_message(update.get("message") or {}, tok)
+                if "callback_query" in update:
+                    handle_button(update["callback_query"], tok)
+                else:
+                    handle_message(update.get("message") or {}, tok)
+                dedupe.finish(update)
     except Exception as e:
         print(f"[lỗi] {e!r}", file=sys.stderr)
     # Luôn trả 200, kẻo Telegram gửi lại mãi một tin nhắn gây lỗi

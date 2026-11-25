@@ -100,6 +100,14 @@ def benchmark_usage(day):
     return f"chitieu:danhgia:{day}"  # số lượt ?danhgia= trong ngày (INCR)
 
 
+def update_seen(update_id):
+    return f"chitieu:capnhat:{update_id}"  # cờ: tin Telegram (update_id) đang/đã xử lý, chống xử lý trùng khi Telegram gửi lại
+
+
+def button_press(chat, message_id, digest):
+    return f"chitieu:bam:{chat}:{message_id}:{digest}"  # cờ vài giây: cùng nút trên cùng tin vừa bấm, chống bấm đúp
+
+
 def image_seen(unique_id):
     return f"chitieu:anh:{unique_id}"  # cờ: ảnh (mã Telegram) đã ghi, tránh ghi trùng
 

@@ -6,7 +6,9 @@ gói miễn phí, OpenRouter dự phòng) chỉ được gọi ở các ô màu 
 ```mermaid
 flowchart TD
     U([📱 Tin nhắn Telegram]) --> W[api/chitieu.py<br/>webhook]
-    W --> P{Ảnh?}
+    W --> D{interface/chitieu/dedupe:<br/>tin đã nhận trước đó,<br/>hoặc bấm đúp một nút?}
+    D -- trùng --> X[Bỏ qua, vẫn trả 200]
+    D -- mới --> P{Ảnh?}
     P -- có --> V[🤖 LLM đọc ảnh<br/>docanh.py]
     V --> VK{Loại ảnh}
     VK -- hóa đơn, chuyển khoản --> REC

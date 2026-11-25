@@ -38,6 +38,7 @@ GOLDEN = {  # chép từ main trước khi refactor
     keys.debt_reminder(3, "2026-11", "truoc"): "chitieu:nhac:no:3:2026-11:truoc",
     keys.saving_maturity_reminder(5, "2026-12-01"): "chitieu:nhac:daohan:5:2026-12-01",
     keys.conversation(42): "chitieu:cho:42", keys.conversation(None): "chitieu:cho:0",
+    keys.update_seen(123): "chitieu:capnhat:123", keys.button_press(1, 55, "ab12"): "chitieu:bam:1:55:ab12",
     keys.card(9): "chitieu:the:9",
     keys.ai_usage("2026-11-15"): "chitieu:hieu:thu:2026-11-15",
     keys.benchmark_usage("2026-11-15"): "chitieu:danhgia:2026-11-15",
