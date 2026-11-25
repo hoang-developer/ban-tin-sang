@@ -2,7 +2,7 @@
 import unittest
 
 from tests import harness as h
-from tests.test_dongtien import item, main_balance, set_main
+from tests.test_dongtien import item, main_balance, net, set_main
 
 from interface.danhgia import benchmark as danhgia
 from infrastructure import kho
@@ -60,6 +60,30 @@ class ViecMoi(unittest.TestCase):
         _, done, _ = h.press(h.button(buttons, "y:ok:"))
         self.assertIn("Đã xóa MoMo", done)
         self.assertFalse(any(it.get("ten") == "MoMo" for it in ts.load()["items"]))
+
+
+class ChoVayNhieuLan(unittest.TestCase):
+    def setUp(self):
+        h.reset()
+        set_main(30_000_000)
+
+    def lend(self, sentence, amount):
+        _, buttons = ask(sentence, {"viec": "cho_vay", "ten": "Hùng", "tien": amount})
+        return h.press(h.button(buttons, "y:ok:"))[1]
+
+    def test_cho_vay_hai_lan_cong_don_tai_san_rong_khong_doi(self):
+        """Lỗi cũ: lần hai ghi đè còn 1tr trong khi tài khoản chính đã trừ đủ 3tr, tài sản ròng hụt 2tr."""
+        before = net()
+        self.lend("cho Hùng vay 2tr", 2_000_000)
+        done = self.lend("cho Hùng vay thêm 1tr", 1_000_000)
+        self.assertIn("Đã cộng thêm vào 🏠 Tài sản khác: Cho Hùng vay +1.000.000đ → tổng 3.000.000đ", done)
+        self.assertEqual(item("Cho Hùng vay")["tien"], 3_000_000)
+        self.assertEqual(main_balance(), 27_000_000)
+        self.assertEqual(net(), before)  # cho vay chỉ chuyển tiền từ ngăn này sang ngăn khác
+        _, buttons = ask("Hùng trả 1tr", {"viec": "thu_no", "ten": "Hùng", "tien": 1_000_000})
+        _, done, _ = h.press(h.button(buttons, "y:ok:"))
+        self.assertIn("Cho Hùng vay: đã thu 1.000.000đ · còn 2.000.000đ", done)  # chưa "trả hết" như lỗi cũ
+        self.assertEqual(net(), before)
 
 
 class NhieuViec(unittest.TestCase):

@@ -34,6 +34,18 @@ def add_simple(data, kind, args):
                           "ngay": clock.now_vn().date().isoformat()})
     return f"✅ Đã thêm {TYPES[kind]}: {html.escape(name)} {vnd(amount)}"
 
+def add_loan(data, borrower, amount):
+    """Cho người khác vay (chưa lưu): khoản phải thu "Cho X vay" thuộc Tài sản khác. Người này đã có khoản phải thu thì
+    cộng dồn (cho vay thêm), không ghi đè như khai báo số dư."""
+    name = f"Cho {borrower} vay"[:30]
+    for it in data["items"]:
+        if it["loai"] == "khac" and accounts.same_name(it["ten"], name):
+            it.update(tien=it["tien"] + amount, ngay=clock.now_vn().date().isoformat())
+            return (f"✅ Đã cộng thêm vào {TYPES['khac']}: {html.escape(it['ten'])} +{vnd(amount)} → "
+                    f"tổng {vnd(it['tien'])}")
+    return add_simple(data, "khac", [name, f"{amount}đ"])
+
+
 def add_saving(data, args):
     text = " ".join(args)
     bare = plain(text)

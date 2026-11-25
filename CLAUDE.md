@@ -6,7 +6,7 @@ Hai bot Telegram tiếng Việt chạy trên Vercel (Python, chỉ dùng thư vi
 - **Bot chi tiêu** (`api/chitieu.py`): nhắn "cà phê 35k" thì ghi và tự xếp nhóm; kèm tài sản, nợ, tiết kiệm, quỹ dự phòng, đầu tư quỹ mở, kế hoạch chia lương, trợ lý hiểu câu thường (AI Gemini, gói miễn phí).
 - **Việc theo giờ** (`api/tick.py`): được gọi mỗi 15 phút (cron-job.org, GitHub Actions dự phòng) để chạy `interface/lich/jobs.py`.
 
-Mô tả cho người dùng ở `README.md`; lịch sử và lý do refactor ở `plan.md`; luồng xử lý tin nhắn ở `docs/luong-tin-nhan.md`.
+Mô tả cho người dùng ở `README.md`; lịch sử và lý do refactor ở `plan.md`; luồng xử lý tin nhắn ở `docs/luong-tin-nhan.md`; kế hoạch đang làm ở `docs/ke-hoach-nghiep-vu.md` (sửa số liệu sai, giai đoạn 0) và `docs/ke-hoach-tro-ly.md` (trợ lý hiểu câu thường): đọc hai file này trước khi đổi nghiệp vụ.
 
 ## Kiến trúc: 6 lớp, mỗi lớp một thư mục, bên trong chia theo chức năng
 
@@ -67,7 +67,7 @@ Mỗi chức năng thường có: `domain/<cn>/` (luật), `services/<cn>/` (d�
 python -m unittest discover -s tests -t . -v
 ```
 
-- CI `kiemthu` (`.github/workflows/kiemthu.yml`, Python 3.12) chạy lệnh trên cho mỗi push vào `main` và mỗi pull request. Hiện 467 test, chạy trong vài giây; không gọi Telegram, Redis, Fmarket hay AI thật.
+- CI `kiemthu` (`.github/workflows/kiemthu.yml`, Python 3.12) chạy lệnh trên cho mỗi push vào `main` và mỗi pull request. Hiện hơn 480 test, chạy trong vài giây; không gọi Telegram, Redis, Fmarket hay AI thật.
 - `tests/harness.py` dựng bot chạy trong bộ nhớ: kho Redis giả (`h.STORE`), AI giả (`h.AI.replies`, `h.AI.photo`), đồng hồ (`h.CLOCK`, `h.at(...)`), tin gửi đi (`h.SENT`); gọi bot bằng `h.say(text)`, `h.press(data)`, `h.send_photo()`. Test nào thay `ai_client.chat` hay hàm mạng phải trả lại bằng `addCleanup`, nếu không các test khác vỡ.
 - `tests/test_kientruc.py` giữ luật 6 lớp; `tests/test_keys.py` cấm viết khóa Redis ngoài `repositories/keys.py`.
 - Khi tách/chuyển code: chạy bản mới và bản `main` cũ trên cùng đầu vào giả rồi so kết quả, lỗi in ra và các lệnh ghi Redis (phương pháp dùng suốt đợt refactor, chi tiết ở `plan.md`).

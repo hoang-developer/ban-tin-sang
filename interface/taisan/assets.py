@@ -38,7 +38,8 @@ from repositories.vang import gold as gold_repo
 from services.taisan import declare, health as health_service
 from services.taisan.accounts import (can_be_main, find_account, main_account, main_balance, main_flows,  # noqa: F401
                                       move_main, pick_main, pin_balance, same_name, set_main)
-from services.taisan.declare import add_fx, add_gold, add_holding, add_saving, add_saving_item, add_simple  # noqa: F401
+from services.taisan.declare import (add_fx, add_gold, add_holding, add_loan, add_saving,  # noqa: F401
+                                     add_saving_item, add_simple)
 from services.taisan.flows import monthly_flows  # noqa: F401
 from services.taisan.prices import (SOURCES, coin_prices, fund_navs, fx_rates, gold_table, prices,  # noqa: F401
                                     stock_prices)
