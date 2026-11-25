@@ -13,6 +13,7 @@ import re
 import unicodedata
 from calendar import monthrange
 from dataclasses import dataclass, field
+from datetime import date
 
 from domain.common.money import parse_amount
 from domain.common.text import plain
@@ -88,11 +89,40 @@ def month_left(d, ym):
     return left if left > need * 0.02 else 0
 
 
+def monthly_rate(d):
+    """Lãi mỗi tháng (số thập phân) của khoản nợ có lãi: lãi %/năm / 12 / 100; 0 nếu không lãi hoặc chưa rõ lãi."""
+    return (d.get("lai") or 0) / 1200
+
+
+def interest_only(d):
+    """Khoản nợ có lãi mà mức trả mỗi tháng không đủ trả lãi một tháng: nợ sẽ không bao giờ hết."""
+    return bool(d.get("thang")) and d["tien"] > 0 and monthly_rate(d) > 0 and d["thang"] <= monthly_rate(d) * d["tien"] + 1e-9
+
+
+def accrual_start(d):
+    """Ngày bắt đầu dồn lãi: lần dồn gần nhất (ngay_lai); khoản cũ chưa có thì ngày trả gần nhất, không thì ngày khai báo
+    dư nợ; None nếu không có ngày nào."""
+    raw = d.get("ngay_lai") or (d["tra"][-1]["ngay"] if d.get("tra") else None) or d.get("ngay")
+    return date.fromisoformat(raw) if raw else None
+
+
+def accrued_interest(d, day):
+    """Lãi dồn của khoản nợ có lãi từ lần cập nhật dư nợ gần nhất tới `day`, theo dư nợ giảm dần: dư nợ × lãi%/năm × số ngày
+    / 365. 0 nếu không lãi, chưa rõ lãi hay hết nợ."""
+    start = accrual_start(d)
+    if not d.get("lai") or d["tien"] <= 0 or not start:
+        return 0.0
+    return d["tien"] * d["lai"] / 100 * max((day - start).days, 0) / 365
+
+
 def schedule(d, day):
-    """(số kỳ còn lại, tháng trả xong 'YYYY-MM') của khoản có mức trả mỗi tháng; None nếu chưa đặt."""
-    if not d.get("thang") or d["tien"] <= 0:
+    """(số kỳ còn lại, tháng trả xong 'YYYY-MM') của khoản có mức trả mỗi tháng; None nếu chưa đặt hoặc nợ có lãi mà mức trả
+    không đủ trả lãi. Nợ có lãi tính theo dư nợ giảm dần: n = -ln(1 - r·B/P) / ln(1 + r) (r lãi tháng, B dư nợ, P mức trả)."""
+    if not d.get("thang") or d["tien"] <= 0 or interest_only(d):
         return None
-    n = math.ceil(d["tien"] / d["thang"] - 1e-9)
+    r = monthly_rate(d)
+    n = (math.ceil(-math.log(1 - r * d["tien"] / d["thang"]) / math.log(1 + r) - 1e-9) if r > 0
+         else math.ceil(d["tien"] / d["thang"] - 1e-9))
     ym = month_of(day)
     start = max(d.get("tu") or ym, ym)
     if start == ym and is_due(d, ym) and not month_left(d, ym):
@@ -211,9 +241,12 @@ def parse_debt(text):
 
 def apply_info(d, info, day, created):
     """Áp các trường đã đọc (trừ tên) vào khoản nợ d (chưa lưu): số còn nợ, tổng nợ, mức trả, lãi, hạn, kỳ trả đầu."""
+    was_bearing = bool(d.get("lai"))
     for field_name in ("goc", "thang", "lai", "ngay_tra"):
         if info[field_name] is not None:
             d[field_name] = info[field_name]
+    if d.get("lai") and (info["con"] is not None or not was_bearing):
+        d["ngay_lai"] = day.isoformat()  # mốc dồn lãi: số còn nợ mới khai báo, hoặc vừa chuyển sang nợ có lãi
     if info["con"] is not None:
         d["tien"] = info["con"]
         d["ngay"] = day.isoformat()
@@ -235,23 +268,45 @@ class Payment:
     left: int
     monthly: int | None  # mức trả mỗi tháng của khoản nợ (nếu có)
     schedule: tuple | None  # (số kỳ còn lại, tháng xong) nếu còn nợ và có mức trả
+    interest: int = 0  # nợ có lãi: phần lãi trong khoản trả lần này (lãi dồn tới ngày trả, trả trước)
+    principal: int | None = None  # nợ có lãi: phần trả gốc (có thể 0 nếu không đủ trả lãi)
+    extra: int = 0  # số trả dư hơn gốc + lãi còn nợ (người dùng nên kiểm tra lại số tiền)
+    interest_only: bool = False  # mức trả mỗi tháng không đủ trả lãi
 
 
 def apply_payment(d, e, reference, day):
-    """Trừ khoản trả e vào nợ d (chưa lưu)."""
-    d["tien"] = max(0, d["tien"] - e["tien"])
-    d.setdefault("tra", []).append({"ngay": e["ngay"], "tien": e["tien"], "ref": reference})
+    """Trừ khoản trả e vào nợ d (chưa lưu). Nợ không lãi: trừ thẳng. Nợ có lãi: lãi dồn tới ngày trả (dư nợ × lãi × số ngày /
+    365) được trả trước, phần còn lại mới trừ gốc; trả không đủ lãi thì lãi chưa trả cộng vào dư nợ."""
+    amount = e["tien"]
+    before = d["tien"]
+    interest = accrued_interest(d, date.fromisoformat(e["ngay"]))
+    owed = before + interest
+    d["tien"] = max(0, round(owed - amount))
+    rec = {"ngay": e["ngay"], "tien": amount, "ref": reference}
+    extra = 0
+    paid_interest = principal = None
+    if d.get("lai"):  # nợ có lãi: nhớ phần lãi/gốc và mốc dồn lãi cũ để hoàn tác được
+        paid_interest = round(min(amount, interest))
+        principal = max(0, round(min(amount, owed)) - paid_interest)
+        extra = max(0, round(amount - owed))
+        rec.update(lai=paid_interest, goc=principal, giam=before - d["tien"], tu=d.get("ngay_lai"))
+        d["ngay_lai"] = e["ngay"]
+    d.setdefault("tra", []).append(rec)
     d["tra"] = d["tra"][-60:]
     if d["tien"] <= 0:
         d["xong"] = day.isoformat()
-        return Payment(d["ten"], True, 0, d.get("thang"), None)
-    return Payment(d["ten"], False, d["tien"], d.get("thang"), schedule(d, day))
+        return Payment(d["ten"], True, 0, d.get("thang"), None, paid_interest or 0, principal, extra)
+    return Payment(d["ten"], False, d["tien"], d.get("thang"), schedule(d, day), paid_interest or 0, principal, extra,
+                   interest_only(d))
 
 
 def undo_payment(d, e, reference):
-    """Khoản trả e bị xóa hoặc bỏ trừ: cộng lại dư nợ d (chưa lưu)."""
+    """Khoản trả e bị xóa hoặc bỏ trừ: cộng lại dư nợ d (chưa lưu). Nợ có lãi: hoàn lại đúng phần dư nợ đã giảm và mốc dồn lãi."""
+    rec = next((p for p in d.get("tra", []) if p.get("ref") == reference), None)
     d["tra"] = [p for p in d.get("tra", []) if p.get("ref") != reference]
-    d["tien"] += e["tien"]
+    d["tien"] += rec["giam"] if rec and "giam" in rec else e["tien"]
+    if rec and rec.get("tu"):
+        d["ngay_lai"] = rec["tu"]
     d.pop("xong", None)
 
 

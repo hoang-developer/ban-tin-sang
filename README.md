@@ -401,6 +401,12 @@ Code ở [interface/no/debt.py](interface/no/debt.py). Khoản nợ lưu chung v
   trả tháng này); chưa trả tháng này thì thêm `tháng này chưa trả`. Lần đầu bot tạo nhóm chi 🏦 Trả nợ.
   Khoản nợ **mới thêm** (và đã có tài khoản chính) thì bot hỏi thêm «tiền vay đã về VCB chưa?» với nút «💰 Tiền vay đã vào
   VCB»: bấm thì cộng tiền vào tài khoản (một lần), tài sản ròng mới đúng; chỉ khai báo nợ đang có thì không bấm.
+- **Nợ có lãi tính theo dư nợ giảm dần**: lãi dồn theo ngày từ lần cập nhật dư nợ gần nhất (dư nợ × lãi %/năm × số ngày / 365).
+  Mỗi lần trả, lãi được trả trước rồi mới trừ gốc, tin báo ghi «lần này gồm lãi 986k, gốc 9,01tr»; trả không đủ lãi thì phần lãi
+  chưa trả cộng vào dư nợ. Số tháng còn lại tính theo công thức trả góp (nợ 100tr, lãi 12%, trả 10tr/tháng: 11 tháng, tổng lãi
+  khoảng 5,9tr; nợ không lãi vẫn chia thẳng, 10 tháng). Mức trả mỗi tháng không đủ trả lãi thì bot cảnh báo nợ sẽ không giảm; trả dư
+  hơn gốc + lãi còn nợ thì báo phần dư. Xóa một khoản trả thì dư nợ và mốc dồn lãi trở về như trước. Dư nợ trong tài sản ròng
+  là gốc đã ghi, chưa gồm lãi dồn chưa trả.
 - **`/no`**: mỗi khoản còn bao nhiêu / tổng ban đầu, thanh tiến độ, có lãi hay không, mỗi tháng trả bao nhiêu, còn
   mấy tháng và tháng nào xong, tháng này đã trả chưa (nút ✅ Trả). Khoản sắp xong thì báo trước mỗi tháng dư ra bao
   nhiêu.
