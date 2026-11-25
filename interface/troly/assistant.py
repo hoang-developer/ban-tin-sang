@@ -1184,6 +1184,21 @@ def ask_date(text, vague, today):
              [("📌 Hôm nay", f"y:chi:{cid}:nay"), ("❌ Không ghi", f"y:huy:{cid}")]])
 
 
+SKIP_WHY = {"tuong_lai": "nghe như một dự định, chưa phải khoản đã chi",
+            "gia_su": "nghe như một câu hỏi giả định, chưa phải khoản đã chi",
+            "hoi": "nghe như một câu hỏi, không phải khoản đã chi"}
+
+
+def ask_record(text, reason):
+    """Tin có số tiền nhưng nghe như dự định, câu hỏi giả định hay câu hỏi (domain/chitieu/guard.py): chưa ghi, hỏi
+    bằng thẻ. Đã chi thật thì bấm 💸 để ghi nguyên tin."""
+    cid = kho.command("INCR", keys.CARD_COUNTER)
+    kho.put(keys.card(cid), {"viec": "_chi", "cau": text.strip()[:300]}, CARD_SECONDS)
+    quoted = html.escape(text.strip()[:80])
+    return (f"🤔 «{quoted}» {SKIP_WHY.get(reason, SKIP_WHY['hoi'])}, nên mình chưa ghi. Nếu đã chi thật thì bấm nút dưới.",
+            [[("💸 Ghi là khoản chi", f"y:chi:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")], [chitieu_ctx.BACK]])
+
+
 def handle(a, text, now, chat):
     """Xử lý một việc AI vừa hiểu. Trả câu trả lời; None nếu là khoản chi thường (ghi như cũ)."""
     job = a["viec"]

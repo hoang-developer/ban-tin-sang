@@ -12,6 +12,8 @@ from domain.chitieu.text import short
 from domain.common.format import vnd
 
 NEED_STORE = "⚠️ Bot chi tiêu cần kho dữ liệu (Upstash Redis trên Vercel), xem README."
+BOT_ECHO = ("🙅 Tin này giống tin bot đã gửi nên mình không ghi. Muốn ghi khoản nào thì nhắn riêng từng khoản, "
+            "ví dụ <b>cà phê 35k</b>.")
 SORT_TITLE = "🗂"  # tin /chuaxep bắt đầu bằng biểu tượng này, vẽ lại vẫn giữ kiểu tin
 
 BACK = ("⬅️ Hôm nay", "m:home")  # nút quay về màn hình 🏠 Hôm nay (interface/menu/screens.py)

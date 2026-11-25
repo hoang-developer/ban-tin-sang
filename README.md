@@ -117,6 +117,10 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
 - Nhiều khoản một lúc: mỗi khoản một dòng.
 - **Không ghi trùng**: Telegram gửi lại một tin khi bot trả lời chậm (cùng `update_id`), hay bạn bấm đúp một nút, thì bot
   chỉ làm một lần ([interface/chitieu/dedupe.py](interface/chitieu/dedupe.py)). Hai tin nhắn khác nhau giống hệt nhau vẫn ghi hai khoản.
+- **Không ghi nhầm dự định hay tin bot gửi**: tin có số tiền nhưng nghe như dự định (`mai tôi định mua laptop 20tr`, `sẽ…`,
+  `tháng sau…`) hay câu hỏi giả định (`nếu mua xe 30tr thì sao`) thì bot **chưa ghi**, hỏi lại bằng thẻ «💸 Ghi là khoản chi /
+  ❌ Không ghi». Dán lại tin bot vừa gửi (hoặc cả báo cáo) cũng không bị ghi thành khoản mới. Luật ở
+  [domain/chitieu/guard.py](domain/chitieu/guard.py); `định kỳ`, `cố định`, `sắp xếp` không bị nhầm là dự định.
 - 📷 **Gửi ảnh** hóa đơn hoặc màn hình chuyển khoản: bot đọc rồi ghi (xem mục Ghi bằng ảnh).
 
 **Nhắn câu thường, không cần nhớ lệnh** ([interface/troly/assistant.py](interface/troly/assistant.py), cần bật AI): ngoài khoản chi, bot hiểu cả các việc khác
