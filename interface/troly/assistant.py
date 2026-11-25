@@ -17,6 +17,7 @@ from datetime import date, timedelta
 
 from infrastructure import kho
 from repositories import keys
+from domain.chitieu import parse as parse_rules
 from domain.chitieu.kinds import INCOME
 from domain.chitieu.learn import learn_key
 from domain.common.format import vnd
@@ -1170,6 +1171,19 @@ def unsure(text, down=False):
             [[("➕ Thêm tài sản, nợ", "y:them"), ("🏠 Menu", "m:home")]])
 
 
+def ask_date(text, vague, today):
+    """Tin có ngày "dd/mm" sau hôm nay (chưa rõ khoản sắp tới hay của năm trước): chưa ghi, hỏi bằng thẻ. Bấm một lựa
+    chọn thì ghi lại tin với ngày đã chọn (nút y:chi:<thẻ>:toi|trc|nay)."""
+    soon, earlier, raw = vague
+    cid = kho.command("INCR", keys.CARD_COUNTER)
+    kho.put(keys.card(cid), {"viec": "_chi", "cau": text.strip()[:300], "mohu": True}, CARD_SECONDS)
+    quoted = html.escape(text.strip()[:80])
+    return (f"📅 «{quoted}»: <b>{raw}</b> chưa tới (hôm nay {today:%d/%m/%Y}). Đây là khoản sắp tới hay của năm "
+            f"trước?",
+            [[(f"📅 {soon:%d/%m/%Y} (sắp tới)", f"y:chi:{cid}:toi"), (f"🗓 {earlier:%d/%m/%Y} (năm trước)", f"y:chi:{cid}:trc")],
+             [("📌 Hôm nay", f"y:chi:{cid}:nay"), ("❌ Không ghi", f"y:huy:{cid}")]])
+
+
 def handle(a, text, now, chat):
     """Xử lý một việc AI vừa hiểu. Trả câu trả lời; None nếu là khoản chi thường (ghi như cũ)."""
     job = a["viec"]
@@ -1375,7 +1389,8 @@ def on_button(arg, message, now):
         return "Đã bỏ", ("edit", lambda: "Đã bỏ, không ghi gì.")
     if kind == "chi" and a.get("viec") == "_chi":
         kho.delete(keys.card(cid))
-        return "Đã ghi", ("edit", lambda: chitieu_bot.record_text(a["cau"], now))
+        text = parse_rules.resolve_vague(a["cau"], option, now.date()) if a.get("mohu") else a["cau"]
+        return "Đã ghi", ("edit", lambda: chitieu_bot.record_text(text, now))
     if kind == "nguon":
         a["san"] = not a.get("san")
         return None, ("edit", lambda: card(a, chat, cid))

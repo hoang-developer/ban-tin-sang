@@ -24,7 +24,7 @@ from repositories.chitieu import groups as groups_repo
 from repositories.chitieu import ledger as ledger_repo
 from services.chitieu import ai_sort, ledger
 from services.chitieu.groups import (MAX_GROUPS, MAX_WORDS, NHOM_USAGE, add_words, after_change,  # noqa: F401
-                                     nhom_them)
+                                     forget_learned, nhom_them)
 
 MAX_GROUPS, MAX_WORDS = 20, 60  # số nhóm tự tạo, số từ khóa tự thêm cho mỗi nhóm
 ai_key = ai_client.key
@@ -133,11 +133,38 @@ def nhom_xoa(rest):
     return (f"✅ Đã ẩn nhóm {name(code, cfg)}: không còn trên nút chọn, bot không xếp vào nữa. Khoản cũ giữ "
             f"nguyên. Dùng lại: /nhom them {html.escape(bare(name(code, cfg)))}")
 
+def nhom_hoc(rest):
+    """/nhom hoc: các cụm bot đã học, gom theo nhóm; /nhom hoc xoa <cụm>: bỏ một cụm học nhầm."""
+    words = rest.split()
+    if words and plain(words[0]) in ("xoa", "bo"):
+        phrase = " ".join(words[1:])
+        if not phrase:
+            return "Bỏ cụm học nhầm: /nhom hoc xoa bò"
+        gone = forget_learned(phrase)
+        if not gone:
+            return f"Không thấy cụm «{html.escape(phrase)}» trong những cụm đã học. Xem danh sách: /nhom hoc"
+        return (f"✅ Đã bỏ cụm {html.escape(', '.join(gone))}: lần sau bot xếp theo từ khóa, hoặc hỏi lại nhóm. "
+                "Khoản đã ghi giữ nguyên nhóm.")
+    learned = groups_repo.learned()
+    if not learned:
+        return "Bot chưa học cụm nào: mỗi lần bạn bấm chọn nhóm cho một khoản, bot nhớ cụm đó cho lần sau."
+    by_group = {}
+    for key, code in learned.items():
+        by_group.setdefault(code, []).append(key)
+    lines = [f"🧠 <b>Cụm bot đã học</b> ({len(learned)}), từ những lần bạn tự chọn nhóm",
+             "<i>Cụm 1 chữ chỉ áp dụng khi cả ghi chú là chữ đó; cụm 2 chữ trở lên áp dụng ở bất kỳ chỗ nào trong câu.</i>"]
+    for code, keys in by_group.items():
+        keep = keys[:15]
+        more = f" …+{len(keys) - len(keep)}" if len(keys) > len(keep) else ""
+        lines.append(f"{html.escape(name(code))}: " + html.escape(", ".join(keep)) + more)
+    lines.append("\nBỏ cụm học nhầm: /nhom hoc xoa bò")
+    return "\n".join(lines)
+
 def nhom_cmd(args):
     action = plain(args[0]) if args else ""
     rest = " ".join(args[1:])
     for words, handler in [(("them", "tao", "moi"), nhom_them), (("tukhoa", "tu", "tk"), nhom_tukhoa),
-                           (("doiten", "ten", "sua"), nhom_doiten), (("xoa",), nhom_xoa)]:
+                           (("doiten", "ten", "sua"), nhom_doiten), (("xoa",), nhom_xoa), (("hoc",), nhom_hoc)]:
         if action in words:
             return handler(rest)
     learned = groups_repo.learned()
