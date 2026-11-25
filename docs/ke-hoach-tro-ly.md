@@ -2,6 +2,11 @@
 
 Trạng thái: **bản nháp chờ duyệt** (25/11/2026). Mỗi mục "PR" là một pull request nhỏ, làm theo quy trình ở cuối file.
 
+**Cập nhật 25/11/2026: thêm giai đoạn 0 (sửa nghiệp vụ) đứng trước giai đoạn 3.** Hội đồng 4 Business Analyst tìm ra các
+lỗi số liệu (thẻ tín dụng tính hai lần, "mỗi ngày được tiêu" sai, quỹ chờ tự sinh tiền…); chi tiết ở
+`docs/ke-hoach-nghiep-vu.md` (PR 0.1 → 0.11). Thứ tự chung: PR 0.1, 0.2 → giai đoạn 1 → PR 0.3 → 0.5 → 🔁 Opus: PR 0.6, 0.7, 2.1 →
+🔁 Sonnet: PR 0.8 → 0.11, 2.2 → 2.6 → giai đoạn 3 → giai đoạn 4. Hoàn tác theo việc (PR 2.4) cũng là nơi xử lý lỗi `/xoa` xóa sai việc.
+
 ## 1. Mục tiêu và ba nguyên tắc
 
 Người dùng nhắn gì bot cũng hiểu và trả lời, và **hiểu đúng ý trước khi làm**, gần như trò chuyện với Claude nhưng là trợ lý
@@ -51,8 +56,8 @@ Tôi không tự đổi được model của phiên. Tới mốc 🔁 tôi **d�
 
 | Phần | Model | Vì sao |
 |---|---|---|
-| PR 1.1 → 1.5, 2.2 → 2.6, 3.1 → 3.3, 3.5 → 3.7, GĐ4 | **Sonnet 5.5** (đang dùng) | Việc có đặc tả rõ, test và CI kiểm lại được |
-| 🔁 **PR 2.1** (chính sách rủi ro) | **Opus 5.5** | Sai ở đây là ghi sai tiền, test khó bắt hết |
+| PR 0.1 → 0.5, 1.1 → 1.5, 0.8 → 0.11, 2.2 → 2.6, 3.1 → 3.3, 3.5 → 3.7, GĐ4 | **Sonnet 5.5** (đang dùng) | Việc có đặc tả rõ, test và CI kiểm lại được |
+| 🔁 **PR 0.6, 0.7** (định nghĩa dòng tiền, kỳ lương) và **PR 2.1** (chính sách rủi ro), làm liền nhau | **Opus 5.5** | Sai ở đây là số sai ở mọi màn hình hoặc ghi sai tiền, test khó bắt hết |
 | 🔁 **PR 3.0** (thiết kế planner) và **PR 3.4** (prompt + định tuyến planner) | **Opus 5.5** | Thiết kế mở, không có đáp án đúng để test sẵn |
 | 🔁 **PR 3.8** (rà soát cuối giai đoạn 3) | **Fable 5.2** nếu còn hạn mức tuần riêng, không thì Opus 5.5 | Một lượt đọc lại toàn bộ thay đổi tìm chỗ hở |
 
