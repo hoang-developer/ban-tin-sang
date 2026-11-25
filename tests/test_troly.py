@@ -161,7 +161,10 @@ class TroLy(unittest.TestCase):
 
     def test_nhan_luong_khong_co_dau_cong_van_la_khoan_thu(self):
         h.AI.replies["nhận lương tháng 11 19tr"] = {"viec": "thu", "tien": 19000000, "ghi_chu": "lương tháng 11"}
-        text, _ = h.say("nhận lương tháng 11 19tr")
+        text, buttons = h.say("nhận lương tháng 11 19tr")
+        self.assertIn("Mình hiểu là", text)  # AI hiểu là khoản thu lớn: qua thẻ (domain/chitieu/risk.py)
+        self.assertEqual(h.month_entries(), [])
+        _, text, _ = h.press(h.button(buttons, "y:ok:"))
         self.assertIn("Đã ghi 19.000.000đ", text)
         self.assertEqual([(e["tien"], e["nhom"], e["ghichu"]) for e in h.month_entries()],
                          [(19_000_000, "thu", "lương tháng 11")])
@@ -181,17 +184,17 @@ class TroLy(unittest.TestCase):
     def test_tra_no_ghi_nguyen_cau_va_tru_du_no(self):
         sono.declare("chú Tư 20tr, trả 5tr/tháng, không lãi, tháng này chưa trả", h.CLOCK["now"].date())
         h.AI.replies["trả nợ chú Tư 5tr"] = {"viec": "tra_no", "ten": "chú Tư", "tien": 5000000}
-        text, _ = h.say("trả nợ chú Tư 5tr")
+        text, _ = h.record("trả nợ chú Tư 5tr")
         self.assertIn("Đã ghi 5.000.000đ", text)
         self.assertEqual(sono.active()[0]["tien"], 15_000_000)
         h.AI.replies.clear()  # lần sau không cần AI
         calls = len(h.AI.calls)
-        h.say("trả nợ chú Tư 5tr")
+        h.record("trả nợ chú Tư 5tr")
         self.assertEqual((len(h.AI.calls), sono.active()[0]["tien"]), (calls, 10_000_000))
 
     def test_tra_no_khi_ai_ban_van_ghi_nhu_truoc(self):
         sono.declare("chú Tư 20tr, trả 5tr/tháng, không lãi, tháng này chưa trả", h.CLOCK["now"].date())
-        text, _ = h.say("trả nợ chú Tư 5tr")
+        text, _ = h.record("trả nợ chú Tư 5tr")
         self.assertIn("Đã ghi 5.000.000đ", text)
         self.assertEqual(sono.active()[0]["tien"], 15_000_000)
 

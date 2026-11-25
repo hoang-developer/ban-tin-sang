@@ -19,6 +19,7 @@ from infrastructure import kho
 from repositories import keys
 from domain.chitieu import parse as parse_rules
 from domain.chitieu import flow
+from domain.chitieu import risk
 from domain.chitieu.kinds import INCOME
 from domain.chitieu.learn import learn_key
 from domain.common.format import vnd
@@ -70,77 +71,77 @@ def loan_choices():
 
 
 JOBS = {
-    "thu": {"nhan": "💰 Khoản thu", "xac_nhan": False, "truong": [
+    "thu": {"nhan": "💰 Khoản thu", "truong": [
         F("tien", "tien", "Nhận được bao nhiêu?"), F("ghi_chu", "chu", can=False), F("ngay", "ngay", can=False)]},
-    "tra_no": {"nhan": "💳 Trả nợ", "xac_nhan": False, "truong": [
+    "tra_no": {"nhan": "💳 Trả nợ", "truong": [
         F("ten", "chu", "Trả khoản nợ nào?", chon=debt_choices), F("tien", "tien", "Trả bao nhiêu?"),
         F("ngay", "ngay", can=False)]},
-    "du_phong": {"nhan": "🛟 Quỹ dự phòng", "xac_nhan": True, "truong": [
+    "du_phong": {"nhan": "🛟 Quỹ dự phòng", "truong": [
         F("tien", "tien", "Số tiền bao nhiêu?"),
         F("chieu", "chon", can=False, chon=[("nap", "Nạp vào"), ("rut", "Rút ra")])]},
-    "tiet_kiem": {"nhan": "🐷 Sổ tiết kiệm", "xac_nhan": True, "truong": [
+    "tiet_kiem": {"nhan": "🐷 Sổ tiết kiệm", "truong": [
         F("ten", "chu", "Gửi ở ngân hàng nào? (tên sổ)"), F("tien", "tien", "Gửi bao nhiêu?"),
         F("lai", "so", "Lãi suất bao nhiêu %/năm?"), F("ky", "so", "Kỳ hạn mấy tháng?", chon=TERMS),
         F("ngay", "ngay", can=False)]},
-    "tai_khoan": {"nhan": "🏦 Số dư tài khoản", "xac_nhan": True, "truong": [
+    "tai_khoan": {"nhan": "🏦 Số dư tài khoản", "truong": [
         F("ten", "chu", "Tài khoản hay ví nào? (ví dụ Techcombank, MoMo, tiền mặt)"),
         F("tien", "tien", "Số dư hiện tại bao nhiêu?"), F("chinh", "co", can=False)]},
-    "vang": {"nhan": "🥇 Mua vàng", "xac_nhan": True, "truong": [
+    "vang": {"nhan": "🥇 Mua vàng", "truong": [
         F("loai", "chon", "Vàng nhẫn (24k, ép vỉ) hay vàng miếng SJC?", chon=[("nhan", "Nhẫn 24k"), ("sjc", "Miếng SJC")]),
         F("chi", "so", "Bao nhiêu chỉ? (1 lượng = 10 chỉ)"),
         F("tien", "tien", "Tổng tiền đã trả bao nhiêu? (để tính lãi lỗ)", can=False, goi=True)]},
-    "co_phieu": {"nhan": "📈 Cổ phiếu", "xac_nhan": True, "truong": [
+    "co_phieu": {"nhan": "📈 Cổ phiếu", "truong": [
         F("chieu", "chon", "Mua hay bán?", chon=[("mua", "Mua"), ("ban", "Bán")]),
         F("ma", "chu", "Mã cổ phiếu nào?"), F("sl", "so", "Số lượng bao nhiêu cổ phiếu?"),
         F("gia", "so", "Giá khớp bao nhiêu? (nghìn đồng một cổ phiếu, ví dụ 12 hoặc 95,5)"),
         F("gia_von", "so", can=False)]},
-    "quy": {"nhan": "💹 Quỹ mở", "xac_nhan": True, "truong": [
+    "quy": {"nhan": "💹 Quỹ mở", "truong": [
         F("chieu", "chon", can=False, chon=[("mua", "Mua"), ("hoan_doi", "Hoán đổi")]),
         F("ma", "chu", can=False), F("tien", "tien", "Số tiền bao nhiêu?", can=False), F("ccq", "so", can=False),
         F("ngay", "ngay", can=False), F("sau_gio", "co", can=False)]},
-    "quy_cho": {"nhan": "📈 Quỹ chờ đầu tư", "xac_nhan": True, "truong": [
+    "quy_cho": {"nhan": "📈 Quỹ chờ đầu tư", "truong": [
         F("tien", "tien", "Số tiền bao nhiêu?"),
         F("chieu", "chon", can=False, chon=[("nap", "Để vào"), ("rut", "Rút ra")])]},
-    "chuyen_tk": {"nhan": "🔁 Chuyển tiền", "xac_nhan": True, "truong": [
+    "chuyen_tk": {"nhan": "🔁 Chuyển tiền", "truong": [
         F("tien", "tien", "Chuyển bao nhiêu?"), F("den", "chu", "Chuyển sang tài khoản, ví nào?"),
         F("tu", "chu", "Chuyển từ tài khoản, ví nào?", can=False)]},
-    "ban_vang": {"nhan": "🥇 Bán vàng", "xac_nhan": True, "truong": [
+    "ban_vang": {"nhan": "🥇 Bán vàng", "truong": [
         F("tien", "tien", "Bán được bao nhiêu tiền?"), F("chi", "so", can=False),
         F("loai", "chon", can=False, chon=[("nhan", "Nhẫn 24k"), ("sjc", "Miếng SJC")])]},
-    "tat_toan": {"nhan": "🐷 Tất toán sổ", "xac_nhan": True, "truong": [
+    "tat_toan": {"nhan": "🐷 Tất toán sổ", "truong": [
         F("ten", "chu", "Tất toán sổ nào?", chon=saving_choices),
         F("tien", "tien", "Nhận về bao nhiêu? (bỏ qua: bot tính gốc + lãi)", can=False, goi=True)]},
-    "ban_quy": {"nhan": "💹 Bán quỹ", "xac_nhan": True, "truong": [
+    "ban_quy": {"nhan": "💹 Bán quỹ", "truong": [
         F("ma", "chu", "Bán quỹ nào?"), F("tien", "tien", "Nhận về bao nhiêu?"),
         F("ccq", "so", "Bán bao nhiêu ccq? (bỏ qua: tính theo NAV gần nhất)", can=False, goi=True)]},
-    "thu_no": {"nhan": "🤝 Thu nợ", "xac_nhan": True, "truong": [
+    "thu_no": {"nhan": "🤝 Thu nợ", "truong": [
         F("ten", "chu", "Ai trả?", chon=loan_choices), F("tien", "tien", "Trả bao nhiêu?")]},
-    "xoa_tai_san": {"nhan": "🗑 Xóa tài sản", "xac_nhan": True, "truong": [
+    "xoa_tai_san": {"nhan": "🗑 Xóa tài sản", "truong": [
         F("ten", "chu", "Xóa tài khoản, sổ hay mã nào?")]},
-    "doi_xong": {"nhan": "🔁 Hoán đổi xong", "xac_nhan": True, "truong": [
+    "doi_xong": {"nhan": "🔁 Hoán đổi xong", "truong": [
         F("ngay_ban", "ngay", "Bán {cho} khớp ngày nào? (lịch sử giao dịch Fmarket)"),
         F("ngay_mua", "ngay", "Mua {chinh} khớp ngày nào?"),
         F("ccq", "so", "Fmarket báo nhận bao nhiêu ccq {chinh}? (bỏ qua: bot tính theo NAV ngày mua)", can=False,
           goi=True),
         F("lenh", "so", can=False)]},
-    "doi_chieu": {"nhan": "🔄 Đối chiếu", "xac_nhan": False, "truong": [
+    "doi_chieu": {"nhan": "🔄 Đối chiếu", "truong": [
         F("gia_tri", "tien", "Số thật là bao nhiêu?"), F("muc", "so", can=False)]},
-    "doi_chieu_sl": {"nhan": "🔄 Đối chiếu", "xac_nhan": False, "truong": [
+    "doi_chieu_sl": {"nhan": "🔄 Đối chiếu", "truong": [
         F("gia_tri", "so", "Số lượng thật là bao nhiêu?"), F("muc", "so", can=False)]},
-    "sua_ccq": {"nhan": "✏️ Sửa số ccq", "xac_nhan": False, "truong": [
+    "sua_ccq": {"nhan": "✏️ Sửa số ccq", "truong": [
         F("ccq", "so", "Fmarket báo lệnh vừa khớp được bao nhiêu ccq?"), F("ma", "chu", can=False)]},
-    "no_moi": {"nhan": "💳 Khoản nợ", "xac_nhan": True, "truong": [
+    "no_moi": {"nhan": "💳 Khoản nợ", "truong": [
         F("ten", "chu", "Nợ ai, hoặc khoản gì? (ví dụ chú Tư, trả góp tủ lạnh)"),
         F("tien", "tien", "Hiện còn nợ bao nhiêu?"),
         F("moi_thang", "tien", "Mỗi tháng trả bao nhiêu?", can=False, goi=True),
         F("lai", "so", "Lãi suất bao nhiêu %/năm?", can=False, goi=True, chon=[(0, "Không lãi")]),
         F("ngay_tra", "so", can=False)]},
-    "cho_vay": {"nhan": "🤝 Cho vay", "xac_nhan": True, "truong": [
+    "cho_vay": {"nhan": "🤝 Cho vay", "truong": [
         F("ten", "chu", "Cho ai vay?"), F("tien", "tien", "Cho vay bao nhiêu?")]},
-    "ngan_sach": {"nhan": "🎯 Ngân sách", "xac_nhan": True, "truong": [
+    "ngan_sach": {"nhan": "🎯 Ngân sách", "truong": [
         F("nhom", "chu", "Ngân sách cho nhóm nào? (tổng, hằng ngày, ăn uống, mua sắm…)"),
         F("tien", "tien", "Mỗi tháng bao nhiêu?")]},
-    "ngay_luong": {"nhan": "💼 Ngày lương", "xac_nhan": True, "truong": [
+    "ngay_luong": {"nhan": "💼 Ngày lương", "truong": [
         F("ngay_luong", "so", "Lương về ngày mấy hằng tháng?"), F("tien", "tien", "Lương khoảng bao nhiêu?")]},
 }
 
@@ -767,7 +768,7 @@ def big_side_buy(a):
         if a["viec"] != "quy" or a.get("chieu") == "hoan_doi" or not side or (a.get("ma") or "").upper() != side["ma"]:
             return None
         monthly = dt.total_of(cfg, dt.ym_of(chitieu_ctx.today()))
-        return cfg["ma"] if monthly and a.get("tien", 0) >= 3 * monthly else None
+        return cfg["ma"] if risk.big_side_buy(a.get("tien", 0), monthly) else None
     except Exception as e:
         print(f"[lỗi] xét khoản mua lớn: {e!r}", file=sys.stderr)
         return None
@@ -917,6 +918,18 @@ def no_main():
         return False
 
 
+def job_signal(a):
+    """Tín hiệu rủi ro của một việc trợ lý đã hiểu (domain/chitieu/risk.py)."""
+    amount = a.get("tien") if isinstance(a.get("tien"), (int, float)) else 0
+    return risk.Signal(amount=amount, direction=risk.THU if a["viec"] == "thu" else risk.CHI,
+                       source=risk.ANH if a.get("_anh") else risk.AI, job=a["viec"])
+
+
+def needs_card(a):
+    """Việc này phải qua thẻ "Mình hiểu là…" (đổi tài sản, nợ, đầu tư; khoản thu/trả nợ lớn; đọc từ ảnh)?"""
+    return risk.decide(job_signal(a)) != risk.GHI_NGAY
+
+
 def advance(a, chat, now):
     """Bước kế tiếp của một việc: hỏi trường còn thiếu, hoặc hiện thẻ xác nhận, hoặc làm luôn."""
     f = missing(a)
@@ -928,7 +941,7 @@ def advance(a, chat, now):
         group = a.pop("_nhom")
         group["ds"][group["i"]] = a
         return start_many(group["ds"], chat, now)
-    if JOBS[a["viec"]]["xac_nhan"]:
+    if needs_card(a):
         return card(a, chat)
     return run(a, now, chat)
 
@@ -1195,14 +1208,28 @@ SKIP_WHY = {"tuong_lai": "nghe như một dự định, chưa phải khoản đ�
             "hoi": "nghe như một câu hỏi, không phải khoản đã chi"}
 
 
-def ask_record(text, reason):
-    """Tin có số tiền nhưng nghe như dự định, câu hỏi giả định hay câu hỏi (domain/chitieu/guard.py): chưa ghi, hỏi
-    bằng thẻ. Đã chi thật thì bấm 💸 để ghi nguyên tin."""
+HELD_WHY = {"lon": "khoản lớn", "nhieu_so": "có nhiều số tiền, mình đọc là", "tuong_lai": "ngày chưa tới",
+            "kep": "số rất lớn"}
+
+
+def ask_record(text, reason, day=None):
+    """Tin có số tiền nhưng chưa ghi thẳng: nghe như dự định, câu hỏi giả định hay câu hỏi (domain/chitieu/guard.py),
+    hoặc chính sách rủi ro bảo phải hỏi (khoản lớn, nhiều số tiền, ngày chưa tới, số rất lớn: domain/chitieu/risk.py).
+    Hỏi bằng thẻ; bấm ✅ thì ghi nguyên tin. Số rất lớn phải bấm hai lần."""
     cid = kho.command("INCR", keys.CARD_COUNTER)
     kho.put(keys.card(cid), {"viec": "_chi", "cau": text.strip()[:300]}, CARD_SECONDS)
     quoted = html.escape(text.strip()[:80])
-    return (f"🤔 «{quoted}» {SKIP_WHY.get(reason, SKIP_WHY['hoi'])}, nên mình chưa ghi. Nếu đã chi thật thì bấm nút dưới.",
-            [[("💸 Ghi là khoản chi", f"y:chi:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")], [chitieu_ctx.BACK]])
+    if reason:
+        return (f"🤔 «{quoted}» {SKIP_WHY.get(reason, SKIP_WHY['hoi'])}, nên mình chưa ghi. Nếu đã chi thật thì bấm nút "
+                f"dưới.", [[("💸 Ghi là khoản chi", f"y:chi:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")], [chitieu_ctx.BACK]])
+    day = day or chitieu_ctx.today()
+    held = risk.held_lines(text, day, lambda line: chitieu_ctx.parse_line(line, day))
+    lines = [f"• «{html.escape(line[:60])}»: {HELD_WHY[why]} <b>{vnd(amount)}</b>" for line, amount, why in held]
+    if any(why == "kep" for _, _, why in held):
+        return ("⚠️ Kiểm tra lại số 0 giúp mình, chưa ghi:\n" + "\n".join(lines),
+                [[("✅ Đúng số này", f"y:kep:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")]])
+    return ("🧐 Kiểm tra lại trước khi ghi:\n" + "\n".join(lines),
+            [[("✅ Đúng, ghi", f"y:chi:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")]])
 
 
 def handle(a, text, now, chat):
@@ -1213,7 +1240,9 @@ def handle(a, text, now, chat):
             remember_plain(text)
             return None
         if a.get("tien"):
-            return chitieu_bot.record_text(f"{a['tien']}đ {a.get('ghi_chu') or 'khoản chi'}", now)
+            line = f"{a['tien']}đ {a.get('ghi_chu') or 'khoản chi'}"
+            level = risk.decide(job_signal(a))
+            return chitieu_bot.record_text(line, now) if level == risk.GHI_NGAY else ask_record(line, None, now.date())
         return unsure(text)
     if job == "tra_no" and a.get("ten") and parse_amount(text):
         remember_plain(text)  # câu trả nợ đủ ý: ghi nguyên câu như trước (sổ nợ tự trừ), lần sau khỏi hỏi AI
@@ -1418,6 +1447,11 @@ def on_button(arg, message, now):
     if kind == "huy":
         kho.delete(keys.card(cid))
         return "Đã bỏ", ("edit", lambda: "Đã bỏ, không ghi gì.")
+    if kind == "kep" and a.get("viec") == "_chi":  # bấm lần hai mới ghi
+        held = risk.held_lines(a["cau"], now.date(), lambda line: chitieu_ctx.parse_line(line, now.date()))
+        total = vnd(sum(amount for _, amount, _ in held))
+        return None, ("edit", lambda: (f"⚠️ Chắc chắn ghi <b>{total}</b>?\n«{html.escape(a['cau'][:80])}»",
+                                       [[("✅ Chắc chắn, ghi", f"y:chi:{cid}"), ("❌ Không ghi", f"y:huy:{cid}")]]))
     if kind == "chi" and a.get("viec") == "_chi":
         kho.delete(keys.card(cid))
         text = parse_rules.resolve_vague(a["cau"], option, now.date()) if a.get("mohu") else a["cau"]
@@ -1463,7 +1497,7 @@ def try_text(text, day):
     if a["viec"] in JOBS:
         f = missing(a)
         lines.append("→ Bot hỏi tiếp: " + f["hoi"].format(**fund_names()) if f else "→ " + (
-            "Thẻ xác nhận: " if JOBS[a["viec"]]["xac_nhan"] else "Làm luôn: ") + re.sub(r"<[^>]+>", "", describe(a)))
+            "Thẻ xác nhận: " if needs_card(a) else "Làm luôn: ") + re.sub(r"<[^>]+>", "", describe(a)))
     else:
         lines.append({"chi": "→ Ghi như khoản chi thường.", "hoi": "→ Trả lời bằng sổ chi tiêu.",
                       "khac": "→ Bot báo chưa hiểu và gợi ý cách nhắn."}.get(a["viec"], f"→ Làm luôn: {a['viec']}"))

@@ -127,10 +127,10 @@ class NgayChuaRo(unittest.TestCase):
         self.assertEqual(len(entries_of("2026-11")), 1)
 
     def test_ngay_xa_hoac_ro_van_ghi_ngay(self):
-        text, _ = h.say("27/12 đóng học 3tr")  # 37 ngày nữa: xa, năm trước, ghi rõ năm
+        text, _ = h.record("27/12 đóng học 3tr")  # 37 ngày nữa: xa, năm trước, ghi rõ năm
         self.assertIn("27/12/2025", text)
         self.assertEqual(entries_of("2025-12"), [("2025-12-27", 3_000_000, "đóng học")])
-        h.say("27/11/2026 mua sách 200k")  # đã ghi năm: ghi như cũ
+        h.record("27/11/2026 mua sách 200k")  # đã ghi năm: không hỏi năm, nhưng ngày chưa tới nên xác nhận (risk)
         h.say("hôm qua phở 50k")
         h.say("tối qua ăn lẩu 300k")  # buổi của hôm qua
         self.assertEqual(sorted(entries_of("2026-11")), [("2026-11-19", 50_000, "phở"), ("2026-11-19", 300_000, "ăn lẩu"),

@@ -185,6 +185,16 @@ def say(text):
         return parts(chitieu_bot.answer(text, CLOCK["now"], CHAT))
 
 
+def record(text):
+    """Nhắn một khoản và bấm xác nhận nếu bot hỏi lại theo chính sách rủi ro (khoản lớn, số rất lớn: domain/chitieu/
+    risk.py), như người dùng bấm ✅: (chữ bot trả lời sau cùng, dữ liệu các nút)."""
+    body, buttons = say(text)
+    for prefix in ("y:kep:", "y:chi:"):
+        if body.startswith(("🧐", "⚠️ Kiểm tra lại số 0", "⚠️ Chắc chắn")) and any(b.startswith(prefix) for b in buttons):
+            _, body, buttons = press(button(buttons, prefix))
+    return body, buttons
+
+
 def press(data, text=""):
     """Người dùng bấm một nút: (thông báo nhỏ, chữ sau khi bấm, dữ liệu các nút)."""
     with kho.memo():

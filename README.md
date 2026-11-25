@@ -125,6 +125,11 @@ Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot
   `tháng sau…`) hay câu hỏi giả định (`nếu mua xe 30tr thì sao`) thì bot **chưa ghi**, hỏi lại bằng thẻ «💸 Ghi là khoản chi /
   ❌ Không ghi». Dán lại tin bot vừa gửi (hoặc cả báo cáo) cũng không bị ghi thành khoản mới. Luật ở
   [domain/chitieu/guard.py](domain/chitieu/guard.py); `định kỳ`, `cố định`, `sắp xếp` không bị nhầm là dự định.
+- **Khoản lớn hỏi trước khi ghi** ([domain/chitieu/risk.py](domain/chitieu/risk.py)): khoản chi tới 2 triệu, một số tiền,
+  ngày không ở tương lai thì ghi ngay như cũ. Khoản chi trên 2 triệu, một dòng có hai số tiền (`ăn trưa 50k cà phê 30k`),
+  ngày chưa tới (`27/12/2026 …`) thì bot hiện thẻ «🧐 Kiểm tra lại trước khi ghi» với số bot đọc được, bấm ✅ mới ghi.
+  Khoản thu bot tự nhận ra (`+ …`, `lương 20tr`) vẫn ghi ngay. Một khoản từ 50 triệu (thường là gõ thừa số 0) phải bấm
+  ✅ hai lần. Khoản AI hiểu từ câu thường cũng theo đúng luật này; việc đổi tài sản, nợ, đầu tư luôn qua thẻ.
 - 📷 **Gửi ảnh** hóa đơn hoặc màn hình chuyển khoản: bot đọc rồi ghi (xem mục Ghi bằng ảnh).
 
 **Nhắn câu thường, không cần nhớ lệnh** ([interface/troly/assistant.py](interface/troly/assistant.py), cần bật AI): ngoài khoản chi, bot hiểu cả các việc khác
