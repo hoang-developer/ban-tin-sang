@@ -16,8 +16,8 @@ def progress(codes, day):
     daily = phantich.daily_groups() if "hangngay" in budgets else []
     extra = (["hangngay"] if daily and set(codes) & set(daily + ["hangngay"]) else []) + (["tong"] if "tong" in budgets else [])
     for code in list(dict.fromkeys([c for c in codes if c in budgets and c not in ("tong", "hangngay")] + extra)):
-        if code == "hangngay":  # chi tiêu hằng ngày, không tính khoản đột biến
-            spent = phantich.daily_spent(day)
+        if code == "hangngay":  # mọi khoản chi của các nhóm hằng ngày (lỗi cũ: bỏ khoản lớn nên siêu thị 600k vẫn là 0đ/3tr)
+            spent = sum(e["tien"] for e in items if e["nhom"] in daily)
         else:
             spent = sum(e["tien"] for e in items if code == "tong" or e["nhom"] == code)
         out.append((code, spent, budgets[code]))

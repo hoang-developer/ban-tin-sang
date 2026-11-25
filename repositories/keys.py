@@ -28,6 +28,7 @@ SALARY = "chitieu:luong"  # {"ngay": ngày nhận lương, "tien": số tiền}
 FUND = "chitieu:dautu"  # cấu hình đầu tư quỹ mở định kỳ (mã quỹ, kế hoạch, lệnh)
 RESERVE = "chitieu:duphong"  # {"thang": số tháng mục tiêu, "han": đạt trong bao nhiêu tháng, "bat_dau": ngày, "chi": tự đặt,
 #                              "nap": {"YYYY-MM": tổng đã nạp trong tháng}}
+PLAN_SETTINGS = "chitieu:kehoach"  # {"tieu_du": phần dư sau chia lương được phép tiêu, 0..1; mặc định 0}
 SAVINGS = "chitieu:tietkiem"  # {"moc", "bat_dau", "khong_tieu": [ngày ISO], "nhac": bool, "da_chuyen": đồng}
 RECONCILE = "chitieu:doichieu"  # {"YYYY-MM": {"muc": {id: {...}}}}
 OWNERS = "chitieu:chutk"  # [tên chủ tài khoản bot đã nhận ra từ ảnh]

@@ -349,8 +349,9 @@ vàng, cổ phiếu, khoản nợ. Bot nối các ngăn thành một dòng tiề
 - **Mỗi ngày được tiêu**: một con số dùng chung cho tin sau khi ghi, `/dubao`, màn hình tổng quan, Chia lương. Có
   ngân sách tổng thì theo ngân sách; không thì theo kế hoạch: thu − trả nợ tới kỳ − quỹ dự phòng − đầu tư là phần để
   chi tiêu cả tháng (không tính trả nợ). Trừ phần đã chi trước hôm nay và khoản lớn sắp tới (tháng trước có, tháng
-  này chưa thấy), chia đều cho hôm nay và các ngày còn lại. Ngân sách hằng ngày (`/ngansach hằng ngày`) vẫn tính
-  riêng cho ăn uống, đi chợ, đi lại. Khi có con số này, dòng tiết kiệm dưới tin chỉ còn chuỗi ngày và số đã bớt.
+  này chưa thấy), chia đều cho hôm nay và các ngày còn lại của kỳ lương. Ngân sách hằng ngày (`/ngansach hằng ngày`)
+  vẫn tính riêng cho ăn uống, đi chợ, đi lại, và tính đủ mọi khoản của các nhóm đó (khoản lớn như siêu thị 600k vẫn
+  trừ vào ngân sách; chỉ dự báo mới bỏ khoản đột biến). Khi có con số này, dòng tiết kiệm dưới tin chỉ còn chuỗi ngày và số đã bớt.
 - Chưa chọn tài khoản chính thì mọi thứ như trước (bot chỉ ghi vào từng ngăn, không trừ số dư tài khoản nào).
 
 ### Đối chiếu tài sản tháng
@@ -436,12 +437,15 @@ Code ở [interface/kehoach/plan.py](interface/kehoach/plan.py). `/kehoach` cho 
 Nợ không lãi (người thân) trả đều theo hẹn, song song với mọi bước. Dưới lộ trình là việc nên làm bây giờ (trả
 khoản nợ tới kỳ, nạp quỹ tháng này, xếp nhóm khoản chưa rõ).
 
-**Chia lương** (`/kehoach chia`, nút 📋, tự gợi ý khi ghi lương): thu tháng này → trả nợ tới kỳ (đã trả ✅ hay chưa)
+**Chia lương** (`/kehoach chia`, nút 📋, tự gợi ý khi ghi lương): thu của kỳ lương (đã đặt `/luong 28 20tr` thì kỳ
+chạy từ ngày 28 tới 27 tháng sau, lương về sớm vài ngày vẫn tính cho kỳ mới; chưa đặt thì theo tháng; khoản thu nhỏ hay
+khoản lệch đối chiếu không làm đổi mức) → trả nợ tới kỳ (đã trả ✅ hay chưa)
 → chi tiêu dự kiến (trung bình 90 ngày qua, không tính trả nợ; có ngân sách tổng thì theo ngân sách) → quỹ dự phòng
 (mức để kịp hạn, cộng tiền trước đây trả các khoản nợ đã xong; không quá phần thu còn lại) → còn lại. Nút trả nợ, nạp
 quỹ ngay trên tin, hoặc ✅ Làm hết theo kế hoạch (xem mục Một dòng tiền). Chưa ghi lương thì dùng số ở `/luong`,
 không có thì thu trung bình 3 tháng. Đã bật `/dautu` thì thêm bước 📈 góp vào quỹ chờ (sau quỹ dự phòng). Cuối tin là
-"hôm nay còn được tiêu bao nhiêu" và số dư tài khoản chính.
+"hôm nay còn được tiêu bao nhiêu" và số dư tài khoản chính. Phần dư hơn mức chi tiêu dự kiến mặc định để dành, không
+cộng vào mức mỗi ngày; muốn tiêu một phần thì `/kehoach tieudu 30` (30% phần dư), để dành hết lại: `/kehoach tieudu 0`.
 
 ### Đầu tư quỹ mở hằng tháng (Value Averaging)
 

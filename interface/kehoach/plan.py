@@ -9,6 +9,7 @@ from domain.common.text import plain
 from interface.chitieu import context as chitieu_ctx
 from interface import common
 from presentation.kehoach import plan as pview
+from repositories.kehoach import settings as settings_repo
 from services.kehoach import plan as service
 
 short, spend_text, room_text, basis_text = pview.short, pview.spend_text, pview.room_text, pview.basis_text
@@ -78,6 +79,17 @@ def kehoach(args):
     word = plain(args[0]) if args else ""
     if word in ("chia", "luong", "chialuong", "thang"):
         return plan(chitieu_ctx.today())
+    if word in ("tieudu", "tieuphandu"):  # /kehoach tieudu 30: được tiêu 30% phần dư, còn lại để dành
+        try:
+            share = float(args[1].rstrip("%").replace(",", ".")) / 100 if len(args) > 1 else None
+        except ValueError:
+            share = None
+        if share is None or not 0 <= share <= 1:
+            return ("Phần dư sau chia lương mặc định để dành hết. Cho tiêu một phần: /kehoach tieudu 30 (30% phần dư); "
+                    "để dành hết lại: /kehoach tieudu 0")
+        settings_repo.save_spend_share(share)
+        return (f"✅ Từ giờ được tiêu {share * 100:.0f}% phần dư sau chia lương, còn lại để dành."
+                if share else "✅ Phần dư sau chia lương để dành hết (mặc định).") + "\n\n" + plan(chitieu_ctx.today())[0]
     return roadmap(chitieu_ctx.today())
 
 
