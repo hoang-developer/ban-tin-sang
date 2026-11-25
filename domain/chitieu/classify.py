@@ -34,10 +34,22 @@ def groups(cfg):
     return {c: (name(c, cfg), cfg.get("tu", {}).get(c, []), CATEGORIES.get(c, ("", []))[1])
             for c in order if c not in hidden}
 
+# Số, ngày tháng, dấu câu đứng quanh một cụm đã học 1 chữ: học "bò" thì "bò 2" vẫn là "bò"
+AROUND = r"[\d\s.,/\-–:;]*"
+
+
+def learned_pattern(phrase):
+    """Mẫu so khớp một cụm đã học. Cụm 1 chữ ("bò", "mua") chỉ khớp khi cả ghi chú là chữ đó: học "bò" thành Đi chợ rồi
+    "phở bò", "bún bò" không bị kéo theo. Cụm từ 2 chữ trở lên khớp ở bất kỳ chỗ nào trong câu."""
+    if len(phrase.split()) <= 1:
+        return re.compile(rf"^{AROUND}{re.escape(phrase)}{AROUND}$")
+    return word_pattern(phrase)
+
+
 def rules(learned, cfg):
     """Bảng so khớp (mẫu có dấu, mẫu không dấu, điểm, mã): cụm từ đã học > từ khóa tự thêm > có sẵn."""
     active = groups(cfg)
-    learned_rules = [(word_pattern(k), word_pattern(plain(k)), 100 + len(k), code)
+    learned_rules = [(learned_pattern(k), learned_pattern(plain(k)), 100 + len(k), code)
                      for k, code in (learned or {}).items() if code in active]
     own = [(word_pattern(norm(k)), plain_pattern(k), len(norm(k)) + 0.5, code)  # +0.5: thắng từ có sẵn trùng
            for code, (_, words, _) in active.items() for k in words]

@@ -3,6 +3,7 @@ dòng phụ, và lượt bấm nút của mọi chức năng. Chỗ duy nhất b
 import html
 import sys
 
+from domain.chitieu import parse as parse_rules
 from domain.chitieu.kinds import INCOME, OTHER
 from domain.chitieu.learn import pending
 from domain.chitieu.refs import button_ref
@@ -111,7 +112,11 @@ def respond(text, now, chat=None):
     return record_text(text, now)
 
 def record_text(text, now):
-    """Ghi các khoản chi/thu trong tin nhắn (mỗi dòng một khoản) và trả câu báo kèm nút."""
+    """Ghi các khoản chi/thu trong tin nhắn (mỗi dòng một khoản) và trả câu báo kèm nút. Ngày "dd/mm" sau hôm nay chưa
+    rõ là khoản sắp tới hay của năm trước thì chưa ghi, hỏi trước."""
+    vague = parse_rules.first_vague_date(text, now.date())
+    if vague:
+        return features.troly().ask_date(text, vague, now.date())
     entries = ledger.add(text, now)
     if not entries:
         return "Không thấy số tiền. Nhắn kiểu: <b>cà phê 35k</b> hoặc bấm /menu"

@@ -109,7 +109,9 @@ nhất mà Telegram gặp.
 Bot Telegram riêng để ghi chi tiêu. Nhắn số tiền kèm nội dung, bot tự hiểu số tiền và xếp nhóm:
 
 - `cà phê 35k` · `đổ xăng 80000` · `tiền nhà 5tr` · `tien dien 1tr2` (gõ không dấu cũng được)
-- `hôm qua ăn tối 250k` · `02/11 cắt tóc 100k` · `+ lương 20tr` (dấu `+` là khoản thu)
+- `hôm qua ăn tối 250k` · `tối qua ăn lẩu 300k` (tối qua, đêm qua, sáng qua… là hôm qua) · `02/11 cắt tóc 100k` · `+ lương 20tr`
+  (dấu `+` là khoản thu). Ngày `dd/mm` chưa tới trong 31 ngày tới (nhắn `27/11` ngày 20/11) thì bot **hỏi** là khoản sắp
+  tới hay của năm trước rồi mới ghi; xa hơn thì là năm trước và tin báo ghi rõ năm
 - `đóng họ 1tr #tiết kiệm`: tự chọn nhóm bằng dấu `#` (tên nhóm, gõ tắt hay không dấu đều được); bot nhớ
   cho lần sau
 - Nhiều khoản một lúc: mỗi khoản một dòng.
@@ -178,6 +180,7 @@ cũng được xếp luôn; số và ngày tháng trong ghi chú được bỏ q
 | `/nhom tukhoa Ăn uống: bún chả, bánh tráng` | Thêm từ khóa cho nhóm bất kỳ; từ khóa bạn thêm thắng từ khóa có sẵn |
 | `/nhom doiten Đi lại: 🚗 Xe cộ` | Đổi tên nhóm |
 | `/nhom xoa Học tập` | Ẩn nhóm không dùng (khoản cũ giữ nguyên); `/nhom them Học tập` để dùng lại |
+| `/nhom hoc` · `/nhom hoc xoa bò` | Xem các cụm bot đã học từ lần bạn sửa nhóm, bỏ cụm học nhầm. Cụm 1 chữ (`bò`) chỉ áp dụng khi cả ghi chú là chữ đó; cụm 2 chữ trở lên (`bún bò`) áp dụng ở bất kỳ chỗ nào trong câu |
 | `/chuaxep` | Các khoản còn ở Khác: xếp lại theo những gì bot đã học, hỏi lại AI, còn lại bấm chọn từng khoản |
 
 Báo cáo nhắc số khoản chưa rõ nhóm. `/nhom` cho xem các nhóm, nhóm đã ẩn, số cụm bot đã học và AI đã

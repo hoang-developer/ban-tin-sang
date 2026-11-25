@@ -7,6 +7,7 @@ from infrastructure import ai as ai_client
 from interface import common
 from interface.chitieu import bot
 from repositories.chitieu import groups as groups_repo
+from repositories.chitieu import ledger as ledger_repo
 from services.chitieu import ledger
 
 
@@ -82,6 +83,100 @@ class Tra(unittest.TestCase):
             self.assertEqual(bot.on_button("bc:ngay", {}, self.now), ("Chưa có kho dữ liệu", None))
         finally:
             bot.common.ready = real
+
+
+def entries_of(ym):
+    return [(e["ngay"], e["tien"], e["ghichu"]) for e in ledger_repo.load(ym)]
+
+
+class NgayChuaRo(unittest.TestCase):
+    """"27/11" nhắn ngày 20/11: hỏi khoản sắp tới hay của năm trước, không im lặng lùi về năm trước như cũ."""
+
+    def setUp(self):
+        h.reset()
+        h.at(2026, 11, 20, 10)
+
+    def choice(self, buttons, option):
+        return next(b for b in buttons if b.endswith(f":{option}"))
+
+    def test_hoi_truoc_khi_ghi(self):
+        text, buttons = h.say("27/11 đóng học 3tr")
+        self.assertIn("27/11 chưa tới (hôm nay 20/11/2026). Đây là khoản sắp tới hay của năm trước?", text)
+        self.assertEqual(sorted(b.rsplit(":", 1)[1] for b in buttons if b.startswith("y:chi:")), ["nay", "toi", "trc"])
+        self.assertTrue(any(b.startswith("y:huy:") for b in buttons))
+        self.assertEqual((entries_of("2026-11"), entries_of("2025-11")), ([], []))  # chưa ghi gì
+
+    def test_chon_sap_toi_ghi_dung_thang(self):
+        _, buttons = h.say("27/11 đóng học 3tr")
+        _, done, _ = h.press(self.choice(buttons, "toi"))
+        self.assertIn("Đã ghi 3.000.000đ", done)
+        self.assertEqual((entries_of("2026-11"), entries_of("2025-11")), ([("2026-11-27", 3_000_000, "đóng học")], []))
+
+    def test_chon_nam_truoc(self):
+        _, buttons = h.say("27/11 đóng học 3tr")
+        _, done, _ = h.press(self.choice(buttons, "trc"))
+        self.assertIn("27/11/2025", done)  # khác năm nay thì tin báo ghi rõ năm
+        self.assertEqual((entries_of("2026-11"), entries_of("2025-11")), ([], [("2025-11-27", 3_000_000, "đóng học")]))
+
+    def test_chon_hom_nay_va_khong_ghi(self):
+        _, buttons = h.say("27/11 đóng học 3tr")
+        h.press(self.choice(buttons, "nay"))
+        self.assertEqual(entries_of("2026-11"), [("2026-11-20", 3_000_000, "đóng học")])
+        _, buttons = h.say("28/11 mua sách 200k")
+        h.press(h.button(buttons, "y:huy:"))
+        self.assertEqual(len(entries_of("2026-11")), 1)
+
+    def test_ngay_xa_hoac_ro_van_ghi_ngay(self):
+        text, _ = h.say("27/12 đóng học 3tr")  # 37 ngày nữa: xa, năm trước, ghi rõ năm
+        self.assertIn("27/12/2025", text)
+        self.assertEqual(entries_of("2025-12"), [("2025-12-27", 3_000_000, "đóng học")])
+        h.say("27/11/2026 mua sách 200k")  # đã ghi năm: ghi như cũ
+        h.say("hôm qua phở 50k")
+        h.say("tối qua ăn lẩu 300k")  # buổi của hôm qua
+        self.assertEqual(sorted(entries_of("2026-11")), [("2026-11-19", 50_000, "phở"), ("2026-11-19", 300_000, "ăn lẩu"),
+                                                         ("2026-11-27", 200_000, "mua sách")])
+
+    def test_the_cu_het_han_va_nhieu_dong(self):
+        text, buttons = h.say("cà phê 35k\n27/11 đóng học 3tr")
+        self.assertEqual(entries_of("2026-11"), [])  # cả tin chờ chọn ngày
+        h.press(self.choice(buttons, "toi"))
+        self.assertEqual(sorted(entries_of("2026-11")), [("2026-11-20", 35_000, "cà phê"), ("2026-11-27", 3_000_000, "đóng học")])
+        self.assertEqual(h.press(self.choice(buttons, "toi"))[0], "Thẻ này đã xử lý hoặc hết hạn")
+
+
+class HocNhom(unittest.TestCase):
+    """Cụm bot học từ lần sửa nhóm: cụm 1 chữ chỉ khớp cả ghi chú; xem và xóa bằng /nhom hoc."""
+
+    def setUp(self):
+        h.reset()
+        h.at(2026, 11, 20, 10)
+
+    def teach(self, note, code):
+        entry = ledger.add(f"{note} 150k", h.CLOCK["now"])[0]
+        h.press(f"nhom:2026-11:{entry['id']}:{code}")
+
+    def test_hoc_bo_khong_keo_theo_pho_bo(self):
+        self.teach("bò", "cho")
+        self.assertIn("Đi chợ", h.say("bò 20k")[0])
+        for note in ("phở bò", "bún bò", "bò bía"):
+            text, _ = h.say(f"{note} 40k")
+            self.assertNotIn("Đi chợ", text, note)
+
+    def test_xem_va_xoa_cum_da_hoc(self):
+        self.assertIn("chưa học cụm nào", h.say("/nhom hoc")[0])
+        self.teach("bò", "cho")
+        self.teach("đóng họ", "qua")
+        text, _ = h.say("/nhom hoc")
+        self.assertIn("Cụm bot đã học", text)
+        self.assertIn("(2)", text)
+        self.assertIn("🛒 Đi chợ, siêu thị: bò", text)
+        self.assertIn("🎁 Hiếu hỷ, quà tặng: đóng họ", text)
+        self.assertIn("Đã bỏ cụm bò", h.say("/nhom hoc xoa bò")[0])
+        self.assertNotIn("Đi chợ", h.say("bò 20k")[0])  # không còn nhóm đã học
+        self.assertIn("Không thấy cụm «bò»", h.say("/nhom hoc xoa bò")[0])
+        self.assertIn("Bỏ cụm học nhầm", h.say("/nhom hoc xoa")[0])
+        self.assertIn("Đã bỏ cụm đóng họ", h.say("/nhom hoc bo Đóng Họ")[0])  # gõ khác hoa thường vẫn xóa được
+        self.assertIn("chưa học cụm nào", h.say("/nhom hoc")[0])
 
 
 if __name__ == "__main__":

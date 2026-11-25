@@ -21,8 +21,10 @@ REPORT_BUTTONS = [[("Hôm nay", "bc:ngay"), ("Tuần này", "bc:tuan"), ("Tháng
 CHI_BUTTONS = REPORT_BUTTONS + [[("🧾 Lịch sử", "m:ls"), ("🗂 Chưa xếp", "m:cx"), ("🎯 Ngân sách", "m:ns")], [BACK]]
 
 def entry_text(e, day, cfg):
+    year = f"/{e['ngay'][:4]}" if e["ngay"][:4] != str(day.year) else ""  # khác năm nay thì ghi rõ năm
     when = "" if e["ngay"] == day.isoformat() else (
-        " · hôm qua" if e["ngay"] == (day - timedelta(days=1)).isoformat() else f" · {e['ngay'][8:]}/{e['ngay'][5:7]}")
+        " · hôm qua" if e["ngay"] == (day - timedelta(days=1)).isoformat()
+        else f" · {e['ngay'][8:]}/{e['ngay'][5:7]}{year}")
     note = html.escape(e["ghichu"]) if e["ghichu"] else "<i>không ghi chú</i>"
     robot = " ✨" if e.get("ai") else ""  # ✨ nhóm do AI đoán
     return f"<b>{vnd(e['tien'])}</b> · {classify.name(e['nhom'], cfg)}{robot} — {note}{when}"

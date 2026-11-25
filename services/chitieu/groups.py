@@ -4,6 +4,7 @@ import json
 
 from domain.chitieu import classify as classify_rules
 from domain.chitieu import labels
+from domain.chitieu.learn import learn_key
 from domain.common.text import plain
 from infrastructure import clock
 from repositories.chitieu import groups as groups_repo
@@ -46,8 +47,21 @@ NHOM_USAGE = ("<b>Tự chỉnh nhóm</b>\n"
               "• Thêm từ khóa: /nhom tukhoa Ăn uống: bún chả, bánh tráng\n"
               "• Đổi tên: /nhom doiten Đi lại: 🚗 Xe cộ\n"
               "• Ẩn nhóm không dùng: /nhom xoa Học tập\n"
+              "• Xem cụm bot đã học, xóa cụm học nhầm: /nhom hoc, /nhom hoc xoa bò\n"
               "• Chọn nhóm ngay khi ghi: đóng họ 1tr #trả nợ\n"
               "• Xếp các khoản đang ở Khác: /chuaxep")
+
+
+def forget_learned(phrase):
+    """Bỏ một cụm bot đã học từ lần người dùng sửa nhóm (gõ có dấu hay không đều được); trả các cụm đã bỏ."""
+    want = plain(learn_key(phrase))
+    if not want:
+        return []
+    learned = groups_repo.learned()
+    gone = [k for k in learned if plain(k) == want]
+    if gone:
+        groups_repo.save_learned({k: c for k, c in learned.items() if k not in gone})
+    return gone
 
 
 def add_words(cfg, code, words):

@@ -9,7 +9,50 @@ from domain.common.money import parse_amount
 from domain.common.text import norm, plain
 
 DATE = re.compile(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?:/(\d{2}|\d{4}))?(?![\d/])")
-DAY_WORDS = {"hôm nay": 0, "hôm qua": -1, "hôm kia": -2}
+# "tối qua", "đêm qua"... là buổi của hôm qua, kể cả nhắn lúc sau nửa đêm
+DAY_WORDS = {"hôm nay": 0, "hôm qua": -1, "hôm kia": -2, "tối qua": -1, "đêm qua": -1, "sáng qua": -1,
+             "chiều qua": -1, "trưa qua": -1}
+FUTURE_DAYS = 31  # "dd/mm" sau hôm nay tới ngần này ngày: khoản sắp tới hay của năm trước? (xa hơn: năm trước)
+
+
+def has_day_word(text):
+    t = norm(text)
+    return any(word_pattern(form).search(t) for words in DAY_WORDS for form in (words, plain(words)))
+
+
+def vague_date(line, day):
+    """Dòng có ngày "dd/mm" (không ghi năm) rơi sau hôm nay nhưng chưa quá FUTURE_DAYS ngày tới: chưa rõ là khoản sắp
+    tới hay của năm trước. Trả (cùng ngày năm nay, cùng ngày năm trước, chữ ngày trong câu); None nếu đã rõ."""
+    if has_day_word(line):
+        return None  # chữ "hôm qua"... thắng ngày ghi bằng số (parse_date cũng làm vậy)
+    m = DATE.search(norm(line))
+    if not m or m[3]:
+        return None
+    try:
+        soon = date(day.year, int(m[2]), int(m[1]))
+        earlier = date(day.year - 1, int(m[2]), int(m[1]))
+    except ValueError:
+        return None
+    return (soon, earlier, m[0]) if 0 < (soon - day).days <= FUTURE_DAYS else None
+
+
+def first_vague_date(text, day):
+    """vague_date của dòng đầu tiên chưa rõ ngày trong tin (mỗi dòng một khoản); None nếu mọi dòng đã rõ."""
+    return next(filter(None, (vague_date(line, day) for line in text.splitlines())), None)
+
+
+def resolve_vague(text, choice, day):
+    """Tin với mọi ngày chưa rõ đã chọn: "toi" (ngày sắp tới), "trc" (năm trước) thêm năm vào "dd/mm"; "nay" đổi thành
+    "hôm nay"."""
+    out = []
+    for line in text.splitlines():
+        v = vague_date(line, day)
+        if v:
+            soon, earlier, raw = v
+            fixed = {"toi": f"{raw}/{soon.year}", "trc": f"{raw}/{earlier.year}"}.get(choice, "hôm nay")
+            line = DATE.sub(fixed, line, count=1)
+        out.append(line)
+    return "\n".join(out)
 
 
 def parse_date(text, day):
