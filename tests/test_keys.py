@@ -20,7 +20,7 @@ GOLDEN = {  # chép từ main trước khi refactor
     keys.PLAIN_NOTES: "chitieu:hieu:chi", keys.DAILY_GROUPS: "chitieu:dubao:nhom",
     keys.ASSETS: "chitieu:taisan", keys.ASSET_HISTORY: "chitieu:taisan:lichsu", keys.GOLD: "vivang",
     keys.SALARY: "chitieu:luong", keys.FUND: "chitieu:dautu", keys.RESERVE: "chitieu:duphong",
-    keys.SAVINGS: "chitieu:tietkiem", keys.RECONCILE: "chitieu:doichieu", keys.OWNERS: "chitieu:chutk",
+    keys.SAVINGS: "chitieu:tietkiem", keys.PLAN_SETTINGS: "chitieu:kehoach", keys.RECONCILE: "chitieu:doichieu", keys.OWNERS: "chitieu:chutk",
     keys.KEYBOARD_FLAG: "chitieu:banphim:2", keys.CARD_COUNTER: "chitieu:the:dem",
     keys.WATCHLIST: "theodoi", keys.REMINDERS: "nhac", keys.KEYWORDS: "tukhoa", keys.GOLD_HISTORY: "vang_lichsu",
     keys.GUESS_STATS: "doan_thongke", keys.ALERT_STATE: "canhbao", keys.BOARD: "bangdien",

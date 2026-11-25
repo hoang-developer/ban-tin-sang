@@ -15,6 +15,7 @@ from domain.no import debt as debt_rules
 from repositories.chitieu import budget as budget_repo
 from repositories.dautu import fund as dautu_fund
 from repositories.duphong import reserve as reserve_repo
+from repositories.kehoach import settings as settings_repo
 from repositories.luong import salary as salary_repo
 from services.dautu import market as dautu_market
 from services.dautu import orders as dautu_orders
@@ -49,17 +50,17 @@ def numbers(day):
     ym = debt_rules.month_of(day)
     data = assets_repo.load()
     group = debt_service.debt_group()[0]
-    month = ledger_repo.load(ym)
-    income = flow.income(month)
-    basis = ""
+    salary = salary_repo.load()
+    # Kỳ chi tiêu: từ ngày lương gần nhất (đã đặt /luong) tới trước ngày lương kế; chưa đặt thì là tháng dương lịch.
+    # Trả nợ, quỹ dự phòng, đầu tư vẫn tính theo tháng dương lịch của hôm nay.
+    start, end = rules.pay_period(day, salary.day if salary else None)
+    window = ledger_repo.between(start - timedelta(days=rules.SALARY_EARLY_DAYS), day)
+    month = [e for e in window if e["ngay"] >= start.isoformat()]
+    income, basis = rules.plan_income(window, start, salary.amount if salary and salary.amount else None)
     if not income:
-        salary = salary_repo.load()
-        if salary and salary.amount:
-            income, basis = salary.amount, "lương dự kiến, chưa ghi"
-        else:
-            _, average, days = flows.monthly_flows(day)
-            if average and days >= 20:
-                income, basis = average, "trung bình 3 tháng qua"
+        _, average, days = flows.monthly_flows(day)
+        if average and days >= 20:
+            income, basis = average, "trung bình 3 tháng qua"
     debts = rules.month_debts(debt_service.debts(data), ym)  # (khoản nợ, phải trả kỳ này, đã trả kỳ này)
     debt_need = sum(need for _, need, _ in debts)
     debt_left = sum(debt_rules.month_left(d, ym) for d, _, _ in debts)
@@ -76,7 +77,8 @@ def numbers(day):
     left = rules.leftover(income, debt_need, spend, target, invest_need)
     return {"ym": ym, "income": income, "income_basis": basis, "debts": debts, "debt_need": debt_need,
             "debt_left": debt_left, "spend": spend, "spend_basis": spend_basis, "spent": spent,
-            "spent_today": spent_today, "group": group, "fund": fund,
+            "spent_today": spent_today, "group": group, "fund": fund, "period": (start, end),
+            "days_left": (end - day).days,
             "fund_target": target, "fund_ideal": ideal, "fund_added": added, "fund_left": max(0, target - added),
             "freed": freed, "freed_names": freed_names, "left": left, "data": data, "invest": invest,
             "invest_left": max(0, invest_need - invest["added"]) if invest else 0}
@@ -98,7 +100,7 @@ def spendable(day, n=None):
     invest = n["invest"]["gop"] if n["invest"] else 0
     upcoming = sum(e["tien"] for e in flow.spending(f["upcoming"], n["group"]))
     return rules.plan_spendable(n["income"], n["debt_need"], n["fund_target"], invest, n["spent"], n["spent_today"],
-                                upcoming, f["left"])
+                                upcoming, n.get("days_left", f["left"]), n["spend"], settings_repo.spend_share())
 
 
 def spendable_safe(day, n=None):

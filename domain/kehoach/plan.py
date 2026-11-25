@@ -14,14 +14,55 @@ theo ngân sách) → quỹ dự phòng (mức mỗi tháng để kịp hạn, c
 Số liệu chia lương (numbers) và mỗi ngày được tiêu (spendable) là dict rộng, nhiều màn hình đọc theo khóa: giữ dạng dict,
 kiểu riêng làm khi tách các màn hình đó (plan.md).
 """
+from calendar import monthrange
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
+from domain.chitieu.kinds import INCOME
+from domain.common.text import plain
 from domain.duphong.reserve import MIN_DAYS
 from domain.no.debt import is_due, month_left, paid_in
 
 INVEST = (("tietkiem", "tiết kiệm"), ("vang", "vàng"), ("etf", "ETF"), ("quy", "quỹ mở"), ("cp", "cổ phiếu"))
 STEP_MIN = 100_000  # việc nạp quỹ/đầu tư nhỏ hơn mức này thì bỏ qua
+SALARY_EARLY_DAYS = 5  # lương về sớm tới ngần này ngày trước ngày lương vẫn tính cho kỳ mới
+
+
+def _payday_in(year, month, payday):
+    return date(year, month, min(payday, monthrange(year, month)[1]))
+
+
+def pay_period(day, payday):
+    """(ngày đầu, ngày cuối) của kỳ chi tiêu chứa day: từ ngày lương gần nhất tới trước ngày lương kế. Chưa đặt ngày lương
+    thì là tháng dương lịch. Lương về ngày 28 thì 31/10 và 1/11 cùng một kỳ (28/10 tới 27/11): không còn chuyện cuối tháng
+    dồn hết phần dư vào một ngày rồi đầu tháng tính lương thêm lần nữa."""
+    if not payday:
+        return day.replace(day=1), day.replace(day=monthrange(day.year, day.month)[1])
+    this = _payday_in(day.year, day.month, payday)
+    nxt_month = (day.year + (day.month == 12), day.month % 12 + 1)
+    prev_month = (day.year - (day.month == 1), (day.month - 2) % 12 + 1)
+    if day >= this:
+        return this, _payday_in(*nxt_month, payday) - timedelta(days=1)
+    return _payday_in(*prev_month, payday), this - timedelta(days=1)
+
+
+def is_salary(e):
+    return e["nhom"] == INCOME and "luong" in plain(e.get("ghichu") or "")
+
+
+def plan_income(entries, start, expected):
+    """(thu dùng để chia lương trong kỳ bắt đầu từ start, cách tính). entries: các khoản từ SALARY_EARLY_DAYS ngày trước
+    start. Lương: khoản lương thật lớn nhất đã ghi (lương về sớm vài ngày vẫn tính), chưa có thì lương dự kiến; cộng các khoản
+    thu khác trong kỳ. Không tính khoản thu bot tự sinh (lãi bán, lãi tiết kiệm, khoản lệch đối chiếu: có cờ khong_tk), nên
+    một khoản thu nhỏ hay một lần đối chiếu không làm "mỗi ngày được tiêu" sụp như trước."""
+    counted = [e for e in entries if e["nhom"] == INCOME and not e.get("khong_tk")]
+    salaries = [e["tien"] for e in counted if is_salary(e)]
+    others = sum(e["tien"] for e in counted if not is_salary(e) and e["ngay"] >= start.isoformat())
+    if salaries:
+        return max(salaries) + others, ""
+    if expected:
+        return expected + others, "lương dự kiến, chưa ghi"
+    return others, ""
 
 
 def estimate_spend(budget_total, debt_need, items, day, manual):
@@ -70,13 +111,22 @@ def leftover(income, debt_need, spend, fund_target, invest_need):
     return income - debt_need - spend - fund_target - invest_need if income else None
 
 
-def plan_spendable(income, debt_need, fund_target, invest, spent, spent_today, upcoming, days_left):
-    """Mỗi ngày được tiêu theo kế hoạch chia lương: thu − trả nợ − quỹ dự phòng − đầu tư là phần chi tiêu cả tháng
-    (không tính trả nợ); trừ phần đã chi trước hôm nay và khoản lớn sắp tới, chia đều cho hôm nay và các ngày còn lại."""
+def plan_spendable(income, debt_need, fund_target, invest, spent, spent_today, upcoming, days_left, planned_spend=0,
+                   spend_share=0.0):
+    """Mỗi ngày được tiêu theo kế hoạch chia lương: thu − trả nợ − quỹ dự phòng − đầu tư là phần có thể chi cả kỳ (không
+    tính trả nợ). Phần dư hơn mức chi tiêu dự kiến (planned_spend, trung bình các tháng trước) mặc định để dành; spend_share
+    (0..1) là phần dư được phép tiêu. Trừ phần đã chi trước hôm nay và khoản lớn sắp tới, chia đều cho hôm nay và các ngày
+    còn lại của kỳ."""
     limit = income - debt_need - fund_target - invest
+    saved = 0
+    if planned_spend and planned_spend < limit:  # lỗi cũ: chia lương ghi "chi tiêu ~5,24tr, còn 10,16tr" mà mỗi ngày ra 15,4tr/tháng
+        saved = (limit - planned_spend) * (1 - spend_share)
+        limit -= saved
     room = limit - (spent - spent_today) - upcoming
     per_day = room / (days_left + 1)
     parts = [("thu", income), ("trả nợ", debt_need), ("quỹ dự phòng", fund_target), ("đầu tư", invest)]
+    if saved:
+        parts.append(("để dành phần dư", saved))
     return {"per_day": per_day, "today_left": per_day - spent_today, "limit": limit, "spent": spent,
             "basis": "plan", "parts": parts}
 

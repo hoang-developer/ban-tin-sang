@@ -11,7 +11,8 @@ Trạng thái: **đã duyệt các mặc định ở mục 2** (25/11/2026). Ngu
 - **PR 0.4 (sổ tiết kiệm đáo hạn và tất toán sớm):** làm xong. Lãi không kỳ hạn mặc định 0,5%/năm, chỉnh theo sổ bằng trường `lai_kkh` (chưa có lệnh riêng; người dùng nhập số thật nhận về khi tất toán).
 - **PR 0.5 (nợ có lãi giảm dần):** làm xong: lãi dồn theo ngày, trả lãi trước gốc, số kỳ theo công thức trả góp, cảnh báo mức trả không đủ lãi và trả dư. Dư nợ trong tài sản ròng vẫn là gốc đã ghi (chưa cộng lãi dồn chưa trả); phần lãi trong khoản trả chưa được tách ra khỏi "chi" (làm ở PR 0.6).
 - **PR 0.6 (một định nghĩa dòng tiền):** làm xong (`domain/chitieu/flow.py`). Hoàn tiền lưu là khoản số âm ở nhóm gốc (cờ `hoan`), nên mọi tổng cộng thẳng là đúng mà không cần sửa từng chỗ. "Để dành thật" không còn tính trả nợ.
-- **Việc kế tiếp:** PR 0.7 (kế hoạch theo kỳ lương), PR 2.1 (chính sách rủi ro), vẫn Opus.
+- **PR 0.7 (kế hoạch theo kỳ lương):** làm xong. Lương về sớm tới 5 ngày trước ngày lương vẫn tính cho kỳ mới; khoản thu bot tự sinh (cờ `khong_tk`) không tính vào thu kế hoạch. Phần dư để dành hết, chỉnh bằng `/kehoach tieudu 30` (khóa mới `chitieu:kehoach`). Trả nợ, quỹ dự phòng, đầu tư vẫn tính theo tháng dương lịch. Dòng "hôm nay 35k/324k" trong tin ghi chi dời sang PR 0.8 (cùng việc bỏ mốc cá nhân).
+- **Việc kế tiếp:** PR 2.1 (chính sách rủi ro), vẫn Opus; sau đó đổi lại Sonnet cho 0.8–0.11.
 
 Giai đoạn này đứng **trước** các giai đoạn của `docs/ke-hoach-tro-ly.md` vì trợ lý hội thoại (giai đoạn 3) đưa chính các con số này
 cho AI viết thành lời; số sai thì lời càng thuyết phục càng nguy hiểm.
