@@ -19,7 +19,8 @@ class KhongGhiThang(unittest.TestCase):
     def test_du_dinh_va_cau_gia_dinh_khong_vao_so(self):
         for text in ("mai tôi định mua laptop 20tr", "tháng sau đóng học 3tr", "sẽ mua xe 30tr", "muốn mua xe 30tr",
                      "nếu mua xe 30tr thì sao", "giả sử mua laptop 20tr", "có nên mua laptop 20tr không",
-                     "mua laptop 20tr được không"):
+                     "mua laptop 20tr được không",
+                     "ngày mai đóng tiền nhà 5tr"):  # từng ghi 5tr vào hôm nay
             reply, _ = h.say(text)
             self.assertEqual(count(), 0, text)
             self.assertNotIn("✅ Đã ghi", reply, text)
@@ -110,6 +111,30 @@ class CauHoiNgoaiSo(unittest.TestCase):
             reply, _ = h.say(text)
             self.assertIn("50.000đ", reply, text)
             self.assertNotIn("chưa trả lời được", reply, text)
+
+
+class ChuaSua(unittest.TestCase):
+    """Lỗi ghi sai đã tái hiện nhưng chưa sửa (docs/ke-hoach-tro-ly.md, giai đoạn 2). Mỗi ca đánh dấu expectedFailure: khi sửa xong,
+    test báo "unexpected success" thì bỏ dòng đánh dấu để ca thành ca hồi quy thường."""
+
+    def setUp(self):
+        h.reset()
+        h.at(2026, 11, 20, 10)
+
+    @unittest.expectedFailure
+    def test_so_mo_ho_chuc_khong_ghi_6k(self):  # PR 2.2: "6 chục" = 60.000đ, hoặc hỏi lại
+        h.say("bún bò 6 chục")
+        self.assertNotIn(6_000, [e["tien"] for e in h.month_entries()])
+
+    @unittest.expectedFailure
+    def test_me_cho_tien_khong_ghi_la_chi(self):  # PR 2.3: tiền nhận được là thu, hoặc hỏi lại chiều
+        h.say("mẹ cho 500k")
+        self.assertFalse([e for e in h.month_entries() if e["nhom"] != "thu" and e["tien"] == 500_000])
+
+    @unittest.expectedFailure
+    def test_tang_luong_khong_ghi_la_thu(self):  # PR 2.3: thông tin tăng lương, không phải khoản tiền vừa về
+        h.say("tôi vừa được tăng lương lên 25tr")
+        self.assertEqual(h.month_entries(), [])
 
 
 if __name__ == "__main__":
